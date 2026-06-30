@@ -5,7 +5,7 @@ PartOf=graphical-session.target
 
 [Service]
 Type=simple
-ExecStart=/usr/bin/backlit-notification-daemon
+ExecStart=/usr/bin/backlit-notification-daemon --serve
 Environment=RUST_BACKTRACE=1
 SyslogIdentifier=backlit-notification-daemon
 StandardOutput=journal

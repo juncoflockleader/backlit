@@ -37,6 +37,7 @@ require_executable scripts/verify-launch-performance.sh
 require_executable scripts/verify-resource-budget.sh
 require_executable scripts/verify-notification-daemon.sh
 require_executable scripts/verify-settings-daemon.sh
+require_executable scripts/verify-service-lifecycle.sh
 require_executable scripts/verify-settings-app.sh
 require_executable scripts/verify-portal-security.sh
 require_executable scripts/verify-crash-logs.sh
@@ -101,6 +102,7 @@ require_contains scripts/verify-linux-e2e.sh './scripts/verify-launcher-desktop-
 require_contains scripts/verify-linux-e2e.sh './scripts/verify-resource-budget.sh'
 require_contains scripts/verify-linux-e2e.sh './scripts/verify-notification-daemon.sh'
 require_contains scripts/verify-linux-e2e.sh './scripts/verify-settings-daemon.sh'
+require_contains scripts/verify-linux-e2e.sh './scripts/verify-service-lifecycle.sh'
 require_contains scripts/verify-linux-e2e.sh './scripts/verify-settings-app.sh'
 require_contains scripts/verify-linux-e2e.sh './scripts/verify-portal-security.sh'
 require_contains scripts/verify-linux-e2e.sh './scripts/verify-crash-logs.sh'
@@ -139,10 +141,10 @@ require_contains scripts/verify-drm-session-smoke.sh '"input_broker_ready"'
 require_contains packaging/sessions/backlit.desktop 'Exec=backlit-session --backend=drm --activate-systemd'
 require_contains packaging/applications/org.backlit.Settings.desktop 'Exec=backlit-settings'
 require_contains packaging/systemd/backlit-session.target 'Wants=backlit-compositor.service backlit-shell.service backlit-notification-daemon.service backlit-settings-daemon.service'
-require_contains packaging/systemd/backlit-compositor.service 'ExecStart=/usr/bin/backlit-compositor'
-require_contains packaging/systemd/backlit-shell.service 'ExecStart=/usr/bin/backlit-shell'
-require_contains packaging/systemd/backlit-notification-daemon.service 'ExecStart=/usr/bin/backlit-notification-daemon'
-require_contains packaging/systemd/backlit-settings-daemon.service 'ExecStart=/usr/bin/backlit-settings-daemon'
+require_contains packaging/systemd/backlit-compositor.service 'ExecStart=/usr/bin/backlit-compositor --backend=drm --socket=backlit-0 --serve'
+require_contains packaging/systemd/backlit-shell.service 'ExecStart=/usr/bin/backlit-shell --component=all --socket=backlit-0 --serve'
+require_contains packaging/systemd/backlit-notification-daemon.service 'ExecStart=/usr/bin/backlit-notification-daemon --serve'
+require_contains packaging/systemd/backlit-settings-daemon.service 'ExecStart=/usr/bin/backlit-settings-daemon --serve'
 require_contains packaging/debian/control.stub 'Package: fastgui-session'
 
 artifact_manifests_checked=false
@@ -156,6 +158,7 @@ if [ -n "$artifact_root" ] && [ -d "$artifact_root" ]; then
   require_file "$artifact_root/resource-budget/manifest.json"
   require_file "$artifact_root/notification-daemon/manifest.json"
   require_file "$artifact_root/settings-daemon/manifest.json"
+  require_file "$artifact_root/service-lifecycle/manifest.json"
   require_file "$artifact_root/settings-app/manifest.json"
   require_file "$artifact_root/portal-security/manifest.json"
   require_file "$artifact_root/crash-logs/manifest.json"
@@ -246,6 +249,12 @@ if [ -n "$artifact_root" ] && [ -d "$artifact_root" ]; then
   require_contains "$artifact_root/settings-daemon/manifest.json" '"disruptive_power_actions_guarded": true'
   require_contains "$artifact_root/settings-daemon/manifest.json" '"suspend_action_ready": true'
   require_contains "$artifact_root/settings-daemon/manifest.json" '"shutdown_command": "systemctl poweroff"'
+  require_contains "$artifact_root/service-lifecycle/manifest.json" '"compositor_service_lifecycle": true'
+  require_contains "$artifact_root/service-lifecycle/manifest.json" '"shell_service_lifecycle": true'
+  require_contains "$artifact_root/service-lifecycle/manifest.json" '"notification_daemon_service_lifecycle": true'
+  require_contains "$artifact_root/service-lifecycle/manifest.json" '"settings_daemon_service_lifecycle": true'
+  require_contains "$artifact_root/service-lifecycle/manifest.json" '"bounded_service_exit": true'
+  require_contains "$artifact_root/service-lifecycle/manifest.json" '"systemd_service_mode": true'
   require_contains "$artifact_root/settings-app/manifest.json" '"launcher_target_ready": true'
   require_contains "$artifact_root/settings-app/manifest.json" '"display_panel": true'
   require_contains "$artifact_root/settings-app/manifest.json" '"input_panel": true'
@@ -346,6 +355,7 @@ cat > "$out_dir/manifest.json" <<EOF
     "compositor_service_ready": true,
     "notification_daemon": true,
     "settings_daemon": true,
+    "service_lifecycle": true,
     "settings_app": true,
     "portal_security": true,
     "crash_logs": true,

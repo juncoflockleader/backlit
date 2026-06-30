@@ -17,6 +17,8 @@ fn run() -> Result<(), String> {
     let mut verify = false;
     let mut help = false;
     let mut idle_probe_ms = None;
+    let mut serve = false;
+    let mut serve_for_ms = None;
 
     let mut args = env::args().skip(1);
     while let Some(arg) = args.next() {
@@ -24,6 +26,8 @@ fn run() -> Result<(), String> {
             help = true;
         } else if arg == "--verify" {
             verify = true;
+        } else if arg == "--serve" {
+            serve = true;
         } else if let Some(value) = arg.strip_prefix("--idle-probe-ms=") {
             idle_probe_ms = Some(parse_u64("--idle-probe-ms", value)?);
         } else if arg == "--idle-probe-ms" {
@@ -31,6 +35,15 @@ fn run() -> Result<(), String> {
                 .next()
                 .ok_or_else(|| String::from("missing value for --idle-probe-ms"))?;
             idle_probe_ms = Some(parse_u64("--idle-probe-ms", &value)?);
+        } else if let Some(value) = arg.strip_prefix("--serve-for-ms=") {
+            serve = true;
+            serve_for_ms = Some(parse_u64("--serve-for-ms", value)?);
+        } else if arg == "--serve-for-ms" {
+            let value = args
+                .next()
+                .ok_or_else(|| String::from("missing value for --serve-for-ms"))?;
+            serve = true;
+            serve_for_ms = Some(parse_u64("--serve-for-ms", &value)?);
         } else {
             return Err(format!("unknown flag: {arg}"));
         }
@@ -153,6 +166,37 @@ fn run() -> Result<(), String> {
         );
     }
 
+    if serve {
+        println!(
+            "{}",
+            event_json(
+                "settings_daemon.service_running",
+                &[
+                    ("bounded", FieldValue::Bool(serve_for_ms.is_some())),
+                    ("serve_for_ms", FieldValue::U64(serve_for_ms.unwrap_or(0))),
+                ],
+            )
+        );
+
+        if let Some(duration_ms) = serve_for_ms {
+            thread::sleep(Duration::from_millis(duration_ms));
+            println!(
+                "{}",
+                event_json(
+                    "settings_daemon.service_exit",
+                    &[
+                        ("bounded", FieldValue::Bool(true)),
+                        ("serve_for_ms", FieldValue::U64(duration_ms)),
+                    ],
+                )
+            );
+        } else {
+            loop {
+                thread::sleep(Duration::from_secs(3600));
+            }
+        }
+    }
+
     Ok(())
 }
 
@@ -174,10 +218,11 @@ fn print_help() {
 backlit-settings-daemon
 
 Usage:
-  backlit-settings-daemon [--verify] [--idle-probe-ms=1000]
+  backlit-settings-daemon [--verify] [--serve] [--serve-for-ms=1000] [--idle-probe-ms=1000]
 
 Flags:
   --verify  Fail if display, input, power policy, and power action verification fails.
+  --serve   Stay alive after verification for systemd session service mode.
 "
     );
 }

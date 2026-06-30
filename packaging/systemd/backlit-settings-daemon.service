@@ -5,7 +5,7 @@ PartOf=graphical-session.target
 
 [Service]
 Type=simple
-ExecStart=/usr/bin/backlit-settings-daemon
+ExecStart=/usr/bin/backlit-settings-daemon --serve
 Environment=RUST_BACKTRACE=1
 SyslogIdentifier=backlit-settings-daemon
 StandardOutput=journal

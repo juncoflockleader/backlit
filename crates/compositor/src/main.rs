@@ -101,6 +101,36 @@ fn run() -> Result<(), String> {
         );
     }
 
+    if config.serve {
+        emit(
+            "compositor.service_running",
+            &config,
+            &[
+                ("bounded", FieldValue::Bool(config.serve_for_ms.is_some())),
+                (
+                    "serve_for_ms",
+                    FieldValue::U64(config.serve_for_ms.unwrap_or(0)),
+                ),
+            ],
+        );
+
+        if let Some(duration_ms) = config.serve_for_ms {
+            thread::sleep(Duration::from_millis(duration_ms));
+            emit(
+                "compositor.service_exit",
+                &config,
+                &[
+                    ("bounded", FieldValue::Bool(true)),
+                    ("serve_for_ms", FieldValue::U64(duration_ms)),
+                ],
+            );
+        } else {
+            loop {
+                thread::sleep(Duration::from_secs(3600));
+            }
+        }
+    }
+
     emit(
         "compositor.exit",
         &config,
@@ -694,12 +724,14 @@ fn print_help() {
 backlit-compositor
 
 Usage:
-  backlit-compositor [--backend=headless|wayland|drm] [--socket=backlit-0] [--smoke-test] [--idle-probe-ms=1000]
+  backlit-compositor [--backend=headless|wayland|drm] [--socket=backlit-0] [--smoke-test] [--serve] [--serve-for-ms=1000] [--idle-probe-ms=1000]
 
 Flags:
   --backend      Select compositor backend. Defaults to headless.
   --socket       Wayland socket name to create or target. Defaults to backlit-0.
   --smoke-test   Run the current MVP 0 policy/metrics smoke test and exit.
+  --serve        Stay alive after readiness for systemd session service mode.
+  --serve-for-ms Stay alive for a bounded service-lifecycle probe duration.
   --idle-probe-ms
                  Stay alive without doing work for bounded resource sampling.
   --help         Show this help text.

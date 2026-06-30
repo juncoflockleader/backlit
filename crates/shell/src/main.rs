@@ -21,6 +21,8 @@ fn run() -> Result<(), String> {
     let mut component = ComponentSelection::One(ShellSurfaceRole::Panel);
     let mut verify = false;
     let mut idle_probe_ms = None;
+    let mut serve = false;
+    let mut serve_for_ms = None;
 
     let mut args = env::args().skip(1);
     while let Some(arg) = args.next() {
@@ -29,6 +31,8 @@ fn run() -> Result<(), String> {
             return Ok(());
         } else if arg == "--verify" {
             verify = true;
+        } else if arg == "--serve" {
+            serve = true;
         } else if let Some(value) = arg.strip_prefix("--idle-probe-ms=") {
             idle_probe_ms = Some(parse_u64("--idle-probe-ms", value)?);
         } else if arg == "--idle-probe-ms" {
@@ -36,6 +40,15 @@ fn run() -> Result<(), String> {
                 .next()
                 .ok_or_else(|| String::from("missing value for --idle-probe-ms"))?;
             idle_probe_ms = Some(parse_u64("--idle-probe-ms", &value)?);
+        } else if let Some(value) = arg.strip_prefix("--serve-for-ms=") {
+            serve = true;
+            serve_for_ms = Some(parse_u64("--serve-for-ms", value)?);
+        } else if arg == "--serve-for-ms" {
+            let value = args
+                .next()
+                .ok_or_else(|| String::from("missing value for --serve-for-ms"))?;
+            serve = true;
+            serve_for_ms = Some(parse_u64("--serve-for-ms", &value)?);
         } else if let Some(value) = arg.strip_prefix("--socket=") {
             socket = value.to_string();
         } else if arg == "--socket" {
@@ -298,6 +311,41 @@ fn run() -> Result<(), String> {
         );
     }
 
+    if serve {
+        println!(
+            "{}",
+            event_json(
+                "shell.service_running",
+                &[
+                    ("socket", FieldValue::Str(socket.as_str())),
+                    ("components", FieldValue::U64(components.len() as u64)),
+                    ("bounded", FieldValue::Bool(serve_for_ms.is_some())),
+                    ("serve_for_ms", FieldValue::U64(serve_for_ms.unwrap_or(0))),
+                ],
+            )
+        );
+
+        if let Some(duration_ms) = serve_for_ms {
+            thread::sleep(Duration::from_millis(duration_ms));
+            println!(
+                "{}",
+                event_json(
+                    "shell.service_exit",
+                    &[
+                        ("socket", FieldValue::Str(socket.as_str())),
+                        ("components", FieldValue::U64(components.len() as u64)),
+                        ("bounded", FieldValue::Bool(true)),
+                        ("serve_for_ms", FieldValue::U64(duration_ms)),
+                    ],
+                )
+            );
+        } else {
+            loop {
+                thread::sleep(Duration::from_secs(3600));
+            }
+        }
+    }
+
     Ok(())
 }
 
@@ -352,7 +400,7 @@ fn print_help() {
 backlit-shell
 
 Usage:
-  backlit-shell [--component=all|panel|launcher|wallpaper|app-switcher|notification-host|lock-screen] [--socket=backlit-0] [--verify] [--idle-probe-ms=1000]
+  backlit-shell [--component=all|panel|launcher|wallpaper|app-switcher|notification-host|lock-screen] [--socket=backlit-0] [--verify] [--serve] [--serve-for-ms=1000] [--idle-probe-ms=1000]
 "
     );
 }

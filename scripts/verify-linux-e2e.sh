@@ -12,6 +12,7 @@ launcher_desktop_dir="$out_dir/launcher-desktop-discovery"
 resource_budget_dir="$out_dir/resource-budget"
 notification_daemon_dir="$out_dir/notification-daemon"
 settings_daemon_dir="$out_dir/settings-daemon"
+service_lifecycle_dir="$out_dir/service-lifecycle"
 settings_app_dir="$out_dir/settings-app"
 portal_security_dir="$out_dir/portal-security"
 crash_logs_dir="$out_dir/crash-logs"
@@ -41,6 +42,7 @@ cargo clippy --workspace --all-targets -- -D warnings
 ./scripts/verify-resource-budget.sh "$resource_budget_dir"
 ./scripts/verify-notification-daemon.sh "$notification_daemon_dir"
 ./scripts/verify-settings-daemon.sh "$settings_daemon_dir"
+./scripts/verify-service-lifecycle.sh "$service_lifecycle_dir"
 ./scripts/verify-settings-app.sh "$settings_app_dir"
 ./scripts/verify-portal-security.sh "$portal_security_dir"
 ./scripts/verify-crash-logs.sh "$crash_logs_dir"
@@ -79,6 +81,7 @@ cat > "$out_dir/manifest.json" <<EOF
     "resource_budget_manifest": "$resource_budget_dir/manifest.json",
     "notification_daemon_manifest": "$notification_daemon_dir/manifest.json",
     "settings_daemon_manifest": "$settings_daemon_dir/manifest.json",
+    "service_lifecycle_manifest": "$service_lifecycle_dir/manifest.json",
     "settings_app_manifest": "$settings_app_dir/manifest.json",
     "portal_security_manifest": "$portal_security_dir/manifest.json",
     "crash_logs_manifest": "$crash_logs_dir/manifest.json",
@@ -104,6 +107,7 @@ cat > "$out_dir/manifest.json" <<EOF
     "resource_budget": true,
     "notification_daemon": true,
     "settings_daemon": true,
+    "service_lifecycle": true,
     "settings_app": true,
     "portal_security": true,
     "crash_logs": true,

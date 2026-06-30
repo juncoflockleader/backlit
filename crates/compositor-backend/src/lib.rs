@@ -720,6 +720,8 @@ pub struct RunConfig {
     pub backend: BackendKind,
     pub socket: String,
     pub smoke_test: bool,
+    pub serve: bool,
+    pub serve_for_ms: Option<u64>,
     pub idle_probe_ms: Option<u64>,
     pub help: bool,
 }
@@ -730,6 +732,8 @@ impl Default for RunConfig {
             backend: BackendKind::Headless,
             socket: String::from("backlit-0"),
             smoke_test: false,
+            serve: false,
+            serve_for_ms: None,
             idle_probe_ms: None,
             help: false,
         }
@@ -768,6 +772,8 @@ where
             config.help = true;
         } else if arg == "--smoke-test" {
             config.smoke_test = true;
+        } else if arg == "--serve" {
+            config.serve = true;
         } else if let Some(value) = arg.strip_prefix("--backend=") {
             config.backend = parse_backend(value)?;
         } else if arg == "--backend" {
@@ -784,6 +790,15 @@ where
                 .next()
                 .ok_or(ArgError::MissingValue("--idle-probe-ms"))?;
             config.idle_probe_ms = Some(parse_u64("--idle-probe-ms", &value)?);
+        } else if let Some(value) = arg.strip_prefix("--serve-for-ms=") {
+            config.serve = true;
+            config.serve_for_ms = Some(parse_u64("--serve-for-ms", value)?);
+        } else if arg == "--serve-for-ms" {
+            let value = args
+                .next()
+                .ok_or(ArgError::MissingValue("--serve-for-ms"))?;
+            config.serve = true;
+            config.serve_for_ms = Some(parse_u64("--serve-for-ms", &value)?);
         } else {
             return Err(ArgError::UnknownFlag(arg));
         }
@@ -1082,6 +1097,8 @@ mod tests {
             "--smoke-test",
             "--idle-probe-ms",
             "250",
+            "--serve",
+            "--serve-for-ms=25",
         ])
         .unwrap();
 
@@ -1089,6 +1106,8 @@ mod tests {
         assert_eq!(config.socket, "backlit-test");
         assert!(config.smoke_test);
         assert_eq!(config.idle_probe_ms, Some(250));
+        assert!(config.serve);
+        assert_eq!(config.serve_for_ms, Some(25));
     }
 
     #[test]

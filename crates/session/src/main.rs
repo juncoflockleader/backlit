@@ -1018,22 +1018,24 @@ fn systemd_unit_contracts() -> [SystemdUnitContract; 4] {
     [
         SystemdUnitContract {
             unit_name: "backlit-compositor.service",
-            exec_start: "ExecStart=/usr/bin/backlit-compositor --backend=drm --socket=backlit-0",
+            exec_start:
+                "ExecStart=/usr/bin/backlit-compositor --backend=drm --socket=backlit-0 --serve",
             after: "After=graphical-session-pre.target",
         },
         SystemdUnitContract {
             unit_name: "backlit-shell.service",
-            exec_start: "ExecStart=/usr/bin/backlit-shell --component=all --socket=backlit-0",
+            exec_start:
+                "ExecStart=/usr/bin/backlit-shell --component=all --socket=backlit-0 --serve",
             after: "After=backlit-compositor.service",
         },
         SystemdUnitContract {
             unit_name: "backlit-notification-daemon.service",
-            exec_start: "ExecStart=/usr/bin/backlit-notification-daemon",
+            exec_start: "ExecStart=/usr/bin/backlit-notification-daemon --serve",
             after: "After=backlit-compositor.service",
         },
         SystemdUnitContract {
             unit_name: "backlit-settings-daemon.service",
-            exec_start: "ExecStart=/usr/bin/backlit-settings-daemon",
+            exec_start: "ExecStart=/usr/bin/backlit-settings-daemon --serve",
             after: "After=backlit-compositor.service",
         },
     ]
@@ -2058,28 +2060,28 @@ mod tests {
             "backlit-compositor.service",
             "Backlit Wayland compositor",
             "After=graphical-session-pre.target",
-            "ExecStart=/usr/bin/backlit-compositor --backend=drm --socket=backlit-0",
+            "ExecStart=/usr/bin/backlit-compositor --backend=drm --socket=backlit-0 --serve",
         );
         write_unit(
             &unit_dir,
             "backlit-shell.service",
             "Backlit shell",
             "After=backlit-compositor.service",
-            "ExecStart=/usr/bin/backlit-shell --component=all --socket=backlit-0",
+            "ExecStart=/usr/bin/backlit-shell --component=all --socket=backlit-0 --serve",
         );
         write_unit(
             &unit_dir,
             "backlit-notification-daemon.service",
             "Backlit notification daemon",
             "After=backlit-compositor.service",
-            "ExecStart=/usr/bin/backlit-notification-daemon",
+            "ExecStart=/usr/bin/backlit-notification-daemon --serve",
         );
         write_unit(
             &unit_dir,
             "backlit-settings-daemon.service",
             "Backlit settings daemon",
             "After=backlit-compositor.service",
-            "ExecStart=/usr/bin/backlit-settings-daemon",
+            "ExecStart=/usr/bin/backlit-settings-daemon --serve",
         );
 
         let report = verify_systemd_units(&unit_dir);
@@ -2153,7 +2155,7 @@ mod tests {
             "backlit-compositor.service",
             "Backlit Wayland compositor",
             "After=graphical-session-pre.target",
-            "ExecStart=/usr/bin/backlit-compositor --backend=drm --socket=backlit-0",
+            "ExecStart=/usr/bin/backlit-compositor --backend=drm --socket=backlit-0 --serve",
         );
 
         let report = verify_systemd_units(&unit_dir);

@@ -33,6 +33,7 @@ MVP 0 is the development harness:
 - Deterministic demo GUI renderer.
 - Headless session launch verification.
 - Backlit user systemd target and dry-run session launch plan for starting/stopping runtime services.
+- Long-lived `--serve` mode for compositor, shell, notification daemon, and settings daemon, with bounded lifecycle probes for automation.
 - Viewable GUI preview renderer with verified session services.
 - Parallels GUI preview export from Ubuntu guest artifacts to the host workspace.
 - Basic MVP protocol smoke registry.
