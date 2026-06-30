@@ -14,7 +14,7 @@ cargo run -p backlit-compositor-backend -- --backend=headless --verify > "$out_d
 cargo run -p backlit-protocols -- --verify --list > "$out_dir/protocols.jsonl"
 cargo run -p backlit-perf -- --verify > "$out_dir/perf.jsonl"
 cargo run -p backlit-shell -- --component=all --socket=backlit-0 --verify > "$out_dir/shell.jsonl"
-cargo run -p backlit-launcher -- --verify --list --target=terminal --desktop-dir=crates/launcher/fixtures > "$out_dir/launcher.jsonl"
+cargo run -p backlit-launcher -- --verify --list --target=terminal --desktop-dir=crates/launcher/fixtures --require-desktop-entries > "$out_dir/launcher.jsonl"
 cargo run -p backlit-launcher -- \
   --verify \
   --target=terminal \

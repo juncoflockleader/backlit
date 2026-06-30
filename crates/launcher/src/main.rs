@@ -3,8 +3,8 @@ use std::process::{self, Command};
 
 use backlit_common::metrics::{event_json, FieldValue};
 use backlit_launcher::{
-    default_catalog, discover_desktop_entries, resolve_command, verify_catalog, LaunchCommand,
-    LaunchTarget,
+    default_catalog, default_desktop_entry_dirs, discover_desktop_entries_in_dirs, resolve_command,
+    verify_catalog, LaunchCommand, LaunchTarget,
 };
 
 fn main() {
@@ -89,10 +89,13 @@ fn run() -> Result<(), String> {
         }
     }
 
-    let desktop_entries = if let Some(desktop_dir) = config.desktop_dir.as_deref() {
-        let entries = discover_desktop_entries(desktop_dir).map_err(|error| {
-            format!("failed to discover desktop entries in {desktop_dir}: {error}")
-        })?;
+    let (desktop_entries, desktop_dirs, default_desktop_dirs) = if config.no_desktop_discovery {
+        (0, 0, false)
+    } else {
+        let (dirs, default_desktop_dirs) = config.desktop_dirs();
+        let desktop_dirs = dirs.len();
+        let entries = discover_desktop_entries_in_dirs(&dirs)
+            .map_err(|error| format!("failed to discover desktop entries: {error}"))?;
 
         for entry in &entries {
             println!(
@@ -109,10 +112,22 @@ fn run() -> Result<(), String> {
             );
         }
 
-        entries.len()
-    } else {
-        0
+        (entries.len(), desktop_dirs, default_desktop_dirs)
     };
+
+    println!(
+        "{}",
+        event_json(
+            "launcher.desktop_discovery",
+            &[
+                ("enabled", FieldValue::Bool(!config.no_desktop_discovery),),
+                ("default_dirs", FieldValue::Bool(default_desktop_dirs)),
+                ("dirs", FieldValue::U64(desktop_dirs as u64)),
+                ("entries", FieldValue::U64(desktop_entries as u64)),
+                ("required", FieldValue::Bool(config.require_desktop_entries),),
+            ],
+        )
+    );
 
     let report = verify_catalog(&catalog);
     println!(
@@ -138,11 +153,17 @@ fn run() -> Result<(), String> {
                     FieldValue::U64(report.empty_programs.len() as u64),
                 ),
                 ("desktop_entries", FieldValue::U64(desktop_entries as u64)),
+                ("desktop_dirs", FieldValue::U64(desktop_dirs as u64)),
+                (
+                    "host_desktop_discovery",
+                    FieldValue::Bool(default_desktop_dirs),
+                ),
             ],
         )
     );
 
-    if config.verify && (!report.passed() || config.desktop_dir.is_some() && desktop_entries == 0) {
+    if config.verify && (!report.passed() || config.require_desktop_entries && desktop_entries == 0)
+    {
         return Err(String::from("launcher catalog verification failed"));
     }
 
@@ -152,10 +173,12 @@ fn run() -> Result<(), String> {
 #[derive(Debug, Clone, PartialEq, Eq, Default)]
 struct Config {
     target: Option<LaunchTarget>,
-    desktop_dir: Option<String>,
+    desktop_dirs: Vec<String>,
     spawn_program: Option<String>,
     spawn_args: Vec<String>,
     wayland_display: Option<String>,
+    no_desktop_discovery: bool,
+    require_desktop_entries: bool,
     spawn_smoke: bool,
     list: bool,
     verify: bool,
@@ -188,12 +211,16 @@ impl Config {
                     .ok_or_else(|| String::from("missing value for --target"))?;
                 config.target = Some(parse_target(&value)?);
             } else if let Some(value) = arg.strip_prefix("--desktop-dir=") {
-                config.desktop_dir = Some(value.to_string());
+                config.desktop_dirs.push(value.to_string());
             } else if arg == "--desktop-dir" {
-                config.desktop_dir = Some(
+                config.desktop_dirs.push(
                     args.next()
                         .ok_or_else(|| String::from("missing value for --desktop-dir"))?,
                 );
+            } else if arg == "--no-desktop-discovery" {
+                config.no_desktop_discovery = true;
+            } else if arg == "--require-desktop-entries" {
+                config.require_desktop_entries = true;
             } else if let Some(value) = arg.strip_prefix("--spawn-program=") {
                 config.spawn_program = Some(value.to_string());
             } else if arg == "--spawn-program" {
@@ -221,6 +248,20 @@ impl Config {
         }
 
         Ok(config)
+    }
+
+    fn desktop_dirs(&self) -> (Vec<std::path::PathBuf>, bool) {
+        if self.desktop_dirs.is_empty() {
+            (default_desktop_entry_dirs(), true)
+        } else {
+            (
+                self.desktop_dirs
+                    .iter()
+                    .map(std::path::PathBuf::from)
+                    .collect(),
+                false,
+            )
+        }
     }
 }
 
@@ -289,7 +330,9 @@ Flags:
   --verify  Fail if the required launch catalog is incomplete.
   --list    Emit the required launch catalog as JSON.
   --target  Resolve a single target in dry-run mode.
-  --desktop-dir  Discover visible .desktop application entries from DIR.
+  --desktop-dir  Discover visible .desktop application entries from DIR. May repeat. Defaults to XDG app dirs.
+  --no-desktop-discovery  Skip .desktop application discovery.
+  --require-desktop-entries  Fail verification if no visible .desktop entries are discovered.
   --spawn-smoke  Spawn the selected launch target or override program and verify it exits successfully.
   --spawn-program  Program override for deterministic spawn verification.
   --spawn-arg  Argument for the spawn program override. May be passed more than once.
@@ -310,6 +353,9 @@ mod tests {
             "--spawn-smoke",
             "--spawn-program",
             "true",
+            "--desktop-dir",
+            "crates/launcher/fixtures",
+            "--require-desktop-entries",
             "--spawn-arg",
             "--help",
             "--wayland-display",
@@ -319,6 +365,8 @@ mod tests {
 
         assert!(config.spawn_smoke);
         assert_eq!(config.spawn_program.as_deref(), Some("true"));
+        assert_eq!(config.desktop_dirs, ["crates/launcher/fixtures"]);
+        assert!(config.require_desktop_entries);
         assert_eq!(config.spawn_args, ["--help"]);
         assert_eq!(config.wayland_display.as_deref(), Some("wayland-1"));
     }

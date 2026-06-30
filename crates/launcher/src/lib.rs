@@ -1,6 +1,7 @@
+use std::collections::HashSet;
 use std::fs;
 use std::io;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::str::FromStr;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -248,6 +249,65 @@ pub fn discover_desktop_entries(dir: impl AsRef<Path>) -> io::Result<Vec<Desktop
     Ok(entries)
 }
 
+pub fn discover_desktop_entries_in_dirs<I, P>(dirs: I) -> io::Result<Vec<DesktopEntry>>
+where
+    I: IntoIterator<Item = P>,
+    P: AsRef<Path>,
+{
+    let mut seen = HashSet::new();
+    let mut entries = Vec::new();
+
+    for dir in dirs {
+        match discover_desktop_entries(dir.as_ref()) {
+            Ok(discovered) => {
+                for entry in discovered {
+                    if seen.insert(entry.id.clone()) {
+                        entries.push(entry);
+                    }
+                }
+            }
+            Err(error) if error.kind() == io::ErrorKind::NotFound => {}
+            Err(error) => return Err(error),
+        }
+    }
+
+    Ok(entries)
+}
+
+pub fn default_desktop_entry_dirs() -> Vec<PathBuf> {
+    default_desktop_entry_dirs_from(
+        std::env::var("HOME").ok().as_deref(),
+        std::env::var("XDG_DATA_HOME").ok().as_deref(),
+        std::env::var("XDG_DATA_DIRS").ok().as_deref(),
+    )
+}
+
+fn default_desktop_entry_dirs_from(
+    home: Option<&str>,
+    xdg_data_home: Option<&str>,
+    xdg_data_dirs: Option<&str>,
+) -> Vec<PathBuf> {
+    let mut dirs = Vec::new();
+
+    if let Some(xdg_data_home) = xdg_data_home.filter(|value| !value.trim().is_empty()) {
+        dirs.push(Path::new(xdg_data_home).join("applications"));
+    } else if let Some(home) = home.filter(|value| !value.trim().is_empty()) {
+        dirs.push(Path::new(home).join(".local/share/applications"));
+    }
+
+    let data_dirs = xdg_data_dirs
+        .filter(|value| !value.trim().is_empty())
+        .unwrap_or("/usr/local/share:/usr/share");
+    for dir in data_dirs
+        .split(':')
+        .filter(|value| !value.trim().is_empty())
+    {
+        dirs.push(Path::new(dir).join("applications"));
+    }
+
+    dirs
+}
+
 fn strip_exec_field_codes(value: &str) -> String {
     value
         .split_whitespace()
@@ -259,9 +319,12 @@ fn strip_exec_field_codes(value: &str) -> String {
 #[cfg(test)]
 mod tests {
     use super::{
-        default_catalog, parse_desktop_entry, resolve_command, verify_catalog, DesktopEntryError,
-        LaunchTarget, REQUIRED_TARGETS,
+        default_catalog, default_desktop_entry_dirs_from, discover_desktop_entries_in_dirs,
+        parse_desktop_entry, resolve_command, verify_catalog, DesktopEntryError, LaunchTarget,
+        REQUIRED_TARGETS,
     };
+    use std::fs;
+    use std::time::{SystemTime, UNIX_EPOCH};
 
     #[test]
     fn default_catalog_covers_required_targets() {
@@ -332,5 +395,79 @@ NoDisplay=true
         .unwrap_err();
 
         assert_eq!(error, DesktopEntryError::Hidden);
+    }
+
+    #[test]
+    fn builds_default_desktop_entry_dirs_from_xdg_environment() {
+        let dirs = default_desktop_entry_dirs_from(
+            Some("/home/backlit"),
+            Some("/tmp/backlit-data"),
+            Some("/opt/share:/usr/share"),
+        );
+
+        assert_eq!(
+            dirs,
+            vec![
+                std::path::PathBuf::from("/tmp/backlit-data/applications"),
+                std::path::PathBuf::from("/opt/share/applications"),
+                std::path::PathBuf::from("/usr/share/applications"),
+            ]
+        );
+    }
+
+    #[test]
+    fn discovers_desktop_entries_across_dirs_with_user_precedence() {
+        let root = unique_test_dir("launcher-desktop-dirs");
+        let user_dir = root.join("user");
+        let system_dir = root.join("system");
+        fs::create_dir_all(&user_dir).expect("user dir should be created");
+        fs::create_dir_all(&system_dir).expect("system dir should be created");
+        fs::write(
+            user_dir.join("org.backlit.Terminal.desktop"),
+            "\
+[Desktop Entry]
+Type=Application
+Name=User Terminal
+Exec=user-terminal
+",
+        )
+        .expect("user entry should be written");
+        fs::write(
+            system_dir.join("org.backlit.Terminal.desktop"),
+            "\
+[Desktop Entry]
+Type=Application
+Name=System Terminal
+Exec=system-terminal
+",
+        )
+        .expect("system duplicate should be written");
+        fs::write(
+            system_dir.join("org.backlit.Browser.desktop"),
+            "\
+[Desktop Entry]
+Type=Application
+Name=Browser
+Exec=browser %U
+",
+        )
+        .expect("system entry should be written");
+
+        let entries = discover_desktop_entries_in_dirs([user_dir, system_dir])
+            .expect("desktop entries should be discovered");
+
+        assert_eq!(entries.len(), 2);
+        assert_eq!(entries[0].name, "User Terminal");
+        assert_eq!(entries[0].exec, "user-terminal");
+        assert_eq!(entries[1].name, "Browser");
+        assert_eq!(entries[1].exec, "browser");
+    }
+
+    fn unique_test_dir(name: &str) -> std::path::PathBuf {
+        let nanos = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .expect("test time should be after epoch")
+            .as_nanos();
+        std::env::temp_dir().join(format!("backlit-{name}-{}-{nanos}", std::process::id()))
     }
 }

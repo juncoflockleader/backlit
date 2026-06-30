@@ -31,6 +31,7 @@ require_file Cargo.toml
 require_file backlit-design.md
 require_file docs/architecture/mvp-0.md
 require_executable scripts/verify-gui-smoke.sh
+require_executable scripts/verify-launcher-desktop-discovery.sh
 require_executable scripts/render-gui-preview.sh
 require_executable scripts/verify-launch-performance.sh
 require_executable scripts/verify-resource-budget.sh
@@ -70,6 +71,7 @@ require_contains scripts/verify-gui-smoke.sh 'cargo run -p backlit-demo-client -
 require_contains scripts/verify-gui-smoke.sh 'cargo run -p backlit-notification-daemon -- --verify'
 require_contains scripts/verify-gui-smoke.sh 'cargo run -p backlit-settings-daemon -- --verify'
 require_contains scripts/verify-gui-smoke.sh 'cargo run -p backlit-portal-backend -- --verify'
+require_contains scripts/verify-gui-smoke.sh '--require-desktop-entries'
 require_contains scripts/verify-gui-smoke.sh '"shell_panel_status": true'
 require_contains scripts/verify-gui-smoke.sh '"shell_network_status": true'
 require_contains scripts/verify-gui-smoke.sh '"shell_audio_status": true'
@@ -82,6 +84,7 @@ require_contains scripts/verify-launch-performance.sh '"name": "backlit-launch-p
 require_contains scripts/verify-linux-e2e.sh './scripts/verify-nested-wayland-smoke.sh'
 require_contains scripts/verify-linux-e2e.sh './scripts/render-gui-preview.sh'
 require_contains scripts/verify-linux-e2e.sh './scripts/verify-launch-performance.sh'
+require_contains scripts/verify-linux-e2e.sh './scripts/verify-launcher-desktop-discovery.sh'
 require_contains scripts/verify-linux-e2e.sh './scripts/verify-resource-budget.sh'
 require_contains scripts/verify-linux-e2e.sh './scripts/verify-notification-daemon.sh'
 require_contains scripts/verify-linux-e2e.sh './scripts/verify-settings-daemon.sh'
@@ -119,6 +122,7 @@ if [ -n "$artifact_root" ] && [ -d "$artifact_root" ]; then
   require_file "$artifact_root/gui-smoke/manifest.json"
   require_file "$artifact_root/gui-preview/manifest.json"
   require_file "$artifact_root/launch-performance/manifest.json"
+  require_file "$artifact_root/launcher-desktop-discovery/manifest.json"
   require_file "$artifact_root/resource-budget/manifest.json"
   require_file "$artifact_root/notification-daemon/manifest.json"
   require_file "$artifact_root/settings-daemon/manifest.json"
@@ -172,6 +176,8 @@ if [ -n "$artifact_root" ] && [ -d "$artifact_root" ]; then
   require_contains "$artifact_root/launch-performance/manifest.json" '"shell_ready_budget": true'
   require_contains "$artifact_root/launch-performance/manifest.json" '"notification_service": true'
   require_contains "$artifact_root/launch-performance/manifest.json" '"settings_service": true'
+  require_contains "$artifact_root/launcher-desktop-discovery/manifest.json" '"fixture_desktop_discovery": true'
+  require_contains "$artifact_root/launcher-desktop-discovery/manifest.json" '"host_default_desktop_discovery": true'
   require_contains "$artifact_root/resource-budget/manifest.json" '"name": "backlit-resource-budget"'
   if grep '"resource_budget_checked": true' "$artifact_root/resource-budget/manifest.json" >/dev/null; then
     require_contains "$artifact_root/resource-budget/manifest.json" '"idle_cpu_budget": true'
@@ -261,6 +267,7 @@ cat > "$out_dir/manifest.json" <<EOF
     "demo_client": true,
     "performance_smoke": true,
     "launch_performance": true,
+    "launcher_desktop_discovery": true,
     "resource_budget": true,
     "notification_daemon": true,
     "settings_daemon": true,

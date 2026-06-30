@@ -8,6 +8,7 @@ out_dir="${1:-target/linux-e2e}"
 smoke_dir="$out_dir/gui-smoke"
 preview_dir="$out_dir/gui-preview"
 launch_performance_dir="$out_dir/launch-performance"
+launcher_desktop_dir="$out_dir/launcher-desktop-discovery"
 resource_budget_dir="$out_dir/resource-budget"
 notification_daemon_dir="$out_dir/notification-daemon"
 settings_daemon_dir="$out_dir/settings-daemon"
@@ -34,6 +35,7 @@ cargo clippy --workspace --all-targets -- -D warnings
 ./scripts/verify-gui-smoke.sh "$smoke_dir"
 ./scripts/render-gui-preview.sh "$preview_dir"
 ./scripts/verify-launch-performance.sh "$launch_performance_dir"
+./scripts/verify-launcher-desktop-discovery.sh "$launcher_desktop_dir"
 ./scripts/verify-resource-budget.sh "$resource_budget_dir"
 ./scripts/verify-notification-daemon.sh "$notification_daemon_dir"
 ./scripts/verify-settings-daemon.sh "$settings_daemon_dir"
@@ -69,6 +71,7 @@ cat > "$out_dir/manifest.json" <<EOF
     "gui_smoke_manifest": "$smoke_dir/manifest.json",
     "gui_preview_manifest": "$preview_dir/manifest.json",
     "launch_performance_manifest": "$launch_performance_dir/manifest.json",
+    "launcher_desktop_discovery_manifest": "$launcher_desktop_dir/manifest.json",
     "resource_budget_manifest": "$resource_budget_dir/manifest.json",
     "notification_daemon_manifest": "$notification_daemon_dir/manifest.json",
     "settings_daemon_manifest": "$settings_daemon_dir/manifest.json",
@@ -91,6 +94,7 @@ cat > "$out_dir/manifest.json" <<EOF
     "gui_smoke": true,
     "gui_preview": true,
     "launch_performance": true,
+    "launcher_desktop_discovery": true,
     "resource_budget": true,
     "notification_daemon": true,
     "settings_daemon": true,

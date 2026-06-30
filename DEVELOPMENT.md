@@ -130,7 +130,7 @@ The Linux-side verifier can also be run directly inside any Ubuntu checkout:
 ./scripts/verify-linux-e2e.sh
 ```
 
-It runs `cargo fmt`, workspace tests, `cargo clippy`, the deterministic GUI smoke verifier, the preview renderer, launch-performance verifier, resource-budget verifier, notification-daemon verifier, settings-daemon verifier, portal-security verifier, crash-log verifier, CI contract verifier, packaging contract verifier, staged session install verifier, launch-readiness verifier, session launch verifier, session clean-exit verifier, nested Wayland smoke verifier, and MVP 0 contract verifier, then writes `target/linux-e2e/manifest.json`.
+It runs `cargo fmt`, workspace tests, `cargo clippy`, the deterministic GUI smoke verifier, the preview renderer, launch-performance verifier, launcher desktop discovery verifier, resource-budget verifier, notification-daemon verifier, settings-daemon verifier, portal-security verifier, crash-log verifier, CI contract verifier, packaging contract verifier, staged session install verifier, launch-readiness verifier, session launch verifier, session clean-exit verifier, nested Wayland smoke verifier, and MVP 0 contract verifier, then writes `target/linux-e2e/manifest.json`.
 
 ## GUI Linux VM Workflow
 
@@ -301,7 +301,7 @@ The default GUI render is guarded by checksum `5635038614353063225`; update it o
 
 The launcher catalog is verified in dry-run mode for the first required targets: terminal, browser, and settings.
 
-The launcher also parses visible `.desktop` entries from a fixture directory in smoke tests, so freedesktop app discovery has a regression path before a full app indexer exists.
+The launcher discovers visible `.desktop` entries from XDG application directories by default. Smoke tests keep a fixture directory for deterministic parser coverage, while `verify-launcher-desktop-discovery.sh` also checks host app discovery and requires visible entries on Linux hosts that actually have desktop files installed.
 
 Launcher spawn verification proves the selected target can start a process with `WAYLAND_DISPLAY` set. In nested Wayland E2E this uses the parent Weston socket and the available Wayland info client as the spawned command.
 
