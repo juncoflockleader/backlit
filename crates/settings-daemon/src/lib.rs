@@ -83,6 +83,94 @@ pub const DEFAULT_POWER_MENU: &[PowerAction] = &[
     PowerAction::Shutdown,
 ];
 
+pub const REQUIRED_POWER_ACTIONS: &[PowerAction] = &[
+    PowerAction::Lock,
+    PowerAction::Logout,
+    PowerAction::Suspend,
+    PowerAction::Reboot,
+    PowerAction::Shutdown,
+];
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct PowerActionCommand {
+    pub action: PowerAction,
+    pub program: &'static str,
+    pub args: &'static [&'static str],
+    pub requires_session_id: bool,
+    pub disruptive: bool,
+}
+
+impl PowerActionCommand {
+    pub fn command_line(self) -> String {
+        if self.args.is_empty() {
+            self.program.to_string()
+        } else {
+            format!("{} {}", self.program, self.args.join(" "))
+        }
+    }
+}
+
+pub const POWER_ACTION_COMMANDS: &[PowerActionCommand] = &[
+    PowerActionCommand {
+        action: PowerAction::Lock,
+        program: "loginctl",
+        args: &["lock-session"],
+        requires_session_id: false,
+        disruptive: false,
+    },
+    PowerActionCommand {
+        action: PowerAction::Logout,
+        program: "loginctl",
+        args: &["terminate-session", "$XDG_SESSION_ID"],
+        requires_session_id: true,
+        disruptive: true,
+    },
+    PowerActionCommand {
+        action: PowerAction::Suspend,
+        program: "systemctl",
+        args: &["suspend"],
+        requires_session_id: false,
+        disruptive: true,
+    },
+    PowerActionCommand {
+        action: PowerAction::Reboot,
+        program: "systemctl",
+        args: &["reboot"],
+        requires_session_id: false,
+        disruptive: true,
+    },
+    PowerActionCommand {
+        action: PowerAction::Shutdown,
+        program: "systemctl",
+        args: &["poweroff"],
+        requires_session_id: false,
+        disruptive: true,
+    },
+];
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct PowerActionDispatch {
+    pub command: PowerActionCommand,
+    pub dry_run: bool,
+}
+
+impl PowerActionDispatch {
+    pub const fn would_execute(self) -> bool {
+        !self.dry_run
+    }
+}
+
+pub fn power_action_command(action: PowerAction) -> Option<PowerActionCommand> {
+    POWER_ACTION_COMMANDS
+        .iter()
+        .copied()
+        .find(|command| command.action == action)
+}
+
+pub fn prepare_power_action(action: PowerAction, dry_run: bool) -> Option<PowerActionDispatch> {
+    power_action_command(action).map(|command| PowerActionDispatch { command, dry_run })
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum SettingsValidationError {
     DisplayMode,
@@ -194,6 +282,16 @@ pub struct SettingsSmokeReport {
     pub invalid_power_rejected: bool,
     pub power_menu_complete: bool,
     pub power_menu_actions: u64,
+    pub power_action_commands_complete: bool,
+    pub power_action_commands: u64,
+    pub power_actions_dry_run: bool,
+    pub disruptive_power_actions_guarded: bool,
+    pub lock_action_ready: bool,
+    pub logout_action_ready: bool,
+    pub suspend_action_ready: bool,
+    pub reboot_action_ready: bool,
+    pub shutdown_action_ready: bool,
+    pub logout_requires_session_id: bool,
     pub state_generation: u64,
 }
 
@@ -207,6 +305,16 @@ impl SettingsSmokeReport {
             && self.invalid_power_rejected
             && self.power_menu_complete
             && self.power_menu_actions == 4
+            && self.power_action_commands_complete
+            && self.power_action_commands == 5
+            && self.power_actions_dry_run
+            && self.disruptive_power_actions_guarded
+            && self.lock_action_ready
+            && self.logout_action_ready
+            && self.suspend_action_ready
+            && self.reboot_action_ready
+            && self.shutdown_action_ready
+            && self.logout_requires_session_id
             && self.state_generation == 3
     }
 }
@@ -260,6 +368,35 @@ pub fn run_settings_smoke() -> SettingsSmokeReport {
         Err(SettingsValidationError::PowerIdlePolicy)
     );
 
+    let lock_command = power_action_command(PowerAction::Lock);
+    let logout_command = power_action_command(PowerAction::Logout);
+    let suspend_command = power_action_command(PowerAction::Suspend);
+    let reboot_command = power_action_command(PowerAction::Reboot);
+    let shutdown_command = power_action_command(PowerAction::Shutdown);
+    let dry_run_dispatches: Vec<PowerActionDispatch> = REQUIRED_POWER_ACTIONS
+        .iter()
+        .copied()
+        .filter_map(|action| prepare_power_action(action, true))
+        .collect();
+    let power_action_commands_complete = REQUIRED_POWER_ACTIONS
+        .iter()
+        .copied()
+        .all(|action| power_action_command(action).is_some())
+        && POWER_ACTION_COMMANDS.len() == REQUIRED_POWER_ACTIONS.len();
+    let power_actions_dry_run = dry_run_dispatches.len() == REQUIRED_POWER_ACTIONS.len()
+        && dry_run_dispatches
+            .iter()
+            .all(|dispatch| dispatch.dry_run && !dispatch.would_execute());
+    let disruptive_power_actions_guarded = dry_run_dispatches
+        .iter()
+        .filter(|dispatch| dispatch.command.disruptive)
+        .count()
+        == 4
+        && dry_run_dispatches
+            .iter()
+            .filter(|dispatch| dispatch.command.disruptive)
+            .all(|dispatch| dispatch.dry_run);
+
     SettingsSmokeReport {
         display_validated,
         input_validated,
@@ -275,6 +412,53 @@ pub fn run_settings_smoke() -> SettingsSmokeReport {
                 PowerAction::Shutdown,
             ],
         power_menu_actions: DEFAULT_POWER_MENU.len() as u64,
+        power_action_commands_complete,
+        power_action_commands: POWER_ACTION_COMMANDS.len() as u64,
+        power_actions_dry_run,
+        disruptive_power_actions_guarded,
+        lock_action_ready: matches!(
+            lock_command,
+            Some(PowerActionCommand {
+                program: "loginctl",
+                args: ["lock-session"],
+                ..
+            })
+        ),
+        logout_action_ready: matches!(
+            logout_command,
+            Some(PowerActionCommand {
+                program: "loginctl",
+                args: ["terminate-session", "$XDG_SESSION_ID"],
+                ..
+            })
+        ),
+        suspend_action_ready: matches!(
+            suspend_command,
+            Some(PowerActionCommand {
+                program: "systemctl",
+                args: ["suspend"],
+                ..
+            })
+        ),
+        reboot_action_ready: matches!(
+            reboot_command,
+            Some(PowerActionCommand {
+                program: "systemctl",
+                args: ["reboot"],
+                ..
+            })
+        ),
+        shutdown_action_ready: matches!(
+            shutdown_command,
+            Some(PowerActionCommand {
+                program: "systemctl",
+                args: ["poweroff"],
+                ..
+            })
+        ),
+        logout_requires_session_id: logout_command
+            .map(|command| command.requires_session_id)
+            .unwrap_or(false),
         state_generation: state.generation,
     }
 }
@@ -282,8 +466,8 @@ pub fn run_settings_smoke() -> SettingsSmokeReport {
 #[cfg(test)]
 mod tests {
     use super::{
-        run_settings_smoke, DisplaySettings, InputSettings, PowerAction, PowerSettings,
-        SettingsDaemonState, SettingsValidationError,
+        power_action_command, prepare_power_action, run_settings_smoke, DisplaySettings,
+        InputSettings, PowerAction, PowerSettings, SettingsDaemonState, SettingsValidationError,
     };
 
     #[test]
@@ -353,5 +537,37 @@ mod tests {
     #[test]
     fn settings_smoke_passes() {
         assert!(run_settings_smoke().passed());
+    }
+
+    #[test]
+    fn maps_power_actions_to_logind_and_systemd_commands() {
+        let lock = power_action_command(PowerAction::Lock).expect("lock command");
+        let logout = power_action_command(PowerAction::Logout).expect("logout command");
+        let suspend = power_action_command(PowerAction::Suspend).expect("suspend command");
+        let reboot = power_action_command(PowerAction::Reboot).expect("reboot command");
+        let shutdown = power_action_command(PowerAction::Shutdown).expect("shutdown command");
+
+        assert_eq!(lock.command_line(), "loginctl lock-session");
+        assert_eq!(
+            logout.command_line(),
+            "loginctl terminate-session $XDG_SESSION_ID"
+        );
+        assert!(logout.requires_session_id);
+        assert_eq!(suspend.command_line(), "systemctl suspend");
+        assert_eq!(reboot.command_line(), "systemctl reboot");
+        assert_eq!(shutdown.command_line(), "systemctl poweroff");
+        assert!(power_action_command(PowerAction::Ignore).is_none());
+    }
+
+    #[test]
+    fn prepares_power_actions_as_dry_run_until_execution_is_requested() {
+        let dry_run = prepare_power_action(PowerAction::Shutdown, true).expect("shutdown dispatch");
+        assert!(dry_run.dry_run);
+        assert!(!dry_run.would_execute());
+
+        let executable =
+            prepare_power_action(PowerAction::Shutdown, false).expect("shutdown dispatch");
+        assert!(!executable.dry_run);
+        assert!(executable.would_execute());
     }
 }

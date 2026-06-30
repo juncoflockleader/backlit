@@ -4,7 +4,7 @@ use std::thread;
 use std::time::Duration;
 
 use backlit_common::metrics::{event_json, FieldValue};
-use backlit_settings_daemon::run_settings_smoke;
+use backlit_settings_daemon::{power_action_command, run_settings_smoke, PowerAction};
 
 fn main() {
     if let Err(error) = run() {
@@ -42,6 +42,11 @@ fn run() -> Result<(), String> {
     }
 
     let report = run_settings_smoke();
+    let lock_command = power_command_line(PowerAction::Lock);
+    let logout_command = power_command_line(PowerAction::Logout);
+    let suspend_command = power_command_line(PowerAction::Suspend);
+    let reboot_command = power_command_line(PowerAction::Reboot);
+    let shutdown_command = power_command_line(PowerAction::Shutdown);
 
     println!(
         "{}",
@@ -76,6 +81,51 @@ fn run() -> Result<(), String> {
                     "power_menu_actions",
                     FieldValue::U64(report.power_menu_actions),
                 ),
+                (
+                    "power_action_commands_complete",
+                    FieldValue::Bool(report.power_action_commands_complete),
+                ),
+                (
+                    "power_action_commands",
+                    FieldValue::U64(report.power_action_commands),
+                ),
+                (
+                    "power_actions_dry_run",
+                    FieldValue::Bool(report.power_actions_dry_run),
+                ),
+                (
+                    "disruptive_power_actions_guarded",
+                    FieldValue::Bool(report.disruptive_power_actions_guarded),
+                ),
+                (
+                    "lock_action_ready",
+                    FieldValue::Bool(report.lock_action_ready),
+                ),
+                (
+                    "logout_action_ready",
+                    FieldValue::Bool(report.logout_action_ready),
+                ),
+                (
+                    "suspend_action_ready",
+                    FieldValue::Bool(report.suspend_action_ready),
+                ),
+                (
+                    "reboot_action_ready",
+                    FieldValue::Bool(report.reboot_action_ready),
+                ),
+                (
+                    "shutdown_action_ready",
+                    FieldValue::Bool(report.shutdown_action_ready),
+                ),
+                (
+                    "logout_requires_session_id",
+                    FieldValue::Bool(report.logout_requires_session_id),
+                ),
+                ("lock_command", FieldValue::Str(&lock_command)),
+                ("logout_command", FieldValue::Str(&logout_command)),
+                ("suspend_command", FieldValue::Str(&suspend_command)),
+                ("reboot_command", FieldValue::Str(&reboot_command)),
+                ("shutdown_command", FieldValue::Str(&shutdown_command)),
                 ("state_generation", FieldValue::U64(report.state_generation),),
             ],
         )
@@ -112,6 +162,12 @@ fn parse_u64(flag: &str, value: &str) -> Result<u64, String> {
         .map_err(|_| format!("invalid value for {flag}: {value}"))
 }
 
+fn power_command_line(action: PowerAction) -> String {
+    power_action_command(action)
+        .map(|command| command.command_line())
+        .unwrap_or_else(|| String::from("missing"))
+}
+
 fn print_help() {
     println!(
         "\
@@ -121,7 +177,7 @@ Usage:
   backlit-settings-daemon [--verify] [--idle-probe-ms=1000]
 
 Flags:
-  --verify  Fail if display, input, and power settings policy verification fails.
+  --verify  Fail if display, input, power policy, and power action verification fails.
 "
     );
 }

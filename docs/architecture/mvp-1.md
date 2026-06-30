@@ -27,7 +27,7 @@ Current launch-readiness checks:
 - `backlit-perf --verify` verifies a deterministic 60-frame drag pacing smoke with zero dropped frames and pointer-to-frame p99 under 16 ms.
 - `backlit-compositor -- --smoke-test` verifies direct-scanout eligibility policy for opaque fullscreen dmabuf surfaces, including overlay and SHM blockers.
 - `backlit-notification-daemon --verify` verifies notification service behavior that the session launches with shell services.
-- `backlit-settings-daemon --verify` verifies display, input, and power policy state for the settings service launched with the session.
+- `backlit-settings-daemon --verify` verifies display, input, power policy state, and dry-run logind/systemd command plans for lock, logout, suspend, reboot, and shutdown.
 - `backlit-portal-backend --verify` verifies that direct screenshot, screencast, and remote-desktop capture are denied and only consented portal-mediated flows are allowed.
 - `backlit-session-supervisor --verify` and `scripts/verify-crash-logs.sh` verify crash isolation plus user-journal crash records for compositor and shell failures.
 - `scripts/verify-launch-performance.sh` verifies MVP launch budgets from built binaries: GUI ready under 500 ms, terminal hotkey spawn under 300 ms, and shell-ready service probes under 2 seconds.

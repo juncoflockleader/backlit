@@ -197,6 +197,16 @@ grep '"invalid_display_rejected":true' "$out_dir/settings-daemon.jsonl" >/dev/nu
 grep '"invalid_input_rejected":true' "$out_dir/settings-daemon.jsonl" >/dev/null
 grep '"invalid_power_rejected":true' "$out_dir/settings-daemon.jsonl" >/dev/null
 grep '"power_menu_complete":true' "$out_dir/settings-daemon.jsonl" >/dev/null
+grep '"power_action_commands_complete":true' "$out_dir/settings-daemon.jsonl" >/dev/null
+grep '"power_action_commands":5' "$out_dir/settings-daemon.jsonl" >/dev/null
+grep '"power_actions_dry_run":true' "$out_dir/settings-daemon.jsonl" >/dev/null
+grep '"disruptive_power_actions_guarded":true' "$out_dir/settings-daemon.jsonl" >/dev/null
+grep '"lock_action_ready":true' "$out_dir/settings-daemon.jsonl" >/dev/null
+grep '"logout_action_ready":true' "$out_dir/settings-daemon.jsonl" >/dev/null
+grep '"suspend_action_ready":true' "$out_dir/settings-daemon.jsonl" >/dev/null
+grep '"reboot_action_ready":true' "$out_dir/settings-daemon.jsonl" >/dev/null
+grep '"shutdown_action_ready":true' "$out_dir/settings-daemon.jsonl" >/dev/null
+grep '"logout_command":"loginctl terminate-session $XDG_SESSION_ID"' "$out_dir/settings-daemon.jsonl" >/dev/null
 grep '"event":"portal_backend.security_smoke"' "$out_dir/portal.jsonl" >/dev/null
 grep '"direct_screenshot_denied":true' "$out_dir/portal.jsonl" >/dev/null
 grep '"direct_screencast_denied":true' "$out_dir/portal.jsonl" >/dev/null
@@ -275,6 +285,9 @@ cat > "$out_dir/manifest.json" <<EOF
     "clipboard_generation": 3,
     "notification_daemon": true,
     "settings_daemon": true,
+    "settings_power_actions": true,
+    "settings_power_actions_dry_run": true,
+    "settings_suspend_action": true,
     "portal_security": true,
     "session_windows_after_launch": 4,
     "session_launch_spawn": true,

@@ -289,7 +289,7 @@ The launch-performance verifier runs the built `backlit-session`, `backlit-compo
 
 The resource-budget verifier runs bounded idle probes for `backlit-compositor` and `backlit-shell`, samples Linux `/proc`, then writes `target/resource-budget/manifest.json`. On Linux it enforces compositor idle CPU under 0.5% and combined compositor+shell RSS under 250 MB; on non-Linux hosts it records an expected skip so Parallels remains the authoritative resource-budget proof.
 
-Settings daemon state is covered by `backlit-settings-daemon --verify`, which validates display mode/scale/refresh settings, keyboard and pointer policy, power idle policy, and the lock/logout/reboot/shutdown power menu.
+Settings daemon state is covered by `backlit-settings-daemon --verify`, which validates display mode/scale/refresh settings, keyboard and pointer policy, power idle policy, the lock/logout/reboot/shutdown power menu, and dry-run command plans for lock, logout, suspend, reboot, and shutdown through logind/systemd.
 
 Notification daemon state is covered by `backlit-notification-daemon --verify`, which verifies D-Bus-style notification fields, replace-id behavior, action invocation, critical notification persistence, and expired/dismissed/replaced close reasons.
 

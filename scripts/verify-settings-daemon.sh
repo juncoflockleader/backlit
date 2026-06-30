@@ -21,6 +21,21 @@ grep '"invalid_input_rejected":true' "$settings_log" >/dev/null
 grep '"invalid_power_rejected":true' "$settings_log" >/dev/null
 grep '"power_menu_complete":true' "$settings_log" >/dev/null
 grep '"power_menu_actions":4' "$settings_log" >/dev/null
+grep '"power_action_commands_complete":true' "$settings_log" >/dev/null
+grep '"power_action_commands":5' "$settings_log" >/dev/null
+grep '"power_actions_dry_run":true' "$settings_log" >/dev/null
+grep '"disruptive_power_actions_guarded":true' "$settings_log" >/dev/null
+grep '"lock_action_ready":true' "$settings_log" >/dev/null
+grep '"logout_action_ready":true' "$settings_log" >/dev/null
+grep '"suspend_action_ready":true' "$settings_log" >/dev/null
+grep '"reboot_action_ready":true' "$settings_log" >/dev/null
+grep '"shutdown_action_ready":true' "$settings_log" >/dev/null
+grep '"logout_requires_session_id":true' "$settings_log" >/dev/null
+grep '"lock_command":"loginctl lock-session"' "$settings_log" >/dev/null
+grep '"logout_command":"loginctl terminate-session $XDG_SESSION_ID"' "$settings_log" >/dev/null
+grep '"suspend_command":"systemctl suspend"' "$settings_log" >/dev/null
+grep '"reboot_command":"systemctl reboot"' "$settings_log" >/dev/null
+grep '"shutdown_command":"systemctl poweroff"' "$settings_log" >/dev/null
 grep '"state_generation":3' "$settings_log" >/dev/null
 
 cat > "$out_dir/manifest.json" <<EOF
@@ -39,6 +54,21 @@ cat > "$out_dir/manifest.json" <<EOF
     "invalid_power_rejected": true,
     "power_menu_complete": true,
     "power_menu_actions": 4,
+    "power_action_commands_complete": true,
+    "power_action_commands": 5,
+    "power_actions_dry_run": true,
+    "disruptive_power_actions_guarded": true,
+    "lock_action_ready": true,
+    "logout_action_ready": true,
+    "suspend_action_ready": true,
+    "reboot_action_ready": true,
+    "shutdown_action_ready": true,
+    "logout_requires_session_id": true,
+    "lock_command": "loginctl lock-session",
+    "logout_command": "loginctl terminate-session \$XDG_SESSION_ID",
+    "suspend_command": "systemctl suspend",
+    "reboot_command": "systemctl reboot",
+    "shutdown_command": "systemctl poweroff",
     "state_generation": 3
   }
 }
