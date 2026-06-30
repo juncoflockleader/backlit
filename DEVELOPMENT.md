@@ -314,7 +314,7 @@ Keyboard shortcut routing is also verified in dry-run mode for launcher, termina
 
 Input routing is verified by `backlit-input --verify`, which feeds deterministic keyboard and pointer events into the same policy layer the compositor will use for libinput events. It proves that `Super+Enter` routes to terminal launch, `Alt+Tab` changes focus, title-bar drags move windows, resize-grip drags resize windows, and pointer grabs end cleanly.
 
-Surface lifecycle is verified by `backlit-surface --verify`, which proves the xdg-shell-style path from toplevel creation through initial configure/ack/commit, focus, maximize, fullscreen, close request, and clean window removal.
+Surface lifecycle is verified by `backlit-surface --verify`, which proves the xdg-shell-style path from toplevel creation through initial configure/ack/commit, focus, maximize, fullscreen, close request, and clean window removal. `backlit-compositor -- --smoke-test` also drives that xdg-toplevel path through the compositor smoke by mapping a configured surface into the headless backend frame before maximizing, fullscreening, and closing it.
 
 The session smoke path consumes those routes too: `Alt+Tab` cycles focus and `Super+Enter` resolves the terminal launch path, pointer input verifies focus/move/resize routing, surface lifecycle verifies map/configure/close behavior, spawns the terminal launch target with `WAYLAND_DISPLAY` set when `--verify-launch-spawn` is enabled, then records the resulting window-policy state in `session.jsonl`.
 

@@ -10,5 +10,6 @@ publish = false
 [dependencies]
 backlit-common = { path = "../common" }
 backlit-compositor-backend = { path = "../compositor-backend" }
+backlit-protocols = { path = "../protocols" }
+backlit-surface = { path = "../surface" }
 backlit-window-policy = { path = "../window-policy" }
-

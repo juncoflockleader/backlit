@@ -195,6 +195,8 @@ grep -F '"children_exited_cleanly":true' "$session_log" >/dev/null || fail "sess
 
 "$bin_dir/backlit-compositor" --backend=headless --socket=backlit-0 --smoke-test > "$compositor_log"
 grep -F '"event":"compositor.smoke_test"' "$compositor_log" >/dev/null || fail "missing compositor smoke event"
+grep -F '"xdg_surface_lifecycle":true' "$compositor_log" >/dev/null || fail "staged compositor xdg lifecycle did not verify"
+grep -F '"xdg_backend_surface_presented":true' "$compositor_log" >/dev/null || fail "staged compositor did not present xdg backend surface"
 
 "$bin_dir/backlit-shell" --component=all --socket=backlit-0 --verify > "$shell_log"
 grep -F '"event":"shell.verified"' "$shell_log" >/dev/null || fail "missing shell verification event"
@@ -258,6 +260,7 @@ cat > "$out_dir/manifest.json" <<EOF
     "staged_session_launch_spawn": true,
     "staged_session_services": true,
     "staged_compositor_smoke": true,
+    "staged_compositor_surface_lifecycle": true,
     "staged_shell_verify": true,
     "staged_notification_daemon_verify": true,
     "staged_settings_daemon_verify": true,

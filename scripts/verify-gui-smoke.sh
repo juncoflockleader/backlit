@@ -56,6 +56,21 @@ grep '"direct_scanout_dmabuf":true' "$out_dir/compositor.jsonl" >/dev/null
 grep '"direct_scanout_fullscreen":true' "$out_dir/compositor.jsonl" >/dev/null
 grep '"direct_scanout_overlay_blocked":true' "$out_dir/compositor.jsonl" >/dev/null
 grep '"direct_scanout_shm_blocked":true' "$out_dir/compositor.jsonl" >/dev/null
+grep '"xdg_shell_registered":true' "$out_dir/compositor.jsonl" >/dev/null
+grep '"xdg_surface_lifecycle":true' "$out_dir/compositor.jsonl" >/dev/null
+grep '"xdg_toplevel_created":true' "$out_dir/compositor.jsonl" >/dev/null
+grep '"xdg_initial_configured":true' "$out_dir/compositor.jsonl" >/dev/null
+grep '"xdg_ack_configure_ok":true' "$out_dir/compositor.jsonl" >/dev/null
+grep '"xdg_mapped_window":true' "$out_dir/compositor.jsonl" >/dev/null
+grep '"xdg_backend_surface_presented":true' "$out_dir/compositor.jsonl" >/dev/null
+grep '"xdg_presented_surfaces":1' "$out_dir/compositor.jsonl" >/dev/null
+grep '"xdg_presented_pixels":307200' "$out_dir/compositor.jsonl" >/dev/null
+grep '"xdg_focused_after_map":true' "$out_dir/compositor.jsonl" >/dev/null
+grep '"xdg_maximize_uses_work_area":true' "$out_dir/compositor.jsonl" >/dev/null
+grep '"xdg_fullscreen_uses_output":true' "$out_dir/compositor.jsonl" >/dev/null
+grep '"xdg_close_requested":true' "$out_dir/compositor.jsonl" >/dev/null
+grep '"xdg_window_removed":true' "$out_dir/compositor.jsonl" >/dev/null
+grep '"xdg_windows_after_close":0' "$out_dir/compositor.jsonl" >/dev/null
 grep '"event":"session.verified"' "$out_dir/session.jsonl" >/dev/null
 grep '"event":"session.interactions"' "$out_dir/session.jsonl" >/dev/null
 grep '"event":"session.launch_spawn"' "$out_dir/session.jsonl" >/dev/null
@@ -322,6 +337,7 @@ cat > "$out_dir/manifest.json" <<EOF
     "keyboard_input": true,
     "pointer_input": true,
     "surface_lifecycle": true,
+    "compositor_surface_lifecycle": true,
     "no_idle_redraw": true,
     "targeted_damage": true,
     "direct_scanout": true,

@@ -85,6 +85,7 @@ require_contains scripts/verify-gui-smoke.sh '"shell_workspace_indicator": true'
 require_contains scripts/verify-gui-smoke.sh '"shell_launcher_targets": 3'
 require_contains scripts/verify-gui-smoke.sh '"shell_app_switcher": true'
 require_contains scripts/verify-gui-smoke.sh '"shell_lock_screen": true'
+require_contains scripts/verify-gui-smoke.sh '"compositor_surface_lifecycle": true'
 require_contains scripts/verify-gui-smoke.sh '"settings_power_actions": true'
 require_contains scripts/verify-gui-smoke.sh '"crash_logs": true'
 require_contains scripts/verify-gui-smoke.sh '"golden_checksum": true'
@@ -112,6 +113,7 @@ require_contains scripts/verify-staged-session-install.sh '--verify-systemd-unit
 require_contains scripts/verify-staged-session-install.sh '"session_systemd_units": true'
 require_contains scripts/verify-staged-session-install.sh '"session_systemd_target": true'
 require_contains scripts/verify-staged-session-install.sh '"session_systemd_launch_plan": true'
+require_contains scripts/verify-staged-session-install.sh '"staged_compositor_surface_lifecycle": true'
 require_contains scripts/verify-launch-readiness.sh '"xdg_runtime_dir_owned_by_user"'
 require_contains scripts/verify-launch-readiness.sh '"session_local"'
 require_contains scripts/verify-launch-readiness.sh '"drm_card_access_ready"'
@@ -170,6 +172,7 @@ if [ -n "$artifact_root" ] && [ -d "$artifact_root" ]; then
   require_contains "$artifact_root/gui-smoke/manifest.json" '"pointer_input": true'
   require_contains "$artifact_root/gui-smoke/manifest.json" '"session_input": true'
   require_contains "$artifact_root/gui-smoke/manifest.json" '"surface_lifecycle": true'
+  require_contains "$artifact_root/gui-smoke/manifest.json" '"compositor_surface_lifecycle": true'
   require_contains "$artifact_root/gui-smoke/manifest.json" '"session_surface_lifecycle": true'
   require_contains "$artifact_root/gui-smoke/manifest.json" '"no_idle_redraw": true'
   require_contains "$artifact_root/gui-smoke/manifest.json" '"targeted_damage": true'
@@ -251,6 +254,7 @@ if [ -n "$artifact_root" ] && [ -d "$artifact_root" ]; then
   require_contains "$artifact_root/staged-session-install/manifest.json" '"systemd_journal_output": true'
   require_contains "$artifact_root/staged-session-install/manifest.json" '"staged_session_gui": true'
   require_contains "$artifact_root/staged-session-install/manifest.json" '"staged_session_services": true'
+  require_contains "$artifact_root/staged-session-install/manifest.json" '"staged_compositor_surface_lifecycle": true'
   require_contains "$artifact_root/staged-session-install/manifest.json" '"staged_notification_daemon_verify": true'
   require_contains "$artifact_root/staged-session-install/manifest.json" '"staged_settings_daemon_verify": true'
   require_contains "$artifact_root/staged-session-install/manifest.json" '"staged_settings_app_verify": true'
@@ -321,6 +325,7 @@ cat > "$out_dir/manifest.json" <<EOF
     "crash_logs": true,
     "input_smoke": true,
     "surface_lifecycle": true,
+    "compositor_surface_lifecycle": true,
     "shell_chrome": true,
     "workspace_switch": true,
     "window_snap": true,

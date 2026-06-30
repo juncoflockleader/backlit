@@ -9,7 +9,8 @@ use backlit_compositor_backend::{
     parse_args, preflight_backend_with_environment, BackendPreflightEnvironment,
     BackendPreflightReport, HeadlessCompositor, RunConfig, SurfaceOptions,
 };
-use backlit_window_policy::WindowPolicy;
+use backlit_surface::{SurfaceManager, SurfacePhase, SurfaceRole};
+use backlit_window_policy::{OutputLayout, WindowPolicy, WindowState};
 
 fn main() {
     if let Err(error) = run() {
@@ -108,6 +109,7 @@ fn run_smoke_test(config: &RunConfig) {
         idle_frame.damaged_surfaces == 0 && post_damage_idle_frame.damaged_surfaces == 0;
     let targeted_damage_ok = damage_frame.damaged_surfaces == 1;
     let scanout_smoke = run_direct_scanout_smoke();
+    let surface_smoke = run_compositor_surface_smoke();
 
     emit(
         "compositor.smoke_test",
@@ -152,11 +154,197 @@ fn run_smoke_test(config: &RunConfig) {
                 "direct_scanout_shm_blocked",
                 FieldValue::Bool(scanout_smoke.shm_blocked),
             ),
+            (
+                "xdg_shell_registered",
+                FieldValue::Bool(surface_smoke.xdg_shell_registered),
+            ),
+            (
+                "xdg_surface_lifecycle",
+                FieldValue::Bool(surface_smoke.passed()),
+            ),
+            (
+                "xdg_toplevel_created",
+                FieldValue::Bool(surface_smoke.created_toplevel),
+            ),
+            (
+                "xdg_initial_configured",
+                FieldValue::Bool(surface_smoke.initial_configured),
+            ),
+            (
+                "xdg_ack_configure_ok",
+                FieldValue::Bool(surface_smoke.ack_configure_ok),
+            ),
+            (
+                "xdg_mapped_window",
+                FieldValue::Bool(surface_smoke.mapped_window),
+            ),
+            (
+                "xdg_backend_surface_presented",
+                FieldValue::Bool(surface_smoke.backend_surface_presented),
+            ),
+            (
+                "xdg_presented_surfaces",
+                FieldValue::U64(surface_smoke.presented_surfaces),
+            ),
+            (
+                "xdg_presented_pixels",
+                FieldValue::U64(surface_smoke.presented_pixels),
+            ),
+            (
+                "xdg_focused_after_map",
+                FieldValue::Bool(surface_smoke.focused_after_map),
+            ),
+            (
+                "xdg_maximize_uses_work_area",
+                FieldValue::Bool(surface_smoke.maximize_uses_work_area),
+            ),
+            (
+                "xdg_fullscreen_uses_output",
+                FieldValue::Bool(surface_smoke.fullscreen_uses_output),
+            ),
+            (
+                "xdg_close_requested",
+                FieldValue::Bool(surface_smoke.close_requested),
+            ),
+            (
+                "xdg_window_removed",
+                FieldValue::Bool(surface_smoke.window_removed),
+            ),
+            (
+                "xdg_windows_after_close",
+                FieldValue::U64(surface_smoke.windows_after_close),
+            ),
             ("total_surface_pixels", FieldValue::U64(frame.total_pixels)),
             ("first_window", FieldValue::U64(first.0)),
             ("focused_window", FieldValue::U64(second.0)),
         ],
     );
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+struct CompositorSurfaceSmoke {
+    xdg_shell_registered: bool,
+    created_toplevel: bool,
+    initial_configured: bool,
+    ack_configure_ok: bool,
+    mapped_window: bool,
+    backend_surface_presented: bool,
+    presented_surfaces: u64,
+    presented_pixels: u64,
+    focused_after_map: bool,
+    maximize_uses_work_area: bool,
+    fullscreen_uses_output: bool,
+    close_requested: bool,
+    window_removed: bool,
+    windows_after_close: u64,
+}
+
+impl CompositorSurfaceSmoke {
+    fn passed(self) -> bool {
+        self.xdg_shell_registered
+            && self.created_toplevel
+            && self.initial_configured
+            && self.ack_configure_ok
+            && self.mapped_window
+            && self.backend_surface_presented
+            && self.presented_surfaces == 1
+            && self.presented_pixels == 640 * 480
+            && self.focused_after_map
+            && self.maximize_uses_work_area
+            && self.fullscreen_uses_output
+            && self.close_requested
+            && self.window_removed
+            && self.windows_after_close == 0
+    }
+}
+
+fn run_compositor_surface_smoke() -> CompositorSurfaceSmoke {
+    let mut manager = SurfaceManager::new(OutputLayout::new(800, 520, 42));
+    let mut backend = HeadlessCompositor::default();
+    let client = backend.connect_client("xdg-demo-client");
+    let surface = manager.create_toplevel("xdg-terminal", (640, 480));
+    let xdg_shell_registered = backlit_protocols::lookup_protocol("xdg_wm_base")
+        .map(|protocol| protocol.mvp_required)
+        .unwrap_or(false);
+    let created_toplevel = manager
+        .surface(surface)
+        .map(|surface| {
+            surface.role == SurfaceRole::XdgToplevel && surface.phase == SurfacePhase::Created
+        })
+        .unwrap_or(false);
+
+    let initial_configure = manager.send_initial_configure(surface);
+    let initial_configured = initial_configure
+        .map(|configure| configure.width == 640 && configure.height == 480)
+        .unwrap_or(false);
+    let ack_configure_ok = initial_configure
+        .map(|configure| manager.ack_configure(surface, configure.serial))
+        .unwrap_or(false);
+    let mapped_window = manager.commit(surface);
+    let window_id = manager
+        .surface(surface)
+        .and_then(|surface| surface.window_id);
+    let focused_after_map = window_id
+        .map(|window_id| manager.policy().focused() == Some(window_id))
+        .unwrap_or(false);
+
+    let backend_surface_presented = if mapped_window {
+        backend
+            .submit_surface(client, "xdg-terminal", 640, 480)
+            .map(|_| true)
+            .unwrap_or(false)
+    } else {
+        false
+    };
+    let frame = backend.present();
+
+    let maximize_uses_work_area = manager
+        .request_maximize(surface)
+        .and(window_id)
+        .and_then(|window_id| manager.policy().window(window_id))
+        .map(|window| {
+            window.state == WindowState::Maximized
+                && window.geometry == manager.layout().work_area()
+        })
+        .unwrap_or(false);
+    let fullscreen_uses_output = manager
+        .request_fullscreen(surface)
+        .and(window_id)
+        .and_then(|window_id| manager.policy().window(window_id))
+        .map(|window| {
+            window.state == WindowState::Fullscreen && window.geometry == manager.layout().output
+        })
+        .unwrap_or(false);
+    let close_requested = manager
+        .request_close(surface)
+        .map(|configure| configure.close_requested)
+        .unwrap_or(false);
+    let close_ok = manager.close(surface);
+    let window_removed = close_ok
+        && window_id
+            .map(|window_id| manager.policy().window(window_id).is_none())
+            .unwrap_or(false)
+        && manager
+            .surface(surface)
+            .map(|surface| surface.phase == SurfacePhase::Closed)
+            .unwrap_or(false);
+
+    CompositorSurfaceSmoke {
+        xdg_shell_registered,
+        created_toplevel,
+        initial_configured,
+        ack_configure_ok,
+        mapped_window,
+        backend_surface_presented,
+        presented_surfaces: frame.surface_count,
+        presented_pixels: frame.total_pixels,
+        focused_after_map,
+        maximize_uses_work_area,
+        fullscreen_uses_output,
+        close_requested,
+        window_removed,
+        windows_after_close: manager.policy().windows().len() as u64,
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -357,4 +545,19 @@ Flags:
 Backend launch preflight runs before smoke or service readiness events.
 "
     );
+}
+
+#[cfg(test)]
+mod tests {
+    use super::run_compositor_surface_smoke;
+
+    #[test]
+    fn compositor_surface_smoke_maps_xdg_toplevel_into_backend_frame() {
+        let report = run_compositor_surface_smoke();
+
+        assert!(report.passed(), "{report:?}");
+        assert_eq!(report.presented_surfaces, 1);
+        assert_eq!(report.presented_pixels, 640 * 480);
+        assert_eq!(report.windows_after_close, 0);
+    }
 }

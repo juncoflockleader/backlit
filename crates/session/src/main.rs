@@ -418,6 +418,8 @@ fn run_compositor_probe(path: &Path, config: &Config) -> Result<ServiceProbe, St
         &[
             String::from("\"event\":\"compositor.smoke_test\""),
             backend_event,
+            String::from("\"xdg_surface_lifecycle\":true"),
+            String::from("\"xdg_backend_surface_presented\":true"),
         ],
     )
 }
