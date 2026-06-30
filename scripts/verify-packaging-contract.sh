@@ -48,6 +48,10 @@ require_line packaging/sessions/backlit.desktop "DesktopNames=Backlit"
 require_line packaging/systemd/backlit-compositor.service "PartOf=graphical-session.target"
 require_line packaging/systemd/backlit-compositor.service "Type=simple"
 require_line packaging/systemd/backlit-compositor.service "ExecStart=/usr/bin/backlit-compositor --backend=drm --socket=backlit-0"
+require_line packaging/systemd/backlit-compositor.service "Environment=RUST_BACKTRACE=1"
+require_line packaging/systemd/backlit-compositor.service "SyslogIdentifier=backlit-compositor"
+require_line packaging/systemd/backlit-compositor.service "StandardOutput=journal"
+require_line packaging/systemd/backlit-compositor.service "StandardError=journal"
 require_line packaging/systemd/backlit-compositor.service "Restart=on-failure"
 require_line packaging/systemd/backlit-compositor.service "WantedBy=graphical-session.target"
 
@@ -55,6 +59,10 @@ require_line packaging/systemd/backlit-shell.service "After=backlit-compositor.s
 require_line packaging/systemd/backlit-shell.service "PartOf=graphical-session.target"
 require_line packaging/systemd/backlit-shell.service "Type=simple"
 require_line packaging/systemd/backlit-shell.service "ExecStart=/usr/bin/backlit-shell --component=all --socket=backlit-0"
+require_line packaging/systemd/backlit-shell.service "Environment=RUST_BACKTRACE=1"
+require_line packaging/systemd/backlit-shell.service "SyslogIdentifier=backlit-shell"
+require_line packaging/systemd/backlit-shell.service "StandardOutput=journal"
+require_line packaging/systemd/backlit-shell.service "StandardError=journal"
 require_line packaging/systemd/backlit-shell.service "Restart=on-failure"
 require_line packaging/systemd/backlit-shell.service "WantedBy=graphical-session.target"
 
@@ -62,6 +70,10 @@ require_line packaging/systemd/backlit-settings-daemon.service "After=backlit-co
 require_line packaging/systemd/backlit-settings-daemon.service "PartOf=graphical-session.target"
 require_line packaging/systemd/backlit-settings-daemon.service "Type=simple"
 require_line packaging/systemd/backlit-settings-daemon.service "ExecStart=/usr/bin/backlit-settings-daemon"
+require_line packaging/systemd/backlit-settings-daemon.service "Environment=RUST_BACKTRACE=1"
+require_line packaging/systemd/backlit-settings-daemon.service "SyslogIdentifier=backlit-settings-daemon"
+require_line packaging/systemd/backlit-settings-daemon.service "StandardOutput=journal"
+require_line packaging/systemd/backlit-settings-daemon.service "StandardError=journal"
 require_line packaging/systemd/backlit-settings-daemon.service "Restart=on-failure"
 require_line packaging/systemd/backlit-settings-daemon.service "WantedBy=graphical-session.target"
 
@@ -100,6 +112,7 @@ cat > "$out_dir/manifest.json" <<EOF
   "checks": {
     "desktop_entry": true,
     "systemd_services": true,
+    "journal_logging": true,
     "package_split": true,
     "workspace_binaries": true
   }

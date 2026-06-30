@@ -6,6 +6,10 @@ PartOf=graphical-session.target
 [Service]
 Type=simple
 ExecStart=/usr/bin/backlit-shell --component=all --socket=backlit-0
+Environment=RUST_BACKTRACE=1
+SyslogIdentifier=backlit-shell
+StandardOutput=journal
+StandardError=journal
 Restart=on-failure
 RestartSec=1
 

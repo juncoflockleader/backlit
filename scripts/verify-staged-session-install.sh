@@ -70,8 +70,20 @@ test "$desktop_exec" = "backlit-session" || fail "unexpected session desktop Exe
 require_executable "$bin_dir/$desktop_exec"
 
 require_line "$compositor_service" "ExecStart=/usr/bin/backlit-compositor --backend=drm --socket=backlit-0"
+require_line "$compositor_service" "Environment=RUST_BACKTRACE=1"
+require_line "$compositor_service" "SyslogIdentifier=backlit-compositor"
+require_line "$compositor_service" "StandardOutput=journal"
+require_line "$compositor_service" "StandardError=journal"
 require_line "$shell_service" "ExecStart=/usr/bin/backlit-shell --component=all --socket=backlit-0"
+require_line "$shell_service" "Environment=RUST_BACKTRACE=1"
+require_line "$shell_service" "SyslogIdentifier=backlit-shell"
+require_line "$shell_service" "StandardOutput=journal"
+require_line "$shell_service" "StandardError=journal"
 require_line "$settings_service" "ExecStart=/usr/bin/backlit-settings-daemon"
+require_line "$settings_service" "Environment=RUST_BACKTRACE=1"
+require_line "$settings_service" "SyslogIdentifier=backlit-settings-daemon"
+require_line "$settings_service" "StandardOutput=journal"
+require_line "$settings_service" "StandardError=journal"
 
 compositor_exec_start="$(sed -n 's/^ExecStart=//p' "$compositor_service")"
 shell_exec_start="$(sed -n 's/^ExecStart=//p' "$shell_service")"
@@ -148,6 +160,8 @@ cat > "$out_dir/manifest.json" <<EOF
   "checks": {
     "desktop_exec_resolves": true,
     "systemd_exec_resolves": true,
+    "systemd_journal_output": true,
+    "rust_backtrace_enabled": true,
     "staged_session_help": true,
     "staged_session_gui": true,
     "staged_session_launch_spawn": true,

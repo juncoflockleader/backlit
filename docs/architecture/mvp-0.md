@@ -23,7 +23,7 @@ MVP 0 is the development harness:
 - Focus fallback after closing a window.
 - Clean session shutdown smoke for closing managed windows and clearing focus across headless, nested Wayland, and launch-ready DRM paths.
 - Output work-area policy for panel-aware maximize and fullscreen geometry.
-- Session supervisor crash isolation smoke.
+- Session supervisor crash isolation and journal-addressable crash-log smoke.
 - Clipboard state smoke for text owner, replacement, and clearing.
 - Settings daemon smoke for display, input, and power policy validation.
 - Portal security smoke for denied direct capture and consented portal-mediated flows.

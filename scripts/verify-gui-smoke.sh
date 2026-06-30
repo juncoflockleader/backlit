@@ -160,6 +160,11 @@ grep '"window_removed":true' "$out_dir/surface.jsonl" >/dev/null
 grep '"event":"supervisor.crash_smoke"' "$out_dir/supervisor.jsonl" >/dev/null
 grep '"shell_crash_isolated":true' "$out_dir/supervisor.jsonl" >/dev/null
 grep '"compositor_crash_ends_session":true' "$out_dir/supervisor.jsonl" >/dev/null
+grep '"event":"supervisor.crash_log"' "$out_dir/supervisor.jsonl" >/dev/null
+grep '"crash_logs_recorded":true' "$out_dir/supervisor.jsonl" >/dev/null
+grep '"journalctl_user_scope":true' "$out_dir/supervisor.jsonl" >/dev/null
+grep '"shell_journal_unit":"backlit-shell.service"' "$out_dir/supervisor.jsonl" >/dev/null
+grep '"compositor_journal_unit":"backlit-compositor.service"' "$out_dir/supervisor.jsonl" >/dev/null
 grep '"event":"clipboard.smoke"' "$out_dir/clipboard.jsonl" >/dev/null
 grep '"generation":3' "$out_dir/clipboard.jsonl" >/dev/null
 grep '"event":"settings_daemon.verified"' "$out_dir/settings-daemon.jsonl" >/dev/null
@@ -241,6 +246,7 @@ cat > "$out_dir/manifest.json" <<EOF
     "direct_scanout": true,
     "drag_frame_pacing": true,
     "shell_crash_isolated": true,
+    "crash_logs": true,
     "clipboard_generation": 3,
     "settings_daemon": true,
     "portal_security": true,

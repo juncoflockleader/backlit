@@ -2,7 +2,7 @@ use std::env;
 use std::process;
 
 use backlit_common::metrics::{event_json, FieldValue};
-use backlit_session_supervisor::run_crash_smoke;
+use backlit_session_supervisor::{run_crash_smoke, CrashLogRecord};
 
 fn main() {
     if let Err(error) = run() {
@@ -20,6 +20,9 @@ fn run() -> Result<(), String> {
     }
 
     let report = run_crash_smoke();
+    emit_crash_log(report.shell_log);
+    emit_crash_log(report.compositor_log);
+
     println!(
         "{}",
         event_json(
@@ -35,6 +38,30 @@ fn run() -> Result<(), String> {
                     FieldValue::Bool(report.compositor_crash_ends_session),
                 ),
                 ("restarted_shells", FieldValue::U64(report.restarted_shells)),
+                (
+                    "crash_logs_recorded",
+                    FieldValue::Bool(report.crash_logs_recorded()),
+                ),
+                (
+                    "journalctl_user_scope",
+                    FieldValue::Bool(report.journalctl_user_scope()),
+                ),
+                (
+                    "shell_journal_unit",
+                    FieldValue::Str(report.shell_log.journal_unit),
+                ),
+                (
+                    "compositor_journal_unit",
+                    FieldValue::Str(report.compositor_log.journal_unit),
+                ),
+                (
+                    "shell_syslog_identifier",
+                    FieldValue::Str(report.shell_log.syslog_identifier),
+                ),
+                (
+                    "compositor_syslog_identifier",
+                    FieldValue::Str(report.compositor_log.syslog_identifier),
+                ),
             ],
         )
     );
@@ -44,6 +71,33 @@ fn run() -> Result<(), String> {
     }
 
     Ok(())
+}
+
+fn emit_crash_log(record: CrashLogRecord) {
+    println!(
+        "{}",
+        event_json(
+            "supervisor.crash_log",
+            &[
+                ("role", FieldValue::Str(record.role.as_str())),
+                ("journal_unit", FieldValue::Str(record.journal_unit)),
+                (
+                    "syslog_identifier",
+                    FieldValue::Str(record.syslog_identifier),
+                ),
+                (
+                    "journalctl_user_scope",
+                    FieldValue::Bool(record.journalctl_user_scope),
+                ),
+                ("critical", FieldValue::Bool(record.critical)),
+                ("restartable", FieldValue::Bool(record.restartable)),
+                ("known_process", FieldValue::Bool(record.known_process)),
+                ("restarted", FieldValue::Bool(record.restarted)),
+                ("session_alive", FieldValue::Bool(record.session_alive)),
+                ("recorded", FieldValue::Bool(record.recorded())),
+            ],
+        )
+    );
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]

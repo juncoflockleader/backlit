@@ -24,6 +24,7 @@ Current launch-readiness checks:
 - `backlit-compositor -- --smoke-test` verifies direct-scanout eligibility policy for opaque fullscreen dmabuf surfaces, including overlay and SHM blockers.
 - `backlit-settings-daemon --verify` verifies display, input, and power policy state for the settings service launched with the session.
 - `backlit-portal-backend --verify` verifies that direct screenshot, screencast, and remote-desktop capture are denied and only consented portal-mediated flows are allowed.
+- `backlit-session-supervisor --verify` and `scripts/verify-crash-logs.sh` verify crash isolation plus user-journal crash records for compositor and shell failures.
 - `scripts/verify-launch-performance.sh` verifies MVP launch budgets from built binaries: GUI ready under 500 ms, terminal hotkey spawn under 300 ms, and shell-ready service probes under 2 seconds.
 - `scripts/verify-resource-budget.sh` verifies Linux idle resource budgets from bounded compositor and shell probes: compositor idle CPU under 0.5% and combined compositor+shell RSS under 250 MB.
 - `scripts/verify-drm-session-smoke.sh` runs the full DRM session path with GUI verification, launch spawn, compositor/shell/settings service probes, and clean shutdown on launch-ready Linux hosts.

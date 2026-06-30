@@ -6,6 +6,10 @@ PartOf=graphical-session.target
 [Service]
 Type=simple
 ExecStart=/usr/bin/backlit-settings-daemon
+Environment=RUST_BACKTRACE=1
+SyslogIdentifier=backlit-settings-daemon
+StandardOutput=journal
+StandardError=journal
 Restart=on-failure
 
 [Install]

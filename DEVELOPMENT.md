@@ -22,6 +22,7 @@ crates/
   input/               Keyboard and pointer event routing smoke checks.
   surface/             xdg-shell-style toplevel lifecycle smoke checks.
   window-policy/       Focus, placement, workspaces, snapping; pure logic.
+  session-supervisor/  Crash isolation and crash-log smoke checks.
   shell-protocol/      Private shell/compositor protocol model.
   shell/               Shell chrome state and host smoke checks.
   settings-daemon/     Display, input, and power policy daemon smoke checks.
@@ -128,7 +129,7 @@ The Linux-side verifier can also be run directly inside any Ubuntu checkout:
 ./scripts/verify-linux-e2e.sh
 ```
 
-It runs `cargo fmt`, workspace tests, `cargo clippy`, the deterministic GUI smoke verifier, the preview renderer, launch-performance verifier, resource-budget verifier, settings-daemon verifier, portal-security verifier, CI contract verifier, packaging contract verifier, staged session install verifier, launch-readiness verifier, session launch verifier, session clean-exit verifier, nested Wayland smoke verifier, and MVP 0 contract verifier, then writes `target/linux-e2e/manifest.json`.
+It runs `cargo fmt`, workspace tests, `cargo clippy`, the deterministic GUI smoke verifier, the preview renderer, launch-performance verifier, resource-budget verifier, settings-daemon verifier, portal-security verifier, crash-log verifier, CI contract verifier, packaging contract verifier, staged session install verifier, launch-readiness verifier, session launch verifier, session clean-exit verifier, nested Wayland smoke verifier, and MVP 0 contract verifier, then writes `target/linux-e2e/manifest.json`.
 
 ## GUI Linux VM Workflow
 
@@ -200,6 +201,7 @@ cargo run -p backlit-session -- --backend=headless --screenshot target/backlit-s
 ./scripts/verify-resource-budget.sh
 ./scripts/verify-settings-daemon.sh
 ./scripts/verify-portal-security.sh
+./scripts/verify-crash-logs.sh
 ./scripts/verify-launch-readiness.sh
 ./scripts/verify-session-launch.sh
 ./scripts/verify-session-clean-exit.sh
@@ -288,6 +290,8 @@ Settings daemon state is covered by `backlit-settings-daemon --verify`, which va
 
 Portal security is covered by `backlit-portal-backend --verify`, which denies direct screenshot, screencast, and remote-desktop capture while allowing consented portal-mediated screenshot, screencast, and file-chooser requests.
 
+Crash logging is covered by `backlit-session-supervisor --verify` and `./scripts/verify-crash-logs.sh`. The supervisor emits structured crash-log records for shell and compositor failures, and packaged user services explicitly send stdout/stderr to the systemd journal with stable `SyslogIdentifier` values and `RUST_BACKTRACE=1`.
+
 The default GUI render is guarded by checksum `5635038614353063225`; update it only when an intentional visual change is made.
 
 The launcher catalog is verified in dry-run mode for the first required targets: terminal, browser, and settings.
@@ -318,7 +322,7 @@ Minimized windows are kept in policy state but skipped by focus cycling; this is
 
 Closing the focused window is verified too, including fallback focus that skips minimized windows.
 
-Crash isolation is covered by `backlit-session-supervisor --verify`: shell crashes restart without killing the compositor, while compositor crashes end the session.
+Crash isolation is covered by `backlit-session-supervisor --verify`: shell crashes restart without killing the compositor, compositor crashes end the session, and both paths emit journal-addressable crash records.
 
 Clipboard state is covered by `backlit-clipboard --verify`, which checks text ownership, replacement, clearing, and generation tracking.
 

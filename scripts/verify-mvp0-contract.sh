@@ -36,6 +36,7 @@ require_executable scripts/verify-launch-performance.sh
 require_executable scripts/verify-resource-budget.sh
 require_executable scripts/verify-settings-daemon.sh
 require_executable scripts/verify-portal-security.sh
+require_executable scripts/verify-crash-logs.sh
 require_executable scripts/verify-linux-e2e.sh
 require_executable scripts/verify-ci-contract.sh
 require_executable scripts/verify-packaging-contract.sh
@@ -70,6 +71,7 @@ require_contains scripts/verify-gui-smoke.sh '"shell_panel_status": true'
 require_contains scripts/verify-gui-smoke.sh '"shell_workspace_indicator": true'
 require_contains scripts/verify-gui-smoke.sh '"shell_launcher_targets": 3'
 require_contains scripts/verify-gui-smoke.sh '"shell_app_switcher": true'
+require_contains scripts/verify-gui-smoke.sh '"crash_logs": true'
 require_contains scripts/verify-gui-smoke.sh '"golden_checksum": true'
 require_contains scripts/verify-launch-performance.sh '"name": "backlit-launch-performance"'
 require_contains scripts/verify-linux-e2e.sh './scripts/verify-nested-wayland-smoke.sh'
@@ -78,6 +80,7 @@ require_contains scripts/verify-linux-e2e.sh './scripts/verify-launch-performanc
 require_contains scripts/verify-linux-e2e.sh './scripts/verify-resource-budget.sh'
 require_contains scripts/verify-linux-e2e.sh './scripts/verify-settings-daemon.sh'
 require_contains scripts/verify-linux-e2e.sh './scripts/verify-portal-security.sh'
+require_contains scripts/verify-linux-e2e.sh './scripts/verify-crash-logs.sh'
 require_contains scripts/verify-linux-e2e.sh './scripts/verify-ci-contract.sh'
 require_contains scripts/verify-linux-e2e.sh './scripts/verify-packaging-contract.sh'
 require_contains scripts/verify-linux-e2e.sh './scripts/verify-staged-session-install.sh'
@@ -100,6 +103,7 @@ if [ -n "$artifact_root" ] && [ -d "$artifact_root" ]; then
   require_file "$artifact_root/resource-budget/manifest.json"
   require_file "$artifact_root/settings-daemon/manifest.json"
   require_file "$artifact_root/portal-security/manifest.json"
+  require_file "$artifact_root/crash-logs/manifest.json"
   require_file "$artifact_root/ci-contract/manifest.json"
   require_file "$artifact_root/packaging-contract/manifest.json"
   require_file "$artifact_root/staged-session-install/manifest.json"
@@ -126,6 +130,7 @@ if [ -n "$artifact_root" ] && [ -d "$artifact_root" ]; then
   require_contains "$artifact_root/gui-smoke/manifest.json" '"drag_frame_pacing": true'
   require_contains "$artifact_root/gui-smoke/manifest.json" '"settings_daemon": true'
   require_contains "$artifact_root/gui-smoke/manifest.json" '"portal_security": true'
+  require_contains "$artifact_root/gui-smoke/manifest.json" '"crash_logs": true'
   require_contains "$artifact_root/gui-smoke/manifest.json" '"session_services": true'
   require_contains "$artifact_root/gui-smoke/manifest.json" '"session_settings_service": true'
   require_contains "$artifact_root/gui-smoke/manifest.json" '"session_launch_spawn": true'
@@ -153,10 +158,16 @@ if [ -n "$artifact_root" ] && [ -d "$artifact_root" ]; then
   require_contains "$artifact_root/portal-security/manifest.json" '"direct_screenshot_denied": true'
   require_contains "$artifact_root/portal-security/manifest.json" '"direct_screencast_denied": true'
   require_contains "$artifact_root/portal-security/manifest.json" '"consented_screenshot_allowed": true'
+  require_contains "$artifact_root/crash-logs/manifest.json" '"crash_logs_recorded": true'
+  require_contains "$artifact_root/crash-logs/manifest.json" '"journalctl_user_scope": true'
+  require_contains "$artifact_root/crash-logs/manifest.json" '"systemd_journal_output": true'
+  require_contains "$artifact_root/crash-logs/manifest.json" '"rust_backtrace_enabled": true'
   require_contains "$artifact_root/ci-contract/manifest.json" '"linux_e2e_gate": true'
   require_contains "$artifact_root/packaging-contract/manifest.json" '"desktop_entry": true'
+  require_contains "$artifact_root/packaging-contract/manifest.json" '"journal_logging": true'
   require_contains "$artifact_root/packaging-contract/manifest.json" '"package_split": true'
   require_contains "$artifact_root/staged-session-install/manifest.json" '"desktop_exec_resolves": true'
+  require_contains "$artifact_root/staged-session-install/manifest.json" '"systemd_journal_output": true'
   require_contains "$artifact_root/staged-session-install/manifest.json" '"staged_session_gui": true'
   require_contains "$artifact_root/staged-session-install/manifest.json" '"staged_session_services": true'
   require_contains "$artifact_root/staged-session-install/manifest.json" '"staged_settings_daemon_verify": true'
@@ -208,6 +219,7 @@ cat > "$out_dir/manifest.json" <<EOF
     "resource_budget": true,
     "settings_daemon": true,
     "portal_security": true,
+    "crash_logs": true,
     "input_smoke": true,
     "surface_lifecycle": true,
     "shell_chrome": true,

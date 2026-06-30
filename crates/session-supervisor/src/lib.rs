@@ -25,6 +25,26 @@ impl SessionProcessRole {
     pub fn restartable(self) -> bool {
         !self.critical()
     }
+
+    pub fn journal_unit(self) -> &'static str {
+        match self {
+            Self::Compositor => "backlit-compositor.service",
+            Self::ShellWallpaper
+            | Self::ShellPanel
+            | Self::ShellLauncher
+            | Self::ShellAppSwitcher => "backlit-shell.service",
+        }
+    }
+
+    pub fn syslog_identifier(self) -> &'static str {
+        match self {
+            Self::Compositor => "backlit-compositor",
+            Self::ShellWallpaper
+            | Self::ShellPanel
+            | Self::ShellLauncher
+            | Self::ShellAppSwitcher => "backlit-shell",
+        }
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -128,10 +148,48 @@ impl CrashReport {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct CrashLogRecord {
+    pub role: SessionProcessRole,
+    pub journal_unit: &'static str,
+    pub syslog_identifier: &'static str,
+    pub journalctl_user_scope: bool,
+    pub critical: bool,
+    pub restartable: bool,
+    pub known_process: bool,
+    pub restarted: bool,
+    pub session_alive: bool,
+}
+
+impl CrashLogRecord {
+    pub fn from_report(report: CrashReport) -> Self {
+        Self {
+            role: report.role,
+            journal_unit: report.role.journal_unit(),
+            syslog_identifier: report.role.syslog_identifier(),
+            journalctl_user_scope: true,
+            critical: report.role.critical(),
+            restartable: report.role.restartable(),
+            known_process: report.known_process,
+            restarted: report.restarted,
+            session_alive: report.session_alive,
+        }
+    }
+
+    pub fn recorded(self) -> bool {
+        self.known_process
+            && self.journalctl_user_scope
+            && !self.journal_unit.is_empty()
+            && !self.syslog_identifier.is_empty()
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct CrashSmokeReport {
     pub shell_crash_isolated: bool,
     pub compositor_crash_ends_session: bool,
     pub restarted_shells: u64,
+    pub shell_log: CrashLogRecord,
+    pub compositor_log: CrashLogRecord,
 }
 
 impl CrashSmokeReport {
@@ -139,6 +197,15 @@ impl CrashSmokeReport {
         self.shell_crash_isolated
             && self.compositor_crash_ends_session
             && self.restarted_shells == 1
+            && self.crash_logs_recorded()
+    }
+
+    pub fn crash_logs_recorded(self) -> bool {
+        self.shell_log.recorded() && self.compositor_log.recorded()
+    }
+
+    pub fn journalctl_user_scope(self) -> bool {
+        self.shell_log.journalctl_user_scope && self.compositor_log.journalctl_user_scope
     }
 }
 
@@ -157,6 +224,8 @@ pub fn run_crash_smoke() -> CrashSmokeReport {
         shell_crash_isolated: shell_crash.shell_crash_isolated(),
         compositor_crash_ends_session: !compositor_crash.session_alive,
         restarted_shells,
+        shell_log: CrashLogRecord::from_report(shell_crash),
+        compositor_log: CrashLogRecord::from_report(compositor_crash),
     }
 }
 
@@ -187,5 +256,23 @@ mod tests {
         let report = run_crash_smoke();
 
         assert!(report.passed(), "{report:?}");
+        assert!(report.crash_logs_recorded());
+        assert_eq!(report.shell_log.journal_unit, "backlit-shell.service");
+        assert_eq!(
+            report.compositor_log.journal_unit,
+            "backlit-compositor.service"
+        );
+    }
+
+    #[test]
+    fn crash_roles_map_to_user_journal_units() {
+        assert_eq!(
+            SessionProcessRole::ShellPanel.journal_unit(),
+            "backlit-shell.service"
+        );
+        assert_eq!(
+            SessionProcessRole::Compositor.syslog_identifier(),
+            "backlit-compositor"
+        );
     }
 }

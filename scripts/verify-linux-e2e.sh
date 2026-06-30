@@ -11,6 +11,7 @@ launch_performance_dir="$out_dir/launch-performance"
 resource_budget_dir="$out_dir/resource-budget"
 settings_daemon_dir="$out_dir/settings-daemon"
 portal_security_dir="$out_dir/portal-security"
+crash_logs_dir="$out_dir/crash-logs"
 ci_contract_dir="$out_dir/ci-contract"
 packaging_dir="$out_dir/packaging-contract"
 staged_install_dir="$out_dir/staged-session-install"
@@ -35,6 +36,7 @@ cargo clippy --workspace --all-targets -- -D warnings
 ./scripts/verify-resource-budget.sh "$resource_budget_dir"
 ./scripts/verify-settings-daemon.sh "$settings_daemon_dir"
 ./scripts/verify-portal-security.sh "$portal_security_dir"
+./scripts/verify-crash-logs.sh "$crash_logs_dir"
 ./scripts/verify-ci-contract.sh "$ci_contract_dir"
 ./scripts/verify-packaging-contract.sh "$packaging_dir"
 ./scripts/verify-staged-session-install.sh "$staged_install_dir"
@@ -68,6 +70,7 @@ cat > "$out_dir/manifest.json" <<EOF
     "resource_budget_manifest": "$resource_budget_dir/manifest.json",
     "settings_daemon_manifest": "$settings_daemon_dir/manifest.json",
     "portal_security_manifest": "$portal_security_dir/manifest.json",
+    "crash_logs_manifest": "$crash_logs_dir/manifest.json",
     "ci_contract_manifest": "$ci_contract_dir/manifest.json",
     "packaging_contract_manifest": "$packaging_dir/manifest.json",
     "staged_session_install_manifest": "$staged_install_dir/manifest.json",
@@ -88,6 +91,7 @@ cat > "$out_dir/manifest.json" <<EOF
     "resource_budget": true,
     "settings_daemon": true,
     "portal_security": true,
+    "crash_logs": true,
     "ci_contract": true,
     "packaging_contract": true,
     "staged_session_install": true,
