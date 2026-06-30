@@ -1,0 +1,216 @@
+use std::env;
+use std::process;
+use std::str::FromStr;
+use std::time::Instant;
+
+use backlit_common::metrics::{event_json, FieldValue};
+use backlit_compositor_backend::BackendKind;
+use backlit_demo_client::{render_demo_gui, verify_demo_gui};
+use backlit_window_policy::WindowPolicy;
+
+fn main() {
+    if let Err(error) = run() {
+        eprintln!("backlit-session: {error}");
+        process::exit(2);
+    }
+}
+
+fn run() -> Result<(), String> {
+    let config = Config::parse(env::args().skip(1))?;
+
+    if config.help {
+        print_help();
+        return Ok(());
+    }
+
+    if config.backend == BackendKind::Drm && !cfg!(target_os = "linux") {
+        return Err(String::from(
+            "the drm backend requires Linux with a real graphics/input stack",
+        ));
+    }
+
+    let started = Instant::now();
+    emit(
+        "session.launch",
+        &config,
+        &[("verify", FieldValue::Bool(config.verify))],
+    );
+
+    let mut policy = WindowPolicy::default();
+    policy.add_window("terminal", (800, 600));
+    policy.add_window("settings", (720, 560));
+    policy.add_window("browser", (1100, 720));
+
+    let screenshot = config
+        .screenshot
+        .clone()
+        .unwrap_or_else(|| String::from("target/backlit-session.ppm"));
+    let canvas = render_demo_gui(config.width, config.height);
+    canvas
+        .write_ppm(&screenshot)
+        .map_err(|error| format!("failed to write {screenshot}: {error}"))?;
+
+    emit(
+        "session.gui_ready",
+        &config,
+        &[
+            ("screenshot", FieldValue::Str(screenshot.as_str())),
+            ("windows", FieldValue::U64(policy.windows().len() as u64)),
+            ("width", FieldValue::U64(canvas.width() as u64)),
+            ("height", FieldValue::U64(canvas.height() as u64)),
+        ],
+    );
+
+    if config.verify {
+        let report = verify_demo_gui(&canvas);
+        emit(
+            "session.verified",
+            &config,
+            &[
+                ("passed", FieldValue::Bool(report.passed())),
+                (
+                    "non_background_pixels",
+                    FieldValue::U64(report.non_background_pixels),
+                ),
+                ("panel_ok", FieldValue::Bool(report.panel_ok)),
+                ("launcher_ok", FieldValue::Bool(report.launcher_ok)),
+                ("window_ok", FieldValue::Bool(report.window_ok)),
+                ("pointer_ok", FieldValue::Bool(report.pointer_ok)),
+            ],
+        );
+
+        if !report.passed() {
+            return Err(String::from("headless GUI verification failed"));
+        }
+    }
+
+    emit(
+        "session.exit",
+        &config,
+        &[(
+            "elapsed_ms",
+            FieldValue::U64(started.elapsed().as_millis() as u64),
+        )],
+    );
+
+    Ok(())
+}
+
+fn emit(event: &str, config: &Config, fields: &[(&str, FieldValue<'_>)]) {
+    let mut combined = Vec::with_capacity(fields.len() + 2);
+    combined.push(("backend", FieldValue::Str(config.backend.as_str())));
+    combined.push(("socket", FieldValue::Str(config.socket.as_str())));
+    combined.extend_from_slice(fields);
+    println!("{}", event_json(event, &combined));
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct Config {
+    backend: BackendKind,
+    socket: String,
+    screenshot: Option<String>,
+    width: u32,
+    height: u32,
+    verify: bool,
+    help: bool,
+}
+
+impl Default for Config {
+    fn default() -> Self {
+        Self {
+            backend: BackendKind::Headless,
+            socket: String::from("backlit-0"),
+            screenshot: None,
+            width: 800,
+            height: 520,
+            verify: false,
+            help: false,
+        }
+    }
+}
+
+impl Config {
+    fn parse<I, S>(args: I) -> Result<Self, String>
+    where
+        I: IntoIterator<Item = S>,
+        S: Into<String>,
+    {
+        let mut config = Self::default();
+        let mut args = args.into_iter().map(Into::into);
+
+        while let Some(arg) = args.next() {
+            if arg == "--help" || arg == "-h" {
+                config.help = true;
+            } else if arg == "--verify" {
+                config.verify = true;
+            } else if let Some(value) = arg.strip_prefix("--backend=") {
+                config.backend = parse_backend(value)?;
+            } else if arg == "--backend" {
+                let value = args
+                    .next()
+                    .ok_or_else(|| String::from("missing value for --backend"))?;
+                config.backend = parse_backend(&value)?;
+            } else if let Some(value) = arg.strip_prefix("--socket=") {
+                config.socket = value.to_string();
+            } else if arg == "--socket" {
+                config.socket = args
+                    .next()
+                    .ok_or_else(|| String::from("missing value for --socket"))?;
+            } else if let Some(value) = arg.strip_prefix("--screenshot=") {
+                config.screenshot = Some(value.to_string());
+            } else if arg == "--screenshot" {
+                config.screenshot = Some(
+                    args.next()
+                        .ok_or_else(|| String::from("missing value for --screenshot"))?,
+                );
+            } else if let Some(value) = arg.strip_prefix("--width=") {
+                config.width = parse_dimension("--width", value)?;
+            } else if arg == "--width" {
+                let value = args
+                    .next()
+                    .ok_or_else(|| String::from("missing value for --width"))?;
+                config.width = parse_dimension("--width", &value)?;
+            } else if let Some(value) = arg.strip_prefix("--height=") {
+                config.height = parse_dimension("--height", value)?;
+            } else if arg == "--height" {
+                let value = args
+                    .next()
+                    .ok_or_else(|| String::from("missing value for --height"))?;
+                config.height = parse_dimension("--height", &value)?;
+            } else {
+                return Err(format!("unknown flag: {arg}"));
+            }
+        }
+
+        Ok(config)
+    }
+}
+
+fn parse_backend(value: &str) -> Result<BackendKind, String> {
+    BackendKind::from_str(value).map_err(|_| format!("invalid backend: {value}"))
+}
+
+fn parse_dimension(flag: &str, value: &str) -> Result<u32, String> {
+    value
+        .parse::<u32>()
+        .map_err(|_| format!("invalid value for {flag}: {value}"))
+}
+
+fn print_help() {
+    println!(
+        "\
+backlit-session
+
+Usage:
+  backlit-session [--backend=headless|wayland|drm] [--socket=backlit-0] [--screenshot=target/backlit-session.ppm] [--verify]
+
+Flags:
+  --backend      Select compositor backend. Defaults to headless.
+  --socket       Wayland socket name. Defaults to backlit-0.
+  --screenshot   Write a deterministic PPM GUI screenshot.
+  --width        Screenshot width in pixels.
+  --height       Screenshot height in pixels.
+  --verify       Fail if expected GUI regions are missing.
+"
+    );
+}

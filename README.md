@@ -14,7 +14,7 @@ The initial implementation follows the design in [backlit-design.md](backlit-des
 ```bash
 cargo test --workspace
 cargo run -p backlit-compositor -- --backend=headless --smoke-test
+./scripts/verify-gui-smoke.sh
 ```
 
 See [DEVELOPMENT.md](DEVELOPMENT.md) for environment setup, VM workflow, project layout, and contribution rules.
-

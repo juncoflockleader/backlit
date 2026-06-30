@@ -1,0 +1,15 @@
+[package]
+name = "backlit-session"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+publish = false
+
+[dependencies]
+backlit-common = { path = "../common" }
+backlit-compositor-backend = { path = "../compositor-backend" }
+backlit-demo-client = { path = "../demo-client" }
+backlit-window-policy = { path = "../window-policy" }
+

@@ -5,6 +5,8 @@ members = [
   "crates/compositor-backend",
   "crates/compositor",
   "crates/portal-backend",
+  "crates/demo-client",
+  "crates/session",
   "crates/settings-daemon",
   "crates/shell",
   "crates/shell-protocol",
@@ -15,7 +17,6 @@ members = [
 version = "0.1.0"
 edition = "2021"
 rust-version = "1.76"
-license = "MIT OR Apache-2.0"
+license = "MIT"
 repository = "https://github.com/juncoflockleader/backlit"
 authors = ["Backlit contributors"]
-

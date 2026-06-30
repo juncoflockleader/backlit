@@ -133,6 +133,8 @@ cargo fmt --all
 cargo clippy --workspace --all-targets -- -D warnings
 cargo test --workspace --all-targets
 cargo run -p backlit-compositor -- --backend=headless --smoke-test
+cargo run -p backlit-session -- --backend=headless --screenshot target/backlit-session.ppm --verify
+./scripts/verify-gui-smoke.sh
 cargo run -p backlit-shell -- --component=panel --socket=backlit-0
 ```
 
@@ -144,6 +146,20 @@ Current compositor flags:
 --smoke-test
 --help
 ```
+
+## GUI Smoke Verification
+
+MVP 0 includes a deterministic headless GUI harness. It does not replace nested Wayland or real DRM/KMS testing, but it proves that the session launch path can create a visible shell preview and verify expected GUI regions in CI.
+
+```bash
+./scripts/verify-gui-smoke.sh
+```
+
+Artifacts are written to `target/gui-smoke/`:
+
+- `backlit-session.ppm`: deterministic session screenshot.
+- `demo-client.ppm`: deterministic demo client screenshot.
+- `*.jsonl`: structured launch and verification events.
 
 ## Engineering Rules
 
@@ -164,4 +180,3 @@ git remote add origin https://github.com/juncoflockleader/backlit.git
 ```
 
 Use `main` as the default branch.
-

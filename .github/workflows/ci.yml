@@ -17,4 +17,5 @@ jobs:
         run: cargo fmt --all -- --check
       - name: Test
         run: cargo test --workspace --all-targets
-
+      - name: GUI smoke
+        run: ./scripts/verify-gui-smoke.sh
