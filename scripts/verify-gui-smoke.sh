@@ -26,6 +26,7 @@ cargo run -p backlit-input -- --verify > "$out_dir/input.jsonl"
 cargo run -p backlit-surface -- --verify > "$out_dir/surface.jsonl"
 cargo run -p backlit-session-supervisor -- --verify > "$out_dir/supervisor.jsonl"
 cargo run -p backlit-clipboard -- --verify > "$out_dir/clipboard.jsonl"
+cargo run -p backlit-notification-daemon -- --verify > "$out_dir/notification-daemon.jsonl"
 cargo run -p backlit-settings-daemon -- --verify > "$out_dir/settings-daemon.jsonl"
 cargo run -p backlit-portal-backend -- --verify > "$out_dir/portal.jsonl"
 cargo run -p backlit-session -- \
@@ -87,6 +88,7 @@ grep '"passed":true' "$out_dir/session.jsonl" >/dev/null
 grep '"golden_ok":true' "$out_dir/session.jsonl" >/dev/null
 grep '"compositor_ready":true' "$out_dir/session.jsonl" >/dev/null
 grep '"shell_ready":true' "$out_dir/session.jsonl" >/dev/null
+grep '"notification_ready":true' "$out_dir/session.jsonl" >/dev/null
 grep '"settings_ready":true' "$out_dir/session.jsonl" >/dev/null
 grep '"children_exited_cleanly":true' "$out_dir/session.jsonl" >/dev/null
 grep '"logs_written":true' "$out_dir/session.jsonl" >/dev/null
@@ -167,6 +169,16 @@ grep '"shell_journal_unit":"backlit-shell.service"' "$out_dir/supervisor.jsonl" 
 grep '"compositor_journal_unit":"backlit-compositor.service"' "$out_dir/supervisor.jsonl" >/dev/null
 grep '"event":"clipboard.smoke"' "$out_dir/clipboard.jsonl" >/dev/null
 grep '"generation":3' "$out_dir/clipboard.jsonl" >/dev/null
+grep '"event":"notification_daemon.smoke"' "$out_dir/notification-daemon.jsonl" >/dev/null
+grep '"notify_calls":3' "$out_dir/notification-daemon.jsonl" >/dev/null
+grep '"replacement_preserved_id":true' "$out_dir/notification-daemon.jsonl" >/dev/null
+grep '"action_invoked":true' "$out_dir/notification-daemon.jsonl" >/dev/null
+grep '"closed_replaced":true' "$out_dir/notification-daemon.jsonl" >/dev/null
+grep '"closed_expired":true' "$out_dir/notification-daemon.jsonl" >/dev/null
+grep '"closed_dismissed":true' "$out_dir/notification-daemon.jsonl" >/dev/null
+grep '"critical_persistent":true' "$out_dir/notification-daemon.jsonl" >/dev/null
+grep '"spec_fields_valid":true' "$out_dir/notification-daemon.jsonl" >/dev/null
+grep '"active_after_cleanup":0' "$out_dir/notification-daemon.jsonl" >/dev/null
 grep '"event":"settings_daemon.verified"' "$out_dir/settings-daemon.jsonl" >/dev/null
 grep '"display_validated":true' "$out_dir/settings-daemon.jsonl" >/dev/null
 grep '"input_validated":true' "$out_dir/settings-daemon.jsonl" >/dev/null
@@ -217,6 +229,7 @@ cat > "$out_dir/manifest.json" <<EOF
     "surface_log": "$out_dir/surface.jsonl",
     "supervisor_log": "$out_dir/supervisor.jsonl",
     "clipboard_log": "$out_dir/clipboard.jsonl",
+    "notification_daemon_log": "$out_dir/notification-daemon.jsonl",
     "settings_daemon_log": "$out_dir/settings-daemon.jsonl",
     "portal_log": "$out_dir/portal.jsonl",
     "session_log": "$out_dir/session.jsonl",
@@ -248,11 +261,13 @@ cat > "$out_dir/manifest.json" <<EOF
     "shell_crash_isolated": true,
     "crash_logs": true,
     "clipboard_generation": 3,
+    "notification_daemon": true,
     "settings_daemon": true,
     "portal_security": true,
     "session_windows_after_launch": 4,
     "session_launch_spawn": true,
     "session_services": true,
+    "session_notification_service": true,
     "session_settings_service": true,
     "session_clean_exit": true,
     "session_move_resize": true,

@@ -6,6 +6,7 @@ members = [
   "crates/compositor-backend",
   "crates/compositor",
   "crates/launcher",
+  "crates/notification-daemon",
   "crates/portal-backend",
   "crates/perf",
   "crates/protocols",

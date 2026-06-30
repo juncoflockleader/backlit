@@ -22,6 +22,7 @@ Current launch-readiness checks:
 - `backlit-surface --verify` verifies the policy-level xdg-shell toplevel contract: create, configure, ack, map into window policy, focus, maximize, fullscreen, close request, and clean removal.
 - `backlit-perf --verify` verifies a deterministic 60-frame drag pacing smoke with zero dropped frames and pointer-to-frame p99 under 16 ms.
 - `backlit-compositor -- --smoke-test` verifies direct-scanout eligibility policy for opaque fullscreen dmabuf surfaces, including overlay and SHM blockers.
+- `backlit-notification-daemon --verify` verifies notification service behavior that the session launches with shell services.
 - `backlit-settings-daemon --verify` verifies display, input, and power policy state for the settings service launched with the session.
 - `backlit-portal-backend --verify` verifies that direct screenshot, screencast, and remote-desktop capture are denied and only consented portal-mediated flows are allowed.
 - `backlit-session-supervisor --verify` and `scripts/verify-crash-logs.sh` verify crash isolation plus user-journal crash records for compositor and shell failures.
@@ -32,6 +33,7 @@ Current launch-readiness checks:
 - The Linux E2E manifest includes the session launch manifest.
 - The Linux E2E manifest includes the launch-performance manifest.
 - The Linux E2E manifest includes the resource-budget manifest.
+- The Linux E2E manifest includes the notification-daemon manifest.
 - The Linux E2E manifest includes the settings-daemon manifest.
 - The Linux E2E manifest includes the DRM session smoke manifest.
 - Parallels Ubuntu E2E is expected to report `drm_expected_ready: true`, `drm_ready: true`, `drm_session_expected_ready: true`, `drm_session_ready: true`, and `drm_session_smoke_ready: true`.

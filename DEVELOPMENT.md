@@ -25,6 +25,7 @@ crates/
   session-supervisor/  Crash isolation and crash-log smoke checks.
   shell-protocol/      Private shell/compositor protocol model.
   shell/               Shell chrome state and host smoke checks.
+  notification-daemon/ D-Bus notification behavior smoke checks.
   settings-daemon/     Display, input, and power policy daemon smoke checks.
   portal-backend/      Future xdg-desktop-portal backend.
 apps/
@@ -129,7 +130,7 @@ The Linux-side verifier can also be run directly inside any Ubuntu checkout:
 ./scripts/verify-linux-e2e.sh
 ```
 
-It runs `cargo fmt`, workspace tests, `cargo clippy`, the deterministic GUI smoke verifier, the preview renderer, launch-performance verifier, resource-budget verifier, settings-daemon verifier, portal-security verifier, crash-log verifier, CI contract verifier, packaging contract verifier, staged session install verifier, launch-readiness verifier, session launch verifier, session clean-exit verifier, nested Wayland smoke verifier, and MVP 0 contract verifier, then writes `target/linux-e2e/manifest.json`.
+It runs `cargo fmt`, workspace tests, `cargo clippy`, the deterministic GUI smoke verifier, the preview renderer, launch-performance verifier, resource-budget verifier, notification-daemon verifier, settings-daemon verifier, portal-security verifier, crash-log verifier, CI contract verifier, packaging contract verifier, staged session install verifier, launch-readiness verifier, session launch verifier, session clean-exit verifier, nested Wayland smoke verifier, and MVP 0 contract verifier, then writes `target/linux-e2e/manifest.json`.
 
 ## GUI Linux VM Workflow
 
@@ -191,6 +192,7 @@ cargo run -p backlit-input -- --verify
 cargo run -p backlit-surface -- --verify
 cargo run -p backlit-session-supervisor -- --verify
 cargo run -p backlit-clipboard -- --verify
+cargo run -p backlit-notification-daemon -- --verify
 cargo run -p backlit-settings-daemon -- --verify
 cargo run -p backlit-portal-backend -- --verify
 cargo run -p backlit-session -- --backend=headless --screenshot target/backlit-session.ppm --verify --verify-services --verify-clean-exit
@@ -199,6 +201,7 @@ cargo run -p backlit-session -- --backend=headless --screenshot target/backlit-s
 ./scripts/verify-gui-smoke.sh
 ./scripts/verify-launch-performance.sh
 ./scripts/verify-resource-budget.sh
+./scripts/verify-notification-daemon.sh
 ./scripts/verify-settings-daemon.sh
 ./scripts/verify-portal-security.sh
 ./scripts/verify-crash-logs.sh
@@ -282,11 +285,13 @@ It also runs `backlit-perf --verify`, which measures the deterministic GUI rende
 
 The compositor smoke path also checks the headless direct-scanout policy: an opaque fullscreen dmabuf surface covering the output is eligible, while overlays and SHM buffers block scanout.
 
-The launch-performance verifier runs the built `backlit-session`, `backlit-compositor`, `backlit-shell`, and `backlit-settings-daemon` binaries directly, then writes `target/launch-performance/manifest.json`. It enforces the current MVP budgets for session GUI readiness under 500 ms, service-ready probes under 2 seconds, and terminal hotkey spawn under 300 ms.
+The launch-performance verifier runs the built `backlit-session`, `backlit-compositor`, `backlit-shell`, `backlit-notification-daemon`, and `backlit-settings-daemon` binaries directly, then writes `target/launch-performance/manifest.json`. It enforces the current MVP budgets for session GUI readiness under 500 ms, service-ready probes under 2 seconds, and terminal hotkey spawn under 300 ms.
 
 The resource-budget verifier runs bounded idle probes for `backlit-compositor` and `backlit-shell`, samples Linux `/proc`, then writes `target/resource-budget/manifest.json`. On Linux it enforces compositor idle CPU under 0.5% and combined compositor+shell RSS under 250 MB; on non-Linux hosts it records an expected skip so Parallels remains the authoritative resource-budget proof.
 
 Settings daemon state is covered by `backlit-settings-daemon --verify`, which validates display mode/scale/refresh settings, keyboard and pointer policy, power idle policy, and the lock/logout/reboot/shutdown power menu.
+
+Notification daemon state is covered by `backlit-notification-daemon --verify`, which verifies D-Bus-style notification fields, replace-id behavior, action invocation, critical notification persistence, and expired/dismissed/replaced close reasons.
 
 Portal security is covered by `backlit-portal-backend --verify`, which denies direct screenshot, screencast, and remote-desktop capture while allowing consented portal-mediated screenshot, screencast, and file-chooser requests.
 
@@ -308,7 +313,7 @@ Surface lifecycle is verified by `backlit-surface --verify`, which proves the xd
 
 The session smoke path consumes those routes too: `Alt+Tab` cycles focus and `Super+Enter` resolves the terminal launch path, pointer input verifies focus/move/resize routing, surface lifecycle verifies map/configure/close behavior, spawns the terminal launch target with `WAYLAND_DISPLAY` set when `--verify-launch-spawn` is enabled, then records the resulting window-policy state in `session.jsonl`.
 
-With `--verify-services`, `backlit-session` also resolves sibling `backlit-compositor`, `backlit-shell`, and `backlit-settings-daemon` binaries, runs their readiness probes, captures their logs, and emits `session.services_verified`.
+With `--verify-services`, `backlit-session` also resolves sibling `backlit-compositor`, `backlit-shell`, `backlit-notification-daemon`, and `backlit-settings-daemon` binaries, runs their readiness probes, captures their logs, and emits `session.services_verified`.
 
 With `--verify-clean-exit`, `backlit-session` also requests shutdown, closes all managed windows, clears focus, and emits `session.clean_exit`.
 

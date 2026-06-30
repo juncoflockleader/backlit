@@ -54,6 +54,13 @@ dependencies = [
 ]
 
 [[package]]
+name = "backlit-notification-daemon"
+version = "0.1.0"
+dependencies = [
+ "backlit-common",
+]
+
+[[package]]
 name = "backlit-perf"
 version = "0.1.0"
 dependencies = [

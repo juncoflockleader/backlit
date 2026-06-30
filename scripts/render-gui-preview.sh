@@ -14,7 +14,12 @@ service_log_dir="$out_dir/session-services"
 expected_checksum="5635038614353063225"
 expected_ppm_bytes="1248015"
 
-cargo build -p backlit-session -p backlit-compositor -p backlit-shell -p backlit-settings-daemon
+cargo build \
+  -p backlit-session \
+  -p backlit-compositor \
+  -p backlit-shell \
+  -p backlit-notification-daemon \
+  -p backlit-settings-daemon
 
 target/debug/backlit-session \
   --backend=headless \
@@ -30,6 +35,7 @@ grep '"passed":true' "$session_log" >/dev/null
 grep '"golden_ok":true' "$session_log" >/dev/null
 grep '"compositor_ready":true' "$session_log" >/dev/null
 grep '"shell_ready":true' "$session_log" >/dev/null
+grep '"notification_ready":true' "$session_log" >/dev/null
 grep '"settings_ready":true' "$session_log" >/dev/null
 grep "\"checksum\":$expected_checksum" "$session_log" >/dev/null
 test -s "$session_ppm"
@@ -89,6 +95,7 @@ cat > "$out_dir/manifest.json" <<EOF
   "checks": {
     "session_verified": true,
     "session_services": true,
+    "notification_service": true,
     "settings_service": true,
     "ppm_bytes": $session_ppm_bytes,
     "png_written": $png_written,

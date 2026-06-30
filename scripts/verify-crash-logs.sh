@@ -59,6 +59,12 @@ require_line packaging/systemd/backlit-shell.service "StandardOutput=journal"
 require_line packaging/systemd/backlit-shell.service "StandardError=journal"
 require_line packaging/systemd/backlit-shell.service "Restart=on-failure"
 
+require_line packaging/systemd/backlit-notification-daemon.service "Environment=RUST_BACKTRACE=1"
+require_line packaging/systemd/backlit-notification-daemon.service "SyslogIdentifier=backlit-notification-daemon"
+require_line packaging/systemd/backlit-notification-daemon.service "StandardOutput=journal"
+require_line packaging/systemd/backlit-notification-daemon.service "StandardError=journal"
+require_line packaging/systemd/backlit-notification-daemon.service "Restart=on-failure"
+
 require_line packaging/systemd/backlit-settings-daemon.service "Environment=RUST_BACKTRACE=1"
 require_line packaging/systemd/backlit-settings-daemon.service "SyslogIdentifier=backlit-settings-daemon"
 require_line packaging/systemd/backlit-settings-daemon.service "StandardOutput=journal"
@@ -79,6 +85,7 @@ cat > "$out_dir/manifest.json" <<EOF
     "supervisor_log": "$supervisor_log",
     "compositor_service": "packaging/systemd/backlit-compositor.service",
     "shell_service": "packaging/systemd/backlit-shell.service",
+    "notification_daemon_service": "packaging/systemd/backlit-notification-daemon.service",
     "settings_daemon_service": "packaging/systemd/backlit-settings-daemon.service"
   },
   "checks": {

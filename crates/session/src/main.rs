@@ -317,6 +317,7 @@ impl ServiceProbe {
 struct ServiceVerification {
     compositor: ServiceProbe,
     shell: ServiceProbe,
+    notification: ServiceProbe,
     settings: ServiceProbe,
     logs_written: bool,
 }
@@ -329,27 +330,36 @@ impl ServiceVerification {
             && self.shell.resolved
             && self.shell.exit_ok
             && self.shell.ready
+            && self.notification.resolved
+            && self.notification.exit_ok
+            && self.notification.ready
             && self.settings.resolved
             && self.settings.exit_ok
             && self.settings.ready
     }
 
     fn children_exited_cleanly(&self) -> bool {
-        self.compositor.exit_ok && self.shell.exit_ok && self.settings.exit_ok
+        self.compositor.exit_ok
+            && self.shell.exit_ok
+            && self.notification.exit_ok
+            && self.settings.exit_ok
     }
 }
 
 fn verify_session_services(config: &Config) -> Result<ServiceVerification, String> {
     let compositor_path = sibling_binary("backlit-compositor");
     let shell_path = sibling_binary("backlit-shell");
+    let notification_path = sibling_binary("backlit-notification-daemon");
     let settings_path = sibling_binary("backlit-settings-daemon");
 
     let compositor = run_compositor_probe(&compositor_path, config)?;
     let shell = run_shell_probe(&shell_path, config)?;
+    let notification = run_notification_probe(&notification_path)?;
     let settings = run_settings_probe(&settings_path)?;
     let mut report = ServiceVerification {
         compositor,
         shell,
+        notification,
         settings,
         logs_written: false,
     };
@@ -415,6 +425,20 @@ fn run_shell_probe(path: &Path, config: &Config) -> Result<ServiceProbe, String>
     )
 }
 
+fn run_notification_probe(path: &Path) -> Result<ServiceProbe, String> {
+    run_service_probe(
+        path,
+        &["--verify"],
+        &[
+            String::from("\"event\":\"notification_daemon.smoke\""),
+            String::from("\"passed\":true"),
+            String::from("\"notify_calls\":3"),
+            String::from("\"replacement_preserved_id\":true"),
+            String::from("\"critical_persistent\":true"),
+        ],
+    )
+}
+
 fn run_settings_probe(path: &Path) -> Result<ServiceProbe, String> {
     run_service_probe(
         path,
@@ -473,6 +497,16 @@ fn write_service_logs(log_dir: &Path, report: &ServiceVerification) -> Result<()
     fs::write(log_dir.join("shell.stderr"), &report.shell.stderr)
         .map_err(|error| format!("failed to write shell service stderr: {error}"))?;
     fs::write(
+        log_dir.join("notification-daemon.jsonl"),
+        &report.notification.stdout,
+    )
+    .map_err(|error| format!("failed to write notification daemon service log: {error}"))?;
+    fs::write(
+        log_dir.join("notification-daemon.stderr"),
+        &report.notification.stderr,
+    )
+    .map_err(|error| format!("failed to write notification daemon service stderr: {error}"))?;
+    fs::write(
         log_dir.join("settings-daemon.jsonl"),
         &report.settings.stdout,
     )
@@ -503,6 +537,14 @@ fn emit_service_verification(config: &Config, report: &ServiceVerification, elap
             ("shell_resolved", FieldValue::Bool(report.shell.resolved)),
             ("shell_ready", FieldValue::Bool(report.shell.ready)),
             (
+                "notification_resolved",
+                FieldValue::Bool(report.notification.resolved),
+            ),
+            (
+                "notification_ready",
+                FieldValue::Bool(report.notification.ready),
+            ),
+            (
                 "settings_resolved",
                 FieldValue::Bool(report.settings.resolved),
             ),
@@ -518,6 +560,10 @@ fn emit_service_verification(config: &Config, report: &ServiceVerification, elap
             ),
             ("shell_probe_ms", FieldValue::U64(report.shell.elapsed_ms)),
             (
+                "notification_probe_ms",
+                FieldValue::U64(report.notification.elapsed_ms),
+            ),
+            (
                 "settings_probe_ms",
                 FieldValue::U64(report.settings.elapsed_ms),
             ),
@@ -528,6 +574,10 @@ fn emit_service_verification(config: &Config, report: &ServiceVerification, elap
             (
                 "shell_stdout_bytes",
                 FieldValue::U64(report.shell.stdout.len() as u64),
+            ),
+            (
+                "notification_stdout_bytes",
+                FieldValue::U64(report.notification.stdout.len() as u64),
             ),
             (
                 "settings_stdout_bytes",

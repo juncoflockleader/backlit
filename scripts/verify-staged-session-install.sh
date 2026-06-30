@@ -12,11 +12,13 @@ systemd_dir="$stage_dir/usr/lib/systemd/user"
 session_desktop="$session_dir/backlit.desktop"
 compositor_service="$systemd_dir/backlit-compositor.service"
 shell_service="$systemd_dir/backlit-shell.service"
+notification_service="$systemd_dir/backlit-notification-daemon.service"
 settings_service="$systemd_dir/backlit-settings-daemon.service"
 session_log="$out_dir/session.jsonl"
 session_screenshot="$out_dir/staged-session.ppm"
 compositor_log="$out_dir/compositor.jsonl"
 shell_log="$out_dir/shell.jsonl"
+notification_log="$out_dir/notification-daemon.jsonl"
 settings_log="$out_dir/settings-daemon.jsonl"
 
 fail() {
@@ -48,20 +50,28 @@ resolve_usr_bin() {
 
 mkdir -p "$bin_dir" "$session_dir" "$systemd_dir" "$out_dir"
 
-cargo build -p backlit-session -p backlit-compositor -p backlit-shell -p backlit-settings-daemon
+cargo build \
+  -p backlit-session \
+  -p backlit-compositor \
+  -p backlit-shell \
+  -p backlit-notification-daemon \
+  -p backlit-settings-daemon
 
 install -m 0755 target/debug/backlit-session "$bin_dir/backlit-session"
 install -m 0755 target/debug/backlit-compositor "$bin_dir/backlit-compositor"
 install -m 0755 target/debug/backlit-shell "$bin_dir/backlit-shell"
+install -m 0755 target/debug/backlit-notification-daemon "$bin_dir/backlit-notification-daemon"
 install -m 0755 target/debug/backlit-settings-daemon "$bin_dir/backlit-settings-daemon"
 install -m 0644 packaging/sessions/backlit.desktop "$session_desktop"
 install -m 0644 packaging/systemd/backlit-compositor.service "$compositor_service"
 install -m 0644 packaging/systemd/backlit-shell.service "$shell_service"
+install -m 0644 packaging/systemd/backlit-notification-daemon.service "$notification_service"
 install -m 0644 packaging/systemd/backlit-settings-daemon.service "$settings_service"
 
 require_file "$session_desktop"
 require_file "$compositor_service"
 require_file "$shell_service"
+require_file "$notification_service"
 require_file "$settings_service"
 
 require_line "$session_desktop" "Exec=backlit-session"
@@ -79,6 +89,11 @@ require_line "$shell_service" "Environment=RUST_BACKTRACE=1"
 require_line "$shell_service" "SyslogIdentifier=backlit-shell"
 require_line "$shell_service" "StandardOutput=journal"
 require_line "$shell_service" "StandardError=journal"
+require_line "$notification_service" "ExecStart=/usr/bin/backlit-notification-daemon"
+require_line "$notification_service" "Environment=RUST_BACKTRACE=1"
+require_line "$notification_service" "SyslogIdentifier=backlit-notification-daemon"
+require_line "$notification_service" "StandardOutput=journal"
+require_line "$notification_service" "StandardError=journal"
 require_line "$settings_service" "ExecStart=/usr/bin/backlit-settings-daemon"
 require_line "$settings_service" "Environment=RUST_BACKTRACE=1"
 require_line "$settings_service" "SyslogIdentifier=backlit-settings-daemon"
@@ -87,17 +102,21 @@ require_line "$settings_service" "StandardError=journal"
 
 compositor_exec_start="$(sed -n 's/^ExecStart=//p' "$compositor_service")"
 shell_exec_start="$(sed -n 's/^ExecStart=//p' "$shell_service")"
+notification_exec_start="$(sed -n 's/^ExecStart=//p' "$notification_service")"
 settings_exec_start="$(sed -n 's/^ExecStart=//p' "$settings_service")"
 compositor_command="${compositor_exec_start%% *}"
 shell_command="${shell_exec_start%% *}"
+notification_command="${notification_exec_start%% *}"
 settings_command="${settings_exec_start%% *}"
 require_executable "$(resolve_usr_bin "$compositor_command")"
 require_executable "$(resolve_usr_bin "$shell_command")"
+require_executable "$(resolve_usr_bin "$notification_command")"
 require_executable "$(resolve_usr_bin "$settings_command")"
 
 "$bin_dir/backlit-session" --help > "$out_dir/backlit-session.help"
 "$bin_dir/backlit-compositor" --help > "$out_dir/backlit-compositor.help"
 "$bin_dir/backlit-shell" --help > "$out_dir/backlit-shell.help"
+"$bin_dir/backlit-notification-daemon" --help > "$out_dir/backlit-notification-daemon.help"
 "$bin_dir/backlit-settings-daemon" --help > "$out_dir/backlit-settings-daemon.help"
 
 "$bin_dir/backlit-session" \
@@ -123,6 +142,7 @@ grep -F '"exit_success":true' "$session_log" >/dev/null || fail "session launch 
 grep -F '"wayland_display_set":true' "$session_log" >/dev/null || fail "session launch target did not receive WAYLAND_DISPLAY"
 grep -F '"compositor_ready":true' "$session_log" >/dev/null || fail "session compositor service did not become ready"
 grep -F '"shell_ready":true' "$session_log" >/dev/null || fail "session shell service did not become ready"
+grep -F '"notification_ready":true' "$session_log" >/dev/null || fail "session notification service did not become ready"
 grep -F '"settings_ready":true' "$session_log" >/dev/null || fail "session settings service did not become ready"
 grep -F '"children_exited_cleanly":true' "$session_log" >/dev/null || fail "session service probes did not exit cleanly"
 
@@ -132,6 +152,12 @@ grep -F '"event":"compositor.smoke_test"' "$compositor_log" >/dev/null || fail "
 "$bin_dir/backlit-shell" --component=all --socket=backlit-0 --verify > "$shell_log"
 grep -F '"event":"shell.verified"' "$shell_log" >/dev/null || fail "missing shell verification event"
 grep -F '"passed":true' "$shell_log" >/dev/null || fail "shell verification did not pass"
+
+"$bin_dir/backlit-notification-daemon" --verify > "$notification_log"
+grep -F '"event":"notification_daemon.smoke"' "$notification_log" >/dev/null || fail "missing notification daemon verification event"
+grep -F '"passed":true' "$notification_log" >/dev/null || fail "notification daemon verification did not pass"
+grep -F '"replacement_preserved_id":true' "$notification_log" >/dev/null || fail "notification replacement policy did not verify"
+grep -F '"critical_persistent":true' "$notification_log" >/dev/null || fail "critical notification persistence did not verify"
 
 "$bin_dir/backlit-settings-daemon" --verify > "$settings_log"
 grep -F '"event":"settings_daemon.verified"' "$settings_log" >/dev/null || fail "missing settings daemon verification event"
@@ -149,12 +175,14 @@ cat > "$out_dir/manifest.json" <<EOF
     "session_desktop": "$session_desktop",
     "compositor_service": "$compositor_service",
     "shell_service": "$shell_service",
+    "notification_daemon_service": "$notification_service",
     "settings_daemon_service": "$settings_service",
     "session_log": "$session_log",
     "session_services_dir": "$out_dir/session-services",
     "session_screenshot": "$session_screenshot",
     "compositor_log": "$compositor_log",
     "shell_log": "$shell_log",
+    "notification_daemon_log": "$notification_log",
     "settings_daemon_log": "$settings_log"
   },
   "checks": {
@@ -168,6 +196,7 @@ cat > "$out_dir/manifest.json" <<EOF
     "staged_session_services": true,
     "staged_compositor_smoke": true,
     "staged_shell_verify": true,
+    "staged_notification_daemon_verify": true,
     "staged_settings_daemon_verify": true
   }
 }

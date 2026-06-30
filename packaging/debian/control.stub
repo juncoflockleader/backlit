@@ -16,7 +16,7 @@ Package: fastgui-shell
 Architecture: any
 Depends: ${shlibs:Depends}, ${misc:Depends}, fastgui-compositor
 Description: Backlit shell clients
- Panel, launcher, wallpaper, and shell support processes for Backlit.
+ Panel, launcher, wallpaper, notifications, and shell support processes for Backlit.
 
 Package: fastgui-session
 Architecture: any

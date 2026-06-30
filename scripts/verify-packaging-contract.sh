@@ -36,6 +36,7 @@ require_package() {
 require_file packaging/sessions/backlit.desktop
 require_file packaging/systemd/backlit-compositor.service
 require_file packaging/systemd/backlit-shell.service
+require_file packaging/systemd/backlit-notification-daemon.service
 require_file packaging/systemd/backlit-settings-daemon.service
 require_file packaging/debian/control.stub
 
@@ -66,6 +67,17 @@ require_line packaging/systemd/backlit-shell.service "StandardError=journal"
 require_line packaging/systemd/backlit-shell.service "Restart=on-failure"
 require_line packaging/systemd/backlit-shell.service "WantedBy=graphical-session.target"
 
+require_line packaging/systemd/backlit-notification-daemon.service "After=backlit-compositor.service"
+require_line packaging/systemd/backlit-notification-daemon.service "PartOf=graphical-session.target"
+require_line packaging/systemd/backlit-notification-daemon.service "Type=simple"
+require_line packaging/systemd/backlit-notification-daemon.service "ExecStart=/usr/bin/backlit-notification-daemon"
+require_line packaging/systemd/backlit-notification-daemon.service "Environment=RUST_BACKTRACE=1"
+require_line packaging/systemd/backlit-notification-daemon.service "SyslogIdentifier=backlit-notification-daemon"
+require_line packaging/systemd/backlit-notification-daemon.service "StandardOutput=journal"
+require_line packaging/systemd/backlit-notification-daemon.service "StandardError=journal"
+require_line packaging/systemd/backlit-notification-daemon.service "Restart=on-failure"
+require_line packaging/systemd/backlit-notification-daemon.service "WantedBy=graphical-session.target"
+
 require_line packaging/systemd/backlit-settings-daemon.service "After=backlit-compositor.service"
 require_line packaging/systemd/backlit-settings-daemon.service "PartOf=graphical-session.target"
 require_line packaging/systemd/backlit-settings-daemon.service "Type=simple"
@@ -91,6 +103,7 @@ done
 
 require_contains packaging/debian/control.stub "fastgui-session, fastgui-portal, fastgui-settings"
 require_contains Cargo.toml "\"crates/compositor\""
+require_contains Cargo.toml "\"crates/notification-daemon\""
 require_contains Cargo.toml "\"crates/session\""
 require_contains Cargo.toml "\"crates/shell\""
 require_contains Cargo.toml "\"crates/settings-daemon\""
@@ -106,6 +119,7 @@ cat > "$out_dir/manifest.json" <<EOF
     "session_desktop": "packaging/sessions/backlit.desktop",
     "compositor_service": "packaging/systemd/backlit-compositor.service",
     "shell_service": "packaging/systemd/backlit-shell.service",
+    "notification_daemon_service": "packaging/systemd/backlit-notification-daemon.service",
     "settings_daemon_service": "packaging/systemd/backlit-settings-daemon.service",
     "debian_control_stub": "packaging/debian/control.stub"
   },
