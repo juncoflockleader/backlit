@@ -133,6 +133,7 @@ cargo fmt --all
 cargo clippy --workspace --all-targets -- -D warnings
 cargo test --workspace --all-targets
 cargo run -p backlit-compositor -- --backend=headless --smoke-test
+cargo run -p backlit-compositor-backend -- --backend=headless --verify
 cargo run -p backlit-protocols -- --verify --list
 cargo run -p backlit-perf -- --verify
 cargo run -p backlit-session -- --backend=headless --screenshot target/backlit-session.ppm --verify
@@ -169,6 +170,16 @@ The verifier also runs `backlit-protocols --verify --list` so MVP protocol cover
 It also runs `backlit-perf --verify`, which measures the deterministic GUI render path and headless backend present path against generous MVP 0 smoke budgets.
 
 The default GUI render is guarded by checksum `5635038614353063225`; update it only when an intentional visual change is made.
+
+Backend preflight can be run directly:
+
+```bash
+cargo run -p backlit-compositor-backend -- --backend=headless --verify
+cargo run -p backlit-compositor-backend -- --backend=wayland --verify
+cargo run -p backlit-compositor-backend -- --backend=drm --verify
+```
+
+The Wayland preflight expects `WAYLAND_DISPLAY` and `XDG_RUNTIME_DIR`; the DRM preflight only becomes meaningful inside a real Linux session.
 
 ## Engineering Rules
 

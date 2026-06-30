@@ -18,6 +18,9 @@ dependencies = [
 [[package]]
 name = "backlit-compositor-backend"
 version = "0.1.0"
+dependencies = [
+ "backlit-common",
+]
 
 [[package]]
 name = "backlit-demo-client"

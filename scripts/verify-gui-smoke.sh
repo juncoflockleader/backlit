@@ -10,6 +10,7 @@ expected_height="520"
 expected_ppm_bytes="1248015"
 
 cargo run -p backlit-compositor -- --backend=headless --smoke-test > "$out_dir/compositor.jsonl"
+cargo run -p backlit-compositor-backend -- --backend=headless --verify > "$out_dir/backend-preflight.jsonl"
 cargo run -p backlit-protocols -- --verify --list > "$out_dir/protocols.jsonl"
 cargo run -p backlit-perf -- --verify > "$out_dir/perf.jsonl"
 cargo run -p backlit-shell -- --component=panel --socket=backlit-0 > "$out_dir/shell.jsonl"
@@ -26,6 +27,8 @@ grep '"event":"session.verified"' "$out_dir/session.jsonl" >/dev/null
 grep '"passed":true' "$out_dir/session.jsonl" >/dev/null
 grep '"golden_ok":true' "$out_dir/session.jsonl" >/dev/null
 grep "\"checksum\":$expected_checksum" "$out_dir/session.jsonl" >/dev/null
+grep '"event":"backend.preflight"' "$out_dir/backend-preflight.jsonl" >/dev/null
+grep '"ready":true' "$out_dir/backend-preflight.jsonl" >/dev/null
 grep '"event":"protocol.smoke"' "$out_dir/protocols.jsonl" >/dev/null
 grep '"required_protocols":7' "$out_dir/protocols.jsonl" >/dev/null
 grep '"event":"perf.smoke"' "$out_dir/perf.jsonl" >/dev/null
@@ -54,6 +57,7 @@ cat > "$out_dir/manifest.json" <<EOF
   "expected_ppm_bytes": $expected_ppm_bytes,
   "artifacts": {
     "compositor_log": "$out_dir/compositor.jsonl",
+    "backend_preflight_log": "$out_dir/backend-preflight.jsonl",
     "protocols_log": "$out_dir/protocols.jsonl",
     "perf_log": "$out_dir/perf.jsonl",
     "shell_log": "$out_dir/shell.jsonl",

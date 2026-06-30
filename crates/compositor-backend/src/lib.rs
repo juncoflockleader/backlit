@@ -22,6 +22,109 @@ impl BackendKind {
     }
 }
 
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct BackendPreflightReport {
+    pub backend: BackendKind,
+    pub ready: bool,
+    pub code: &'static str,
+    pub detail: String,
+}
+
+impl BackendPreflightReport {
+    pub fn ready(backend: BackendKind, code: &'static str, detail: impl Into<String>) -> Self {
+        Self {
+            backend,
+            ready: true,
+            code,
+            detail: detail.into(),
+        }
+    }
+
+    pub fn blocked(backend: BackendKind, code: &'static str, detail: impl Into<String>) -> Self {
+        Self {
+            backend,
+            ready: false,
+            code,
+            detail: detail.into(),
+        }
+    }
+}
+
+pub fn preflight_backend(
+    backend: BackendKind,
+    wayland_display: Option<&str>,
+    xdg_runtime_dir: Option<&str>,
+    target_os: &str,
+) -> BackendPreflightReport {
+    match backend {
+        BackendKind::Headless => BackendPreflightReport::ready(
+            backend,
+            "ready",
+            "headless backend does not require host display state",
+        ),
+        BackendKind::Wayland => preflight_wayland(wayland_display, xdg_runtime_dir),
+        BackendKind::Drm => preflight_drm(xdg_runtime_dir, target_os),
+    }
+}
+
+fn preflight_wayland(
+    wayland_display: Option<&str>,
+    xdg_runtime_dir: Option<&str>,
+) -> BackendPreflightReport {
+    if missing(wayland_display) {
+        return BackendPreflightReport::blocked(
+            BackendKind::Wayland,
+            "missing-wayland-display",
+            "nested Wayland backend requires WAYLAND_DISPLAY from a parent compositor",
+        );
+    }
+
+    if missing(xdg_runtime_dir) {
+        return BackendPreflightReport::blocked(
+            BackendKind::Wayland,
+            "missing-xdg-runtime-dir",
+            "nested Wayland backend requires XDG_RUNTIME_DIR for socket discovery",
+        );
+    }
+
+    BackendPreflightReport::ready(
+        BackendKind::Wayland,
+        "ready",
+        "nested Wayland environment variables are present",
+    )
+}
+
+fn preflight_drm(xdg_runtime_dir: Option<&str>, target_os: &str) -> BackendPreflightReport {
+    if target_os != "linux" {
+        return BackendPreflightReport::blocked(
+            BackendKind::Drm,
+            "requires-linux",
+            "DRM/KMS backend requires Linux with a real graphics/input stack",
+        );
+    }
+
+    if missing(xdg_runtime_dir) {
+        return BackendPreflightReport::blocked(
+            BackendKind::Drm,
+            "missing-xdg-runtime-dir",
+            "DRM/KMS backend expects XDG_RUNTIME_DIR from the session environment",
+        );
+    }
+
+    BackendPreflightReport::ready(
+        BackendKind::Drm,
+        "ready-preliminary",
+        "Linux session environment is present; device, seat, and GPU checks run in the real backend",
+    )
+}
+
+fn missing(value: Option<&str>) -> bool {
+    match value {
+        Some(value) => value.trim().is_empty(),
+        None => true,
+    }
+}
+
 impl FromStr for BackendKind {
     type Err = String;
 
@@ -318,5 +421,43 @@ mod tests {
             .unwrap_err();
 
         assert_eq!(error.to_string(), "unknown headless client 99");
+    }
+
+    #[test]
+    fn headless_preflight_is_always_ready() {
+        let report = super::preflight_backend(BackendKind::Headless, None, None, "macos");
+
+        assert!(report.ready);
+        assert_eq!(report.code, "ready");
+    }
+
+    #[test]
+    fn wayland_preflight_requires_parent_display_and_runtime_dir() {
+        let no_display =
+            super::preflight_backend(BackendKind::Wayland, None, Some("/run/user/1000"), "linux");
+        assert!(!no_display.ready);
+        assert_eq!(no_display.code, "missing-wayland-display");
+
+        let no_runtime =
+            super::preflight_backend(BackendKind::Wayland, Some("wayland-0"), None, "linux");
+        assert!(!no_runtime.ready);
+        assert_eq!(no_runtime.code, "missing-xdg-runtime-dir");
+
+        let ready = super::preflight_backend(
+            BackendKind::Wayland,
+            Some("wayland-0"),
+            Some("/run/user/1000"),
+            "linux",
+        );
+        assert!(ready.ready);
+    }
+
+    #[test]
+    fn drm_preflight_requires_linux() {
+        let report =
+            super::preflight_backend(BackendKind::Drm, None, Some("/run/user/1000"), "macos");
+
+        assert!(!report.ready);
+        assert_eq!(report.code, "requires-linux");
     }
 }
