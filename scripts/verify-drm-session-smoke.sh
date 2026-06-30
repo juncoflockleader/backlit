@@ -31,6 +31,31 @@ count_matching() {
   find "$dir" -maxdepth 1 -name "$pattern" -print 2>/dev/null | wc -l | tr -d ' '
 }
 
+count_accessible_matching() {
+  dir="$1"
+  pattern="$2"
+  mode="$3"
+  count=0
+
+  if [ ! -d "$dir" ]; then
+    printf '0'
+    return
+  fi
+
+  for path in "$dir"/$pattern; do
+    if [ ! -e "$path" ]; then
+      continue
+    fi
+    if [ "$mode" = "read" ] && [ -r "$path" ]; then
+      count=$((count + 1))
+    elif [ "$mode" = "write" ] && [ -w "$path" ]; then
+      count=$((count + 1))
+    fi
+  done
+
+  printf '%s' "$count"
+}
+
 runtime_present=false
 if [ -n "${XDG_RUNTIME_DIR:-}" ] && [ -d "${XDG_RUNTIME_DIR:-}" ]; then
   runtime_present=true
@@ -87,7 +112,24 @@ fi
 drm_card_nodes="$(count_matching /dev/dri 'card*')"
 drm_render_nodes="$(count_matching /dev/dri 'renderD*')"
 input_event_nodes="$(count_matching /dev/input 'event*')"
+drm_card_readable="$(count_accessible_matching /dev/dri 'card*' read)"
+drm_card_writable="$(count_accessible_matching /dev/dri 'card*' write)"
+drm_render_readable="$(count_accessible_matching /dev/dri 'renderD*' read)"
+drm_render_writable="$(count_accessible_matching /dev/dri 'renderD*' write)"
+input_event_readable="$(count_accessible_matching /dev/input 'event*' read)"
 drm_node_count=$((drm_card_nodes + drm_render_nodes))
+
+drm_card_access_ready=false
+if [ "$drm_card_nodes" -gt 0 ] \
+  && [ "$drm_card_readable" -gt 0 ] \
+  && [ "$drm_card_writable" -gt 0 ]; then
+  drm_card_access_ready=true
+fi
+
+input_requires_logind_broker=false
+if [ "$input_event_nodes" -gt 0 ] && [ "$input_event_readable" -eq 0 ]; then
+  input_requires_logind_broker=true
+fi
 
 drm_expected_ready=false
 if [ "$(uname -s)" = "Linux" ] \
@@ -95,7 +137,7 @@ if [ "$(uname -s)" = "Linux" ] \
   && [ "$runtime_owned_by_user" = true ] \
   && [ "$session_present" = true ] \
   && [ "$session_local" = true ] \
-  && [ "$drm_node_count" -gt 0 ] \
+  && [ "$drm_card_access_ready" = true ] \
   && [ "$input_event_nodes" -gt 0 ]; then
   drm_expected_ready=true
 fi
@@ -130,6 +172,7 @@ if [ "$drm_expected_ready" = true ]; then
   grep '"logind_session_verified":true' "$session_log" >/dev/null
   grep '"session_active":true' "$session_log" >/dev/null
   grep '"session_remote":false' "$session_log" >/dev/null
+  grep '"drm_card_access_ready":true' "$session_log" >/dev/null
   grep '"event":"session.gui_ready"' "$session_log" >/dev/null
   grep '"event":"session.verified"' "$session_log" >/dev/null
   grep '"event":"session.launch_spawn"' "$session_log" >/dev/null
@@ -210,6 +253,13 @@ cat > "$out_dir/manifest.json" <<EOF
     "drm_card_nodes": $drm_card_nodes,
     "drm_render_nodes": $drm_render_nodes,
     "input_event_nodes": $input_event_nodes,
+    "drm_card_readable": $drm_card_readable,
+    "drm_card_writable": $drm_card_writable,
+    "drm_render_readable": $drm_render_readable,
+    "drm_render_writable": $drm_render_writable,
+    "input_event_readable": $input_event_readable,
+    "drm_card_access_ready": $drm_card_access_ready,
+    "input_requires_logind_broker": $input_requires_logind_broker,
     "session_ppm_bytes": $session_ppm_bytes
   }
 }

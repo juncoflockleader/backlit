@@ -45,6 +45,11 @@ pub struct BackendPreflightEnvironment {
     pub drm_card_nodes: u64,
     pub drm_render_nodes: u64,
     pub input_event_nodes: u64,
+    pub drm_card_readable: u64,
+    pub drm_card_writable: u64,
+    pub drm_render_readable: u64,
+    pub drm_render_writable: u64,
+    pub input_event_readable: u64,
     pub session_id: Option<String>,
     pub seat: Option<String>,
     pub session_type: Option<String>,
@@ -65,6 +70,11 @@ impl BackendPreflightEnvironment {
             drm_card_nodes: 0,
             drm_render_nodes: 0,
             input_event_nodes: 0,
+            drm_card_readable: 0,
+            drm_card_writable: 0,
+            drm_render_readable: 0,
+            drm_render_writable: 0,
+            input_event_readable: 0,
             session_id: None,
             seat: None,
             session_type: None,
@@ -92,6 +102,16 @@ impl BackendPreflightEnvironment {
         environment.drm_card_nodes = count_entries_with_prefix("/dev/dri", "card");
         environment.drm_render_nodes = count_entries_with_prefix("/dev/dri", "renderD");
         environment.input_event_nodes = count_entries_with_prefix("/dev/input", "event");
+        environment.drm_card_readable =
+            count_openable_entries_with_prefix("/dev/dri", "card", AccessMode::Read);
+        environment.drm_card_writable =
+            count_openable_entries_with_prefix("/dev/dri", "card", AccessMode::Write);
+        environment.drm_render_readable =
+            count_openable_entries_with_prefix("/dev/dri", "renderD", AccessMode::Read);
+        environment.drm_render_writable =
+            count_openable_entries_with_prefix("/dev/dri", "renderD", AccessMode::Write);
+        environment.input_event_readable =
+            count_openable_entries_with_prefix("/dev/input", "event", AccessMode::Read);
         environment
     }
 
@@ -118,6 +138,23 @@ impl BackendPreflightEnvironment {
         self
     }
 
+    pub fn with_drm_card_access(mut self, readable: u64, writable: u64) -> Self {
+        self.drm_card_readable = readable;
+        self.drm_card_writable = writable;
+        self
+    }
+
+    pub fn with_drm_render_access(mut self, readable: u64, writable: u64) -> Self {
+        self.drm_render_readable = readable;
+        self.drm_render_writable = writable;
+        self
+    }
+
+    pub fn with_input_event_access(mut self, readable: u64) -> Self {
+        self.input_event_readable = readable;
+        self
+    }
+
     pub fn with_session_id(mut self, value: impl Into<String>) -> Self {
         self.session_id = Some(value.into());
         self
@@ -141,6 +178,14 @@ impl BackendPreflightEnvironment {
 
     pub fn drm_node_count(&self) -> u64 {
         self.drm_card_nodes + self.drm_render_nodes
+    }
+
+    pub fn drm_card_access_ready(&self) -> bool {
+        self.drm_card_nodes > 0 && self.drm_card_readable > 0 && self.drm_card_writable > 0
+    }
+
+    pub fn input_requires_logind_broker(&self) -> bool {
+        self.input_event_nodes > 0 && self.input_event_readable == 0
     }
 
     fn refresh_logind_session_status(&mut self) {
@@ -270,11 +315,19 @@ fn preflight_drm(environment: &BackendPreflightEnvironment) -> BackendPreflightR
         );
     }
 
-    if environment.drm_node_count() == 0 {
+    if environment.drm_card_nodes == 0 {
         return BackendPreflightReport::blocked(
             BackendKind::Drm,
-            "missing-drm-device",
-            "DRM/KMS backend requires at least one /dev/dri card or render node",
+            "missing-drm-card",
+            "DRM/KMS backend requires at least one /dev/dri/card* node for mode setting",
+        );
+    }
+
+    if !environment.drm_card_access_ready() {
+        return BackendPreflightReport::blocked(
+            BackendKind::Drm,
+            "unavailable-drm-card-access",
+            "DRM/KMS backend requires read/write access to a DRM card node",
         );
     }
 
@@ -366,6 +419,44 @@ fn count_entries_with_prefix(dir: &str, prefix: &str) -> u64 {
                 .unwrap_or(false)
         })
         .count() as u64
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum AccessMode {
+    Read,
+    Write,
+}
+
+fn count_openable_entries_with_prefix(dir: &str, prefix: &str, mode: AccessMode) -> u64 {
+    let Ok(entries) = fs::read_dir(dir) else {
+        return 0;
+    };
+
+    entries
+        .filter_map(Result::ok)
+        .filter(|entry| {
+            entry
+                .file_name()
+                .to_str()
+                .map(|name| name.starts_with(prefix))
+                .unwrap_or(false)
+        })
+        .filter(|entry| open_device_node(entry.path().as_path(), mode))
+        .count() as u64
+}
+
+fn open_device_node(path: &std::path::Path, mode: AccessMode) -> bool {
+    let mut options = fs::OpenOptions::new();
+    match mode {
+        AccessMode::Read => {
+            options.read(true);
+        }
+        AccessMode::Write => {
+            options.write(true);
+        }
+    }
+
+    options.open(path).is_ok()
 }
 
 fn missing(value: Option<&str>) -> bool {
@@ -1071,7 +1162,7 @@ mod tests {
     }
 
     #[test]
-    fn drm_preflight_requires_drm_device_nodes() {
+    fn drm_preflight_requires_drm_card_nodes() {
         let environment = BackendPreflightEnvironment::for_target("linux")
             .with_xdg_runtime_dir("/run/user/1000")
             .with_input_event_nodes(2)
@@ -1080,7 +1171,21 @@ mod tests {
         let report = super::preflight_backend_with_environment(BackendKind::Drm, &environment);
 
         assert!(!report.ready);
-        assert_eq!(report.code, "missing-drm-device");
+        assert_eq!(report.code, "missing-drm-card");
+    }
+
+    #[test]
+    fn drm_preflight_requires_drm_card_access() {
+        let environment = BackendPreflightEnvironment::for_target("linux")
+            .with_xdg_runtime_dir("/run/user/1000")
+            .with_drm_nodes(1, 1)
+            .with_input_event_nodes(2)
+            .with_session_id("1");
+
+        let report = super::preflight_backend_with_environment(BackendKind::Drm, &environment);
+
+        assert!(!report.ready);
+        assert_eq!(report.code, "unavailable-drm-card-access");
     }
 
     #[test]
@@ -1088,6 +1193,7 @@ mod tests {
         let environment = BackendPreflightEnvironment::for_target("linux")
             .with_xdg_runtime_dir("/run/user/1000")
             .with_drm_nodes(1, 1)
+            .with_drm_card_access(1, 1)
             .with_session_id("1");
 
         let report = super::preflight_backend_with_environment(BackendKind::Drm, &environment);
@@ -1101,6 +1207,7 @@ mod tests {
         let environment = BackendPreflightEnvironment::for_target("linux")
             .with_xdg_runtime_dir("/run/user/1000")
             .with_drm_nodes(1, 1)
+            .with_drm_card_access(1, 1)
             .with_input_event_nodes(2);
 
         let report = super::preflight_backend_with_environment(BackendKind::Drm, &environment);
@@ -1114,6 +1221,7 @@ mod tests {
         let environment = BackendPreflightEnvironment::for_target("linux")
             .with_xdg_runtime_dir("/run/user/1000")
             .with_drm_nodes(1, 1)
+            .with_drm_card_access(1, 1)
             .with_input_event_nodes(2)
             .with_session_id("1");
 
@@ -1128,6 +1236,7 @@ mod tests {
         let mut inactive = BackendPreflightEnvironment::for_target("linux")
             .with_xdg_runtime_dir("/run/user/1000")
             .with_drm_nodes(1, 1)
+            .with_drm_card_access(1, 1)
             .with_input_event_nodes(2)
             .with_active_local_session("1", "seat0", "wayland");
         inactive.session_active = false;
@@ -1140,6 +1249,7 @@ mod tests {
         let mut remote = BackendPreflightEnvironment::for_target("linux")
             .with_xdg_runtime_dir("/run/user/1000")
             .with_drm_nodes(1, 1)
+            .with_drm_card_access(1, 1)
             .with_input_event_nodes(2)
             .with_active_local_session("1", "seat0", "wayland");
         remote.session_remote = true;
@@ -1155,6 +1265,7 @@ mod tests {
         let mut missing_seat = BackendPreflightEnvironment::for_target("linux")
             .with_xdg_runtime_dir("/run/user/1000")
             .with_drm_nodes(1, 1)
+            .with_drm_card_access(1, 1)
             .with_input_event_nodes(2)
             .with_active_local_session("1", "seat0", "wayland");
         missing_seat.seat = None;
@@ -1167,6 +1278,7 @@ mod tests {
         let unspecified_type = BackendPreflightEnvironment::for_target("linux")
             .with_xdg_runtime_dir("/run/user/1000")
             .with_drm_nodes(1, 1)
+            .with_drm_card_access(1, 1)
             .with_input_event_nodes(2)
             .with_active_local_session("1", "seat0", "unspecified");
 
@@ -1181,6 +1293,7 @@ mod tests {
         let environment = BackendPreflightEnvironment::for_target("linux")
             .with_xdg_runtime_dir("/run/user/1000")
             .with_drm_nodes(1, 1)
+            .with_drm_card_access(1, 1)
             .with_input_event_nodes(2)
             .with_active_local_session("1", "seat0", "wayland");
 

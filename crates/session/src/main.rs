@@ -629,6 +629,34 @@ fn emit_backend_preflight(
                 "input_event_nodes",
                 FieldValue::U64(environment.input_event_nodes),
             ),
+            (
+                "drm_card_readable",
+                FieldValue::U64(environment.drm_card_readable),
+            ),
+            (
+                "drm_card_writable",
+                FieldValue::U64(environment.drm_card_writable),
+            ),
+            (
+                "drm_render_readable",
+                FieldValue::U64(environment.drm_render_readable),
+            ),
+            (
+                "drm_render_writable",
+                FieldValue::U64(environment.drm_render_writable),
+            ),
+            (
+                "input_event_readable",
+                FieldValue::U64(environment.input_event_readable),
+            ),
+            (
+                "drm_card_access_ready",
+                FieldValue::Bool(environment.drm_card_access_ready()),
+            ),
+            (
+                "input_requires_logind_broker",
+                FieldValue::Bool(environment.input_requires_logind_broker()),
+            ),
             ("session_id", FieldValue::Str(session_id)),
             ("seat", FieldValue::Str(seat)),
             ("session_type", FieldValue::Str(session_type)),

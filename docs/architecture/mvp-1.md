@@ -10,8 +10,9 @@ Current launch-readiness checks:
 - DRM/KMS preflight requires Linux.
 - DRM/KMS preflight requires `XDG_RUNTIME_DIR`.
 - DRM/KMS preflight requires `XDG_RUNTIME_DIR` to be owned by the launching user, so VM runners cannot accidentally inherit root's runtime directory.
-- DRM/KMS preflight requires at least one `/dev/dri/card*` or `/dev/dri/renderD*` node.
+- DRM/KMS preflight requires at least one `/dev/dri/card*` node with read/write access for mode setting.
 - DRM/KMS preflight requires `/dev/input/event*` devices for the future libinput path.
+- DRM/KMS preflight records whether direct input-event access is available or whether the future backend must rely on logind/libseat brokering.
 - DRM/KMS preflight requires `XDG_SESSION_ID` so logind/libseat authorization can be added behind the same contract.
 - DRM/KMS preflight requires logind to verify that the session is active, local, seated, and has a concrete session type such as `tty` or `wayland`.
 - `scripts/verify-launch-readiness.sh` records whether the host is DRM launch-ready or expected-blocked.
@@ -38,4 +39,4 @@ Current launch-readiness checks:
 - The Linux E2E manifest includes the notification-daemon manifest.
 - The Linux E2E manifest includes the settings-daemon manifest.
 - The Linux E2E manifest includes the DRM session smoke manifest.
-- Parallels Ubuntu E2E maps the active `parallels` logind session before running the guest verifier and is expected to report `xdg_runtime_dir_owned_by_user: true`, `session_local: true`, `drm_expected_ready: true`, `drm_ready: true`, and `drm_session_smoke_ready: true`.
+- Parallels Ubuntu E2E maps the active `parallels` logind session before running the guest verifier and is expected to report `xdg_runtime_dir_owned_by_user: true`, `session_local: true`, `drm_card_access_ready: true`, `drm_expected_ready: true`, `drm_ready: true`, and `drm_session_smoke_ready: true`.
