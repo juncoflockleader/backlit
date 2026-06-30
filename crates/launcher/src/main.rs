@@ -77,6 +77,7 @@ fn run() -> Result<(), String> {
                     ("spawned", FieldValue::Bool(report.spawned)),
                     ("exit_success", FieldValue::Bool(report.exit_success)),
                     ("status_code", FieldValue::U64(report.status_code)),
+                    ("status_allowed", FieldValue::Bool(report.status_allowed),),
                     (
                         "wayland_display_set",
                         FieldValue::Bool(report.wayland_display_set),
@@ -177,6 +178,7 @@ struct Config {
     desktop_dirs: Vec<String>,
     spawn_program: Option<String>,
     spawn_args: Vec<String>,
+    allowed_status_codes: Vec<i32>,
     wayland_display: Option<String>,
     no_desktop_discovery: bool,
     require_desktop_entries: bool,
@@ -236,6 +238,13 @@ impl Config {
                     args.next()
                         .ok_or_else(|| String::from("missing value for --spawn-arg"))?,
                 );
+            } else if let Some(value) = arg.strip_prefix("--allow-status-code=") {
+                config.allowed_status_codes.push(parse_status_code(value)?);
+            } else if arg == "--allow-status-code" {
+                let value = args
+                    .next()
+                    .ok_or_else(|| String::from("missing value for --allow-status-code"))?;
+                config.allowed_status_codes.push(parse_status_code(&value)?);
             } else if let Some(value) = arg.strip_prefix("--wayland-display=") {
                 config.wayland_display = Some(value.to_string());
             } else if arg == "--wayland-display" {
@@ -270,6 +279,17 @@ fn parse_target(value: &str) -> Result<LaunchTarget, String> {
     value.parse()
 }
 
+fn parse_status_code(value: &str) -> Result<i32, String> {
+    let code = value
+        .parse::<i32>()
+        .map_err(|_| format!("invalid status code '{value}'"))?;
+    if (0..=255).contains(&code) {
+        Ok(code)
+    } else {
+        Err(format!("status code out of range '{value}'"))
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 struct SpawnReport {
     program: String,
@@ -277,12 +297,13 @@ struct SpawnReport {
     spawned: bool,
     exit_success: bool,
     status_code: u64,
+    status_allowed: bool,
     wayland_display_set: bool,
 }
 
 impl SpawnReport {
     fn passed(&self) -> bool {
-        self.spawned && self.exit_success
+        self.spawned && (self.exit_success || self.status_allowed)
     }
 }
 
@@ -303,12 +324,15 @@ fn run_spawn_smoke(command: &LaunchCommand, config: &Config) -> Result<SpawnRepo
         .status()
         .map_err(|error| format!("failed to spawn {program}: {error}"))?;
 
+    let status_code = status.code().unwrap_or(255);
+
     Ok(SpawnReport {
         program,
         arg_count: args.len(),
         spawned: true,
         exit_success: status.success(),
-        status_code: status.code().unwrap_or(255) as u64,
+        status_code: status_code as u64,
+        status_allowed: config.allowed_status_codes.contains(&status_code),
         wayland_display_set: wayland_display.is_some(),
     })
 }
@@ -350,6 +374,7 @@ Flags:
   --spawn-smoke  Spawn the selected launch target or override program and verify it exits successfully.
   --spawn-program  Program override for deterministic spawn verification.
   --spawn-arg  Argument appended to the selected target, or to the spawn override when --spawn-program is set. May repeat.
+  --allow-status-code  Treat this process exit code as an expected spawn result. May repeat.
   --wayland-display  WAYLAND_DISPLAY value to pass to the spawned process.
 "
     );
@@ -373,6 +398,8 @@ mod tests {
             "--require-desktop-entries",
             "--spawn-arg",
             "--help",
+            "--allow-status-code",
+            "230",
             "--wayland-display",
             "wayland-1",
         ])
@@ -383,6 +410,7 @@ mod tests {
         assert_eq!(config.desktop_dirs, ["crates/launcher/fixtures"]);
         assert!(config.require_desktop_entries);
         assert_eq!(config.spawn_args, ["--help"]);
+        assert_eq!(config.allowed_status_codes, [230]);
         assert_eq!(config.wayland_display.as_deref(), Some("wayland-1"));
     }
 

@@ -80,6 +80,7 @@ WAYLAND_DISPLAY="$socket_name" cargo run -p backlit-launcher -- \
   --spawn-arg=sh \
   --spawn-arg=-lc \
   --spawn-arg=true \
+  --allow-status-code=230 \
   --wayland-display="$socket_name" > "$out_dir/terminal-launch.jsonl"
 cargo build \
   -p backlit-session \
@@ -113,8 +114,14 @@ grep '"target":"terminal"' "$out_dir/terminal-launch.jsonl" >/dev/null
 grep '"program":"foot"' "$out_dir/terminal-launch.jsonl" >/dev/null
 grep '"arg_count":4' "$out_dir/terminal-launch.jsonl" >/dev/null
 grep '"spawned":true' "$out_dir/terminal-launch.jsonl" >/dev/null
-grep '"exit_success":true' "$out_dir/terminal-launch.jsonl" >/dev/null
 grep '"wayland_display_set":true' "$out_dir/terminal-launch.jsonl" >/dev/null
+if grep '"exit_success":true' "$out_dir/terminal-launch.jsonl" >/dev/null; then
+  terminal_no_seat_expected=false
+else
+  grep '"status_code":230' "$out_dir/terminal-launch.jsonl" >/dev/null
+  grep '"status_allowed":true' "$out_dir/terminal-launch.jsonl" >/dev/null
+  terminal_no_seat_expected=true
+fi
 grep '"event":"session.services_verified"' "$out_dir/session.jsonl" >/dev/null
 grep '"event":"session.launch_spawn"' "$out_dir/session.jsonl" >/dev/null
 grep '"event":"session.clean_exit"' "$out_dir/session.jsonl" >/dev/null
@@ -162,6 +169,7 @@ cat > "$out_dir/manifest.json" <<EOF
     "compositor_wayland_smoke": true,
     "launcher_wayland_client_spawn": true,
     "launcher_terminal_wayland_spawn": true,
+    "launcher_terminal_no_seat_expected": $terminal_no_seat_expected,
     "session_wayland_client_spawn": true,
     "session_wayland_services": true,
     "session_notification_service": true,

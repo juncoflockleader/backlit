@@ -154,7 +154,7 @@ The nested Wayland path can be checked without a visible VM desktop by running W
 ./scripts/verify-nested-wayland-smoke.sh
 ```
 
-This starts a temporary parent Weston compositor, verifies the parent socket with `wayland-info` or `weston-info`, launches the real terminal target (`foot`) against that socket with a short-lived command, then runs Backlit's Wayland backend preflight, compositor smoke path, and `backlit-session --backend=wayland --verify-services --verify-clean-exit` path.
+This starts a temporary parent Weston compositor, verifies the parent socket with `wayland-info` or `weston-info`, launches the real terminal target (`foot`) against that socket with a short-lived command, then runs Backlit's Wayland backend preflight, compositor smoke path, and `backlit-session --backend=wayland --verify-services --verify-clean-exit` path. Weston headless does not expose a usable input seat in this setup, so the terminal check accepts `foot`'s known no-seat exit code while still requiring that the real terminal process was spawned with `WAYLAND_DISPLAY`.
 
 When the real compositor loop lands, launch clients into Backlit with:
 
@@ -308,7 +308,7 @@ The launcher catalog is verified in dry-run mode for the first required targets:
 
 The launcher discovers visible `.desktop` entries from XDG application directories by default. Smoke tests keep a fixture directory for deterministic parser coverage, while `verify-launcher-desktop-discovery.sh` also checks host app discovery and requires visible entries on Linux hosts that actually have desktop files installed.
 
-Launcher spawn verification proves the selected target can start a process with `WAYLAND_DISPLAY` set. In nested Wayland E2E this uses the parent Weston socket for both the available Wayland info client and the real terminal target (`foot`) with a short-lived command.
+Launcher spawn verification proves the selected target can start a process with `WAYLAND_DISPLAY` set. In nested Wayland E2E this uses the parent Weston socket for both the available Wayland info client and the real terminal target (`foot`) with a short-lived command; the terminal artifact records whether Weston headless hit the expected no-seat exit.
 
 Keyboard shortcut routing is also verified in dry-run mode for launcher, terminal, browser, settings, and app-switcher actions.
 
