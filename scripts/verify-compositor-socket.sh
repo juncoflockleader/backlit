@@ -12,7 +12,12 @@ socket_name="backlit-socket-contract"
 compositor_log="$out_dir/compositor-socket.jsonl"
 compositor_err="$out_dir/compositor-socket.stderr"
 
-runtime_dir="/private/tmp/backlit-socket-contract-$$"
+if [ "$(uname -s)" = "Darwin" ]; then
+  runtime_base="/private/tmp"
+else
+  runtime_base="${TMPDIR:-/tmp}"
+fi
+runtime_dir="$runtime_base/backlit-socket-contract-$$"
 socket_path="$runtime_dir/$socket_name"
 
 fail() {

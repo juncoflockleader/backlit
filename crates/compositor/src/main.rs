@@ -1258,10 +1258,12 @@ mod tests {
             .duration_since(UNIX_EPOCH)
             .unwrap()
             .as_nanos();
-        let runtime_dir = PathBuf::from(format!(
-            "/private/tmp/blsock-{}-{unique}",
-            std::process::id()
-        ));
+        let runtime_base = if cfg!(target_os = "macos") {
+            PathBuf::from("/private/tmp")
+        } else {
+            std::env::temp_dir()
+        };
+        let runtime_dir = runtime_base.join(format!("blsock-{}-{unique}", std::process::id()));
         fs::create_dir_all(&runtime_dir).unwrap();
 
         let runtime_dir_string = runtime_dir.display().to_string();
