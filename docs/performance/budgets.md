@@ -16,10 +16,18 @@ Any change to compositor startup, input, rendering, app launch, shell startup, o
 
 ## MVP 0 Smoke Check
 
-The current automated regression check is:
+The render/present regression check is:
 
 ```bash
 cargo run -p backlit-perf -- --verify
 ```
 
 It measures the deterministic headless GUI render path and the in-memory headless backend present path. This does not prove real compositor latency, but it catches early regressions while nested Wayland and DRM/KMS backends are still being built.
+
+The launch-path regression check is:
+
+```bash
+./scripts/verify-launch-performance.sh
+```
+
+It builds the session, compositor, and shell binaries, runs `backlit-session` directly, and verifies the current MVP budgets for GUI readiness after session launch, shell-ready service probes after launch, and terminal hotkey spawn time. The Linux E2E gate includes this verifier and publishes `target/linux-e2e/launch-performance/manifest.json`.

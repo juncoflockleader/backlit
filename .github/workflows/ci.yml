@@ -19,3 +19,5 @@ jobs:
         run: cargo test --workspace --all-targets
       - name: GUI smoke
         run: ./scripts/verify-gui-smoke.sh
+      - name: Launch performance
+        run: ./scripts/verify-launch-performance.sh

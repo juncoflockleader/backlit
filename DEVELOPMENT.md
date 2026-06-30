@@ -126,7 +126,7 @@ The Linux-side verifier can also be run directly inside any Ubuntu checkout:
 ./scripts/verify-linux-e2e.sh
 ```
 
-It runs `cargo fmt`, workspace tests, `cargo clippy`, the deterministic GUI smoke verifier, the preview renderer, CI contract verifier, packaging contract verifier, staged session install verifier, launch-readiness verifier, session launch verifier, nested Wayland smoke verifier, and MVP 0 contract verifier, then writes `target/linux-e2e/manifest.json`.
+It runs `cargo fmt`, workspace tests, `cargo clippy`, the deterministic GUI smoke verifier, the preview renderer, launch-performance verifier, CI contract verifier, packaging contract verifier, staged session install verifier, launch-readiness verifier, session launch verifier, nested Wayland smoke verifier, and MVP 0 contract verifier, then writes `target/linux-e2e/manifest.json`.
 
 ## GUI Linux VM Workflow
 
@@ -190,6 +190,7 @@ cargo run -p backlit-session -- --backend=headless --screenshot target/backlit-s
 ./scripts/render-gui-preview.sh
 ./scripts/render-parallels-gui-preview.sh
 ./scripts/verify-gui-smoke.sh
+./scripts/verify-launch-performance.sh
 ./scripts/verify-launch-readiness.sh
 ./scripts/verify-session-launch.sh
 ./scripts/verify-drm-session-smoke.sh
@@ -241,6 +242,7 @@ The workflow installs Ubuntu dependencies, Rust `rustfmt` and `clippy`, runs `./
 
 ```bash
 ./scripts/verify-gui-smoke.sh
+./scripts/verify-launch-performance.sh
 ```
 
 Artifacts are written to `target/gui-smoke/`:
@@ -253,6 +255,8 @@ Artifacts are written to `target/gui-smoke/`:
 The verifier also runs `backlit-protocols --verify --list` so MVP protocol coverage stays explicit while the real Smithay compositor is being brought up.
 
 It also runs `backlit-perf --verify`, which measures the deterministic GUI render path and headless backend present path against generous MVP 0 smoke budgets.
+
+The launch-performance verifier runs the built `backlit-session`, `backlit-compositor`, and `backlit-shell` binaries directly, then writes `target/launch-performance/manifest.json`. It enforces the current MVP budgets for session GUI readiness under 500 ms, shell-ready service probes under 2 seconds, and terminal hotkey spawn under 300 ms.
 
 The default GUI render is guarded by checksum `5635038614353063225`; update it only when an intentional visual change is made.
 

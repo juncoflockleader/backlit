@@ -98,6 +98,10 @@ fn run() -> Result<(), String> {
                 FieldValue::U64(layout.work_area().height as u64),
             ),
             ("checksum", FieldValue::U64(canvas.checksum())),
+            (
+                "elapsed_ms",
+                FieldValue::U64(started.elapsed().as_millis() as u64),
+            ),
         ],
     );
 
@@ -196,7 +200,11 @@ fn run() -> Result<(), String> {
 
     if config.verify_services {
         let service_report = verify_session_services(&config)?;
-        emit_service_verification(&config, &service_report);
+        emit_service_verification(
+            &config,
+            &service_report,
+            started.elapsed().as_millis() as u64,
+        );
 
         if !service_report.passed() {
             return Err(String::from("session service verification failed"));
@@ -220,6 +228,7 @@ struct ServiceProbe {
     resolved: bool,
     exit_ok: bool,
     ready: bool,
+    elapsed_ms: u64,
     stdout: Vec<u8>,
     stderr: Vec<u8>,
 }
@@ -230,6 +239,7 @@ impl ServiceProbe {
             resolved: false,
             exit_ok: false,
             ready: false,
+            elapsed_ms: 0,
             stdout: Vec::new(),
             stderr: Vec::new(),
         }
@@ -344,15 +354,18 @@ fn run_service_probe(
         return Ok(ServiceProbe::missing());
     }
 
+    let started = Instant::now();
     let output = Command::new(path)
         .args(args)
         .output()
         .map_err(|error| format!("failed to run {}: {error}", path.display()))?;
+    let elapsed_ms = started.elapsed().as_millis() as u64;
 
     let mut probe = ServiceProbe {
         resolved: true,
         exit_ok: output.status.success(),
         ready: false,
+        elapsed_ms,
         stdout: output.stdout,
         stderr: output.stderr,
     };
@@ -378,12 +391,13 @@ fn write_service_logs(log_dir: &Path, report: &ServiceVerification) -> Result<()
     Ok(())
 }
 
-fn emit_service_verification(config: &Config, report: &ServiceVerification) {
+fn emit_service_verification(config: &Config, report: &ServiceVerification, elapsed_ms: u64) {
     emit(
         "session.services_verified",
         config,
         &[
             ("passed", FieldValue::Bool(report.passed())),
+            ("elapsed_ms", FieldValue::U64(elapsed_ms)),
             (
                 "compositor_resolved",
                 FieldValue::Bool(report.compositor.resolved),
@@ -399,6 +413,11 @@ fn emit_service_verification(config: &Config, report: &ServiceVerification) {
                 FieldValue::Bool(report.children_exited_cleanly()),
             ),
             ("logs_written", FieldValue::Bool(report.logs_written)),
+            (
+                "compositor_probe_ms",
+                FieldValue::U64(report.compositor.elapsed_ms),
+            ),
+            ("shell_probe_ms", FieldValue::U64(report.shell.elapsed_ms)),
             (
                 "compositor_stdout_bytes",
                 FieldValue::U64(report.compositor.stdout.len() as u64),
@@ -471,6 +490,7 @@ struct LaunchSpawnReport {
     exit_success: bool,
     status_code: u64,
     wayland_display_set: bool,
+    elapsed_ms: u64,
 }
 
 impl LaunchSpawnReport {
@@ -484,6 +504,7 @@ impl LaunchSpawnReport {
 }
 
 fn verify_launch_spawn(config: &Config) -> LaunchSpawnReport {
+    let started = Instant::now();
     let shortcut_resolved = matches!(
         resolve_shortcut("Super+Enter"),
         Some(ShortcutAction::Launch(LaunchTarget::Terminal))
@@ -517,6 +538,7 @@ fn verify_launch_spawn(config: &Config) -> LaunchSpawnReport {
             exit_success: false,
             status_code: 255,
             wayland_display_set: wayland_display.is_some(),
+            elapsed_ms: started.elapsed().as_millis() as u64,
         };
     }
 
@@ -535,6 +557,7 @@ fn verify_launch_spawn(config: &Config) -> LaunchSpawnReport {
             exit_success: status.success(),
             status_code: status.code().unwrap_or(255) as u64,
             wayland_display_set: wayland_display.is_some(),
+            elapsed_ms: started.elapsed().as_millis() as u64,
         },
         Err(_) => LaunchSpawnReport {
             shortcut_resolved,
@@ -544,6 +567,7 @@ fn verify_launch_spawn(config: &Config) -> LaunchSpawnReport {
             exit_success: false,
             status_code: 255,
             wayland_display_set: wayland_display.is_some(),
+            elapsed_ms: started.elapsed().as_millis() as u64,
         },
     }
 }
@@ -571,6 +595,7 @@ fn emit_launch_spawn(config: &Config, report: &LaunchSpawnReport) {
                 "wayland_display_set",
                 FieldValue::Bool(report.wayland_display_set),
             ),
+            ("elapsed_ms", FieldValue::U64(report.elapsed_ms)),
         ],
     );
 }

@@ -32,6 +32,7 @@ require_file backlit-design.md
 require_file docs/architecture/mvp-0.md
 require_executable scripts/verify-gui-smoke.sh
 require_executable scripts/render-gui-preview.sh
+require_executable scripts/verify-launch-performance.sh
 require_executable scripts/verify-linux-e2e.sh
 require_executable scripts/verify-ci-contract.sh
 require_executable scripts/verify-packaging-contract.sh
@@ -54,8 +55,10 @@ require_contains scripts/verify-gui-smoke.sh 'cargo run -p backlit-protocols -- 
 require_contains scripts/verify-gui-smoke.sh 'cargo run -p backlit-perf -- --verify'
 require_contains scripts/verify-gui-smoke.sh 'cargo run -p backlit-demo-client --'
 require_contains scripts/verify-gui-smoke.sh '"golden_checksum": true'
+require_contains scripts/verify-launch-performance.sh '"name": "backlit-launch-performance"'
 require_contains scripts/verify-linux-e2e.sh './scripts/verify-nested-wayland-smoke.sh'
 require_contains scripts/verify-linux-e2e.sh './scripts/render-gui-preview.sh'
+require_contains scripts/verify-linux-e2e.sh './scripts/verify-launch-performance.sh'
 require_contains scripts/verify-linux-e2e.sh './scripts/verify-ci-contract.sh'
 require_contains scripts/verify-linux-e2e.sh './scripts/verify-packaging-contract.sh'
 require_contains scripts/verify-linux-e2e.sh './scripts/verify-staged-session-install.sh'
@@ -72,6 +75,7 @@ if [ -n "$artifact_root" ] && [ -d "$artifact_root" ]; then
   artifact_manifests_checked=true
   require_file "$artifact_root/gui-smoke/manifest.json"
   require_file "$artifact_root/gui-preview/manifest.json"
+  require_file "$artifact_root/launch-performance/manifest.json"
   require_file "$artifact_root/ci-contract/manifest.json"
   require_file "$artifact_root/packaging-contract/manifest.json"
   require_file "$artifact_root/staged-session-install/manifest.json"
@@ -86,6 +90,9 @@ if [ -n "$artifact_root" ] && [ -d "$artifact_root" ]; then
   require_contains "$artifact_root/gui-smoke/manifest.json" '"golden_checksum": true'
   require_contains "$artifact_root/gui-preview/manifest.json" '"session_verified": true'
   require_contains "$artifact_root/gui-preview/manifest.json" '"session_services": true'
+  require_contains "$artifact_root/launch-performance/manifest.json" '"startup_budget": true'
+  require_contains "$artifact_root/launch-performance/manifest.json" '"terminal_launch_budget": true'
+  require_contains "$artifact_root/launch-performance/manifest.json" '"shell_ready_budget": true'
   require_contains "$artifact_root/ci-contract/manifest.json" '"linux_e2e_gate": true'
   require_contains "$artifact_root/packaging-contract/manifest.json" '"desktop_entry": true'
   require_contains "$artifact_root/packaging-contract/manifest.json" '"package_split": true'
@@ -121,6 +128,7 @@ cat > "$out_dir/manifest.json" <<EOF
     "nested_wayland_gate": true,
     "demo_client": true,
     "performance_smoke": true,
+    "launch_performance": true,
     "protocol_smoke": true,
     "golden_gui": true,
     "viewable_preview": true,

@@ -16,8 +16,10 @@ Current launch-readiness checks:
 - `backlit-session --preflight-only` verifies backend launch prerequisites through the actual session entrypoint before rendering starts.
 - `scripts/verify-session-launch.sh` verifies the desktop session entry, headless session launch, and DRM session launch preflight.
 - `backlit-session --verify-launch-spawn` verifies that the `Super+Enter` terminal route can spawn a process with `WAYLAND_DISPLAY` set.
+- `scripts/verify-launch-performance.sh` verifies MVP launch budgets from built binaries: GUI ready under 500 ms, terminal hotkey spawn under 300 ms, and shell-ready service probes under 2 seconds.
 - `scripts/verify-drm-session-smoke.sh` runs the full DRM session path with GUI verification, launch spawn, and compositor/shell service probes on launch-ready Linux hosts.
 - The Linux E2E manifest includes the launch-readiness manifest.
 - The Linux E2E manifest includes the session launch manifest.
+- The Linux E2E manifest includes the launch-performance manifest.
 - The Linux E2E manifest includes the DRM session smoke manifest.
 - Parallels Ubuntu E2E is expected to report `drm_expected_ready: true`, `drm_ready: true`, `drm_session_expected_ready: true`, `drm_session_ready: true`, and `drm_session_smoke_ready: true`.

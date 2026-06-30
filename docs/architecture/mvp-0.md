@@ -26,8 +26,9 @@ MVP 0 is the development harness:
 - Parallels GUI preview export from Ubuntu guest artifacts to the host workspace.
 - Basic MVP protocol smoke registry.
 - Headless performance smoke checks.
+- Launch performance budget verifier for session GUI readiness, shell readiness, and terminal hotkey spawn.
 - JSON metrics.
-- Linux E2E verifier for fmt, tests, clippy, GUI smoke, packaging contract, and nested Wayland smoke inside an Ubuntu guest.
+- Linux E2E verifier for fmt, tests, clippy, GUI smoke, launch performance, packaging contract, and nested Wayland smoke inside an Ubuntu guest.
 - GitHub Actions Linux E2E workflow with artifact upload and local contract verification.
 - MVP 0 contract verifier that checks the executable harness still covers the design deliverables and, inside E2E, validates the generated artifact manifests.
 - Parallels runner for repeatable macOS-to-Ubuntu guest verification.
