@@ -70,8 +70,10 @@ fn run() -> Result<(), String> {
     if config.verify_systemd_units {
         let unit_report = verify_systemd_units(Path::new(&config.systemd_unit_dir));
         emit_systemd_unit_verification(&config, &unit_report);
+        let launch_plan = systemd_launch_plan();
+        emit_systemd_launch_plan(&config, &launch_plan, &unit_report);
 
-        if !unit_report.passed() {
+        if !unit_report.passed() || !launch_plan.ready() {
             return Err(String::from("session systemd unit verification failed"));
         }
     }
@@ -609,6 +611,78 @@ struct SystemdUnitContract {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+struct SystemdCommandPlan {
+    program: &'static str,
+    args: &'static [&'static str],
+}
+
+impl SystemdCommandPlan {
+    fn command_line(self) -> String {
+        if self.args.is_empty() {
+            self.program.to_string()
+        } else {
+            format!("{} {}", self.program, self.args.join(" "))
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+struct SystemdLaunchPlan {
+    dry_run: bool,
+    target: &'static str,
+    service_units: &'static [&'static str],
+    import_environment: SystemdCommandPlan,
+    start_target: SystemdCommandPlan,
+    stop_target: SystemdCommandPlan,
+}
+
+impl SystemdLaunchPlan {
+    fn ready(self) -> bool {
+        self.dry_run
+            && self.target == "backlit-session.target"
+            && self.service_units == service_unit_names()
+            && self.import_environment.command_line()
+                == "systemctl --user import-environment WAYLAND_DISPLAY XDG_CURRENT_DESKTOP DESKTOP_SESSION"
+            && self.start_target.command_line()
+                == "systemctl --user start backlit-session.target"
+            && self.stop_target.command_line() == "systemctl --user stop backlit-session.target"
+    }
+
+    fn service_count(self) -> u64 {
+        self.service_units.len() as u64
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+struct SystemdTargetProbe {
+    present: bool,
+    wants_services: bool,
+    after_graphical_session_pre: bool,
+    part_of_graphical_session: bool,
+    wanted_by_graphical_session: bool,
+}
+
+impl SystemdTargetProbe {
+    fn missing() -> Self {
+        Self {
+            present: false,
+            wants_services: false,
+            after_graphical_session_pre: false,
+            part_of_graphical_session: false,
+            wanted_by_graphical_session: false,
+        }
+    }
+
+    fn passed(self) -> bool {
+        self.present
+            && self.wants_services
+            && self.after_graphical_session_pre
+            && self.part_of_graphical_session
+            && self.wanted_by_graphical_session
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 struct SystemdUnitProbe {
     present: bool,
     exec_start_ok: bool,
@@ -652,6 +726,7 @@ impl SystemdUnitProbe {
 #[derive(Debug, Clone, PartialEq, Eq)]
 struct SystemdUnitVerification {
     unit_dir: PathBuf,
+    session_target: SystemdTargetProbe,
     compositor: SystemdUnitProbe,
     shell: SystemdUnitProbe,
     notification: SystemdUnitProbe,
@@ -660,14 +735,16 @@ struct SystemdUnitVerification {
 
 impl SystemdUnitVerification {
     fn passed(&self) -> bool {
-        self.compositor.passed()
+        self.session_target.passed()
+            && self.compositor.passed()
             && self.shell.passed()
             && self.notification.passed()
             && self.settings.passed()
     }
 
     fn units_present(&self) -> bool {
-        self.compositor.present
+        self.session_target.present
+            && self.compositor.present
             && self.shell.present
             && self.notification.present
             && self.settings.present
@@ -681,14 +758,17 @@ impl SystemdUnitVerification {
     }
 
     fn startup_order_ok(&self) -> bool {
-        self.compositor.after_ok
+        self.session_target.after_graphical_session_pre
+            && self.compositor.after_ok
             && self.shell.after_ok
             && self.notification.after_ok
             && self.settings.after_ok
     }
 
     fn graphical_session_target_ok(&self) -> bool {
-        self.compositor.part_of_graphical_session
+        self.session_target.part_of_graphical_session
+            && self.session_target.wanted_by_graphical_session
+            && self.compositor.part_of_graphical_session
             && self.shell.part_of_graphical_session
             && self.notification.part_of_graphical_session
             && self.settings.part_of_graphical_session
@@ -722,6 +802,10 @@ impl SystemdUnitVerification {
             && self.notification.restart_on_failure
             && self.settings.restart_on_failure
     }
+
+    fn session_target_ok(&self) -> bool {
+        self.session_target.passed()
+    }
 }
 
 fn verify_systemd_units(unit_dir: &Path) -> SystemdUnitVerification {
@@ -730,10 +814,46 @@ fn verify_systemd_units(unit_dir: &Path) -> SystemdUnitVerification {
 
     SystemdUnitVerification {
         unit_dir: unit_dir.to_path_buf(),
+        session_target: verify_systemd_target(unit_dir),
         compositor: verify_systemd_unit(unit_dir, compositor_contract),
         shell: verify_systemd_unit(unit_dir, shell_contract),
         notification: verify_systemd_unit(unit_dir, notification_contract),
         settings: verify_systemd_unit(unit_dir, settings_contract),
+    }
+}
+
+fn service_unit_names() -> &'static [&'static str] {
+    &[
+        "backlit-compositor.service",
+        "backlit-shell.service",
+        "backlit-notification-daemon.service",
+        "backlit-settings-daemon.service",
+    ]
+}
+
+fn systemd_launch_plan() -> SystemdLaunchPlan {
+    SystemdLaunchPlan {
+        dry_run: true,
+        target: "backlit-session.target",
+        service_units: service_unit_names(),
+        import_environment: SystemdCommandPlan {
+            program: "systemctl",
+            args: &[
+                "--user",
+                "import-environment",
+                "WAYLAND_DISPLAY",
+                "XDG_CURRENT_DESKTOP",
+                "DESKTOP_SESSION",
+            ],
+        },
+        start_target: SystemdCommandPlan {
+            program: "systemctl",
+            args: &["--user", "start", "backlit-session.target"],
+        },
+        stop_target: SystemdCommandPlan {
+            program: "systemctl",
+            args: &["--user", "stop", "backlit-session.target"],
+        },
     }
 }
 
@@ -760,6 +880,33 @@ fn systemd_unit_contracts() -> [SystemdUnitContract; 4] {
             after: "After=backlit-compositor.service",
         },
     ]
+}
+
+fn verify_systemd_target(unit_dir: &Path) -> SystemdTargetProbe {
+    let path = unit_dir.join("backlit-session.target");
+    let Ok(contents) = fs::read_to_string(path) else {
+        return SystemdTargetProbe::missing();
+    };
+    let lines: Vec<&str> = contents.lines().map(str::trim).collect();
+    let contains_line = |required: &str| lines.contains(&required);
+    let wants_services = lines.iter().any(|line| {
+        line.strip_prefix("Wants=")
+            .map(|value| {
+                let wanted: Vec<&str> = value.split_whitespace().collect();
+                service_unit_names()
+                    .iter()
+                    .all(|unit| wanted.contains(unit))
+            })
+            .unwrap_or(false)
+    });
+
+    SystemdTargetProbe {
+        present: true,
+        wants_services,
+        after_graphical_session_pre: contains_line("After=graphical-session-pre.target"),
+        part_of_graphical_session: contains_line("PartOf=graphical-session.target"),
+        wanted_by_graphical_session: contains_line("WantedBy=graphical-session.target"),
+    }
 }
 
 fn verify_systemd_unit(unit_dir: &Path, contract: SystemdUnitContract) -> SystemdUnitProbe {
@@ -792,6 +939,7 @@ fn emit_systemd_unit_verification(config: &Config, report: &SystemdUnitVerificat
         &[
             ("passed", FieldValue::Bool(report.passed())),
             ("unit_dir", FieldValue::Str(unit_dir.as_ref())),
+            ("session_target", FieldValue::Str("backlit-session.target")),
             (
                 "compositor_unit",
                 FieldValue::Str("backlit-compositor.service"),
@@ -804,6 +952,14 @@ fn emit_systemd_unit_verification(config: &Config, report: &SystemdUnitVerificat
             (
                 "settings_unit",
                 FieldValue::Str("backlit-settings-daemon.service"),
+            ),
+            (
+                "session_target_ready",
+                FieldValue::Bool(report.session_target_ok()),
+            ),
+            (
+                "session_target_wants_services",
+                FieldValue::Bool(report.session_target.wants_services),
             ),
             ("units_present", FieldValue::Bool(report.units_present())),
             ("exec_starts", FieldValue::Bool(report.exec_starts_ok())),
@@ -824,6 +980,41 @@ fn emit_systemd_unit_verification(config: &Config, report: &SystemdUnitVerificat
                 "restart_policy",
                 FieldValue::Bool(report.restart_policy_ok()),
             ),
+        ],
+    );
+}
+
+fn emit_systemd_launch_plan(
+    config: &Config,
+    plan: &SystemdLaunchPlan,
+    report: &SystemdUnitVerification,
+) {
+    let import_environment_command = plan.import_environment.command_line();
+    let start_target_command = plan.start_target.command_line();
+    let stop_target_command = plan.stop_target.command_line();
+
+    emit(
+        "session.systemd_launch_plan",
+        config,
+        &[
+            ("passed", FieldValue::Bool(plan.ready() && report.passed())),
+            ("dry_run", FieldValue::Bool(plan.dry_run)),
+            ("target", FieldValue::Str(plan.target)),
+            ("service_units", FieldValue::U64(plan.service_count())),
+            (
+                "session_target_ready",
+                FieldValue::Bool(report.session_target_ok()),
+            ),
+            ("launch_plan_ready", FieldValue::Bool(plan.ready())),
+            (
+                "import_environment_command",
+                FieldValue::Str(&import_environment_command),
+            ),
+            (
+                "start_target_command",
+                FieldValue::Str(&start_target_command),
+            ),
+            ("stop_target_command", FieldValue::Str(&stop_target_command)),
         ],
     );
 }
@@ -1554,7 +1745,7 @@ mod tests {
     use std::path::Path;
     use std::time::{SystemTime, UNIX_EPOCH};
 
-    use super::{binary_name, verify_systemd_units, Config};
+    use super::{binary_name, systemd_launch_plan, verify_systemd_units, Config};
 
     #[test]
     fn parses_service_verification_flags() {
@@ -1603,6 +1794,7 @@ mod tests {
     fn verifies_systemd_unit_contracts() {
         let unit_dir = unique_test_dir("systemd-units-ok");
         fs::create_dir_all(&unit_dir).expect("unit dir should be created");
+        write_session_target(&unit_dir);
         write_unit(
             &unit_dir,
             "backlit-compositor.service",
@@ -1635,6 +1827,7 @@ mod tests {
         let report = verify_systemd_units(&unit_dir);
 
         assert!(report.passed(), "{report:?}");
+        assert!(report.session_target_ok());
         assert!(report.units_present());
         assert!(report.exec_starts_ok());
         assert!(report.startup_order_ok());
@@ -1642,6 +1835,28 @@ mod tests {
         assert!(report.journal_output_ok());
         assert!(report.rust_backtrace_enabled());
         assert!(report.restart_policy_ok());
+    }
+
+    #[test]
+    fn builds_systemd_session_launch_plan() {
+        let plan = systemd_launch_plan();
+
+        assert!(plan.ready());
+        assert!(plan.dry_run);
+        assert_eq!(plan.target, "backlit-session.target");
+        assert_eq!(plan.service_count(), 4);
+        assert_eq!(
+            plan.import_environment.command_line(),
+            "systemctl --user import-environment WAYLAND_DISPLAY XDG_CURRENT_DESKTOP DESKTOP_SESSION"
+        );
+        assert_eq!(
+            plan.start_target.command_line(),
+            "systemctl --user start backlit-session.target"
+        );
+        assert_eq!(
+            plan.stop_target.command_line(),
+            "systemctl --user stop backlit-session.target"
+        );
     }
 
     #[test]
@@ -1660,6 +1875,7 @@ mod tests {
 
         assert!(!report.passed());
         assert!(!report.units_present());
+        assert!(!report.session_target_ok());
         assert!(report.compositor.passed());
         assert!(!report.shell.present);
     }
@@ -1670,6 +1886,21 @@ mod tests {
             .expect("test time should be after epoch")
             .as_nanos();
         std::env::temp_dir().join(format!("backlit-{name}-{}-{nanos}", std::process::id()))
+    }
+
+    fn write_session_target(unit_dir: &Path) {
+        let contents = "\
+[Unit]
+Description=Backlit graphical session services
+Wants=backlit-compositor.service backlit-shell.service backlit-notification-daemon.service backlit-settings-daemon.service
+After=graphical-session-pre.target
+PartOf=graphical-session.target
+
+[Install]
+WantedBy=graphical-session.target
+";
+        fs::write(unit_dir.join("backlit-session.target"), contents)
+            .expect("session target should be written");
     }
 
     fn write_unit(

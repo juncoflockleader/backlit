@@ -35,6 +35,7 @@ require_package() {
 
 require_file packaging/sessions/backlit.desktop
 require_file packaging/applications/org.backlit.Settings.desktop
+require_file packaging/systemd/backlit-session.target
 require_file packaging/systemd/backlit-compositor.service
 require_file packaging/systemd/backlit-shell.service
 require_file packaging/systemd/backlit-notification-daemon.service
@@ -53,6 +54,12 @@ require_line packaging/applications/org.backlit.Settings.desktop "Exec=backlit-s
 require_line packaging/applications/org.backlit.Settings.desktop "Type=Application"
 require_line packaging/applications/org.backlit.Settings.desktop "Categories=Settings;DesktopSettings;"
 require_line packaging/applications/org.backlit.Settings.desktop "OnlyShowIn=Backlit;"
+
+require_line packaging/systemd/backlit-session.target "Description=Backlit graphical session services"
+require_line packaging/systemd/backlit-session.target "Wants=backlit-compositor.service backlit-shell.service backlit-notification-daemon.service backlit-settings-daemon.service"
+require_line packaging/systemd/backlit-session.target "After=graphical-session-pre.target"
+require_line packaging/systemd/backlit-session.target "PartOf=graphical-session.target"
+require_line packaging/systemd/backlit-session.target "WantedBy=graphical-session.target"
 
 require_line packaging/systemd/backlit-compositor.service "PartOf=graphical-session.target"
 require_line packaging/systemd/backlit-compositor.service "Type=simple"
@@ -127,6 +134,7 @@ cat > "$out_dir/manifest.json" <<EOF
   "artifacts": {
     "session_desktop": "packaging/sessions/backlit.desktop",
     "settings_desktop": "packaging/applications/org.backlit.Settings.desktop",
+    "session_target": "packaging/systemd/backlit-session.target",
     "compositor_service": "packaging/systemd/backlit-compositor.service",
     "shell_service": "packaging/systemd/backlit-shell.service",
     "notification_daemon_service": "packaging/systemd/backlit-notification-daemon.service",
@@ -136,6 +144,7 @@ cat > "$out_dir/manifest.json" <<EOF
   "checks": {
     "desktop_entry": true,
     "settings_desktop_entry": true,
+    "systemd_session_target": true,
     "systemd_services": true,
     "journal_logging": true,
     "package_split": true,

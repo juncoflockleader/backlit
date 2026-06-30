@@ -13,3 +13,5 @@ Initial package split from the design:
 - `fastgui-dev-tools`
 
 The package names can keep the design vocabulary while the source repository and crate names use Backlit branding.
+
+The session package installs `packaging/sessions/backlit.desktop`, `packaging/systemd/backlit-session.target`, and the user services for compositor, shell, notification daemon, and settings daemon. The session launcher verifies a dry-run `systemctl --user import-environment`, `start backlit-session.target`, and `stop backlit-session.target` plan before real service activation is wired in.

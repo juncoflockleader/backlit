@@ -355,11 +355,11 @@ To capture the current host's launch readiness:
 ./scripts/verify-drm-session-smoke.sh
 ```
 
-These write `target/launch-readiness/manifest.json`, `target/session-launch/manifest.json`, `target/session-clean-exit/manifest.json`, and `target/drm-session-smoke/manifest.json`. On macOS or headless CI they can pass with DRM expected-blocked; inside the Parallels Ubuntu GUI VM the wrapper maps the active `parallels` logind session before running E2E, so the manifests should report a user-owned runtime, active local session, accessible DRM card, `input_broker_ready: true`, DRM expected-ready, and ready. Direct `/dev/input/event*` access is recorded separately; when it is unavailable, the manifest should report `input_broker_mode: "logind-libseat"`. The session launch verifier also checks that `packaging/sessions/backlit.desktop` resolves to `backlit-session`, that `backlit-session --preflight-only` exits cleanly for launchable backends, and that `backlit-session --verify-systemd-units` accepts the user-unit contract for compositor, shell, notification, and settings services. The session clean-exit verifier checks requested shutdown from the headless session path. The DRM session smoke verifier runs the full `backlit-session --backend=drm` path with GUI verification, terminal spawn verification, compositor/shell/settings service probes, and clean shutdown when the host is launch-ready.
+These write `target/launch-readiness/manifest.json`, `target/session-launch/manifest.json`, `target/session-clean-exit/manifest.json`, and `target/drm-session-smoke/manifest.json`. On macOS or headless CI they can pass with DRM expected-blocked; inside the Parallels Ubuntu GUI VM the wrapper maps the active `parallels` logind session before running E2E, so the manifests should report a user-owned runtime, active local session, accessible DRM card, `input_broker_ready: true`, DRM expected-ready, and ready. Direct `/dev/input/event*` access is recorded separately; when it is unavailable, the manifest should report `input_broker_mode: "logind-libseat"`. The session launch verifier also checks that `packaging/sessions/backlit.desktop` resolves to `backlit-session`, that `backlit-session --preflight-only` exits cleanly for launchable backends, and that `backlit-session --verify-systemd-units` accepts the `backlit-session.target` user target plus the dry-run `systemctl --user import-environment/start/stop` launch plan for compositor, shell, notification, and settings services. The session clean-exit verifier checks requested shutdown from the headless session path. The DRM session smoke verifier runs the full `backlit-session --backend=drm` path with GUI verification, terminal spawn verification, compositor/shell/settings service probes, and clean shutdown when the host is launch-ready.
 
 ## Packaging Contract Verification
 
-The packaging contract verifier checks that the session desktop entry, systemd units, Debian package split, and workspace binary names agree:
+The packaging contract verifier checks that the session desktop entry, Backlit systemd target, systemd units, Debian package split, and workspace binary names agree:
 
 ```bash
 ./scripts/verify-packaging-contract.sh
@@ -369,7 +369,7 @@ It writes `target/packaging-contract/manifest.json` by default.
 
 ## Staged Session Install Verification
 
-The staged install verifier builds the session, compositor, shell, and settings daemon binaries, lays them out under a fake `/usr`, installs the session desktop entry and user systemd units, and verifies that all launch commands resolve to staged executables:
+The staged install verifier builds the session, compositor, shell, and settings daemon binaries, lays them out under a fake `/usr`, installs the session desktop entry, `backlit-session.target`, and user systemd units, and verifies that all launch commands resolve to staged executables:
 
 ```bash
 ./scripts/verify-staged-session-install.sh

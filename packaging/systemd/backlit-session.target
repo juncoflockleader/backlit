@@ -1,0 +1,8 @@
+[Unit]
+Description=Backlit graphical session services
+Wants=backlit-compositor.service backlit-shell.service backlit-notification-daemon.service backlit-settings-daemon.service
+After=graphical-session-pre.target
+PartOf=graphical-session.target
+
+[Install]
+WantedBy=graphical-session.target

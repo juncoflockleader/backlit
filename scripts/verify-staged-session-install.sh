@@ -12,6 +12,7 @@ app_dir="$stage_dir/usr/share/applications"
 systemd_dir="$stage_dir/usr/lib/systemd/user"
 session_desktop="$session_dir/backlit.desktop"
 settings_desktop="$app_dir/org.backlit.Settings.desktop"
+session_target="$systemd_dir/backlit-session.target"
 compositor_service="$systemd_dir/backlit-compositor.service"
 shell_service="$systemd_dir/backlit-shell.service"
 notification_service="$systemd_dir/backlit-notification-daemon.service"
@@ -70,6 +71,7 @@ install -m 0755 target/debug/backlit-settings "$bin_dir/backlit-settings"
 install -m 0755 target/debug/backlit-settings-daemon "$bin_dir/backlit-settings-daemon"
 install -m 0644 packaging/sessions/backlit.desktop "$session_desktop"
 install -m 0644 packaging/applications/org.backlit.Settings.desktop "$settings_desktop"
+install -m 0644 packaging/systemd/backlit-session.target "$session_target"
 install -m 0644 packaging/systemd/backlit-compositor.service "$compositor_service"
 install -m 0644 packaging/systemd/backlit-shell.service "$shell_service"
 install -m 0644 packaging/systemd/backlit-notification-daemon.service "$notification_service"
@@ -77,6 +79,7 @@ install -m 0644 packaging/systemd/backlit-settings-daemon.service "$settings_ser
 
 require_file "$session_desktop"
 require_file "$settings_desktop"
+require_file "$session_target"
 require_file "$compositor_service"
 require_file "$shell_service"
 require_file "$notification_service"
@@ -91,6 +94,12 @@ require_line "$settings_desktop" "Exec=backlit-settings"
 settings_desktop_exec="$(sed -n 's/^Exec=//p' "$settings_desktop")"
 test "$settings_desktop_exec" = "backlit-settings" || fail "unexpected settings desktop Exec=$settings_desktop_exec"
 require_executable "$bin_dir/$settings_desktop_exec"
+
+require_line "$session_target" "Description=Backlit graphical session services"
+require_line "$session_target" "Wants=backlit-compositor.service backlit-shell.service backlit-notification-daemon.service backlit-settings-daemon.service"
+require_line "$session_target" "After=graphical-session-pre.target"
+require_line "$session_target" "PartOf=graphical-session.target"
+require_line "$session_target" "WantedBy=graphical-session.target"
 
 require_line "$compositor_service" "ExecStart=/usr/bin/backlit-compositor --backend=drm --socket=backlit-0"
 require_line "$compositor_service" "Environment=RUST_BACKTRACE=1"
@@ -141,7 +150,16 @@ require_executable "$(resolve_usr_bin "$settings_command")"
   --systemd-unit-dir "$systemd_dir" > "$systemd_units_log"
 
 grep -F '"event":"session.systemd_units_verified"' "$systemd_units_log" >/dev/null || fail "missing session systemd unit verification event"
+grep -F '"event":"session.systemd_launch_plan"' "$systemd_units_log" >/dev/null || fail "missing session systemd launch plan event"
 grep -F '"passed":true' "$systemd_units_log" >/dev/null || fail "session systemd unit verification did not pass"
+grep -F '"session_target_ready":true' "$systemd_units_log" >/dev/null || fail "session target did not verify"
+grep -F '"session_target_wants_services":true' "$systemd_units_log" >/dev/null || fail "session target does not want service graph"
+grep -F '"launch_plan_ready":true' "$systemd_units_log" >/dev/null || fail "session systemd launch plan did not verify"
+grep -F '"target":"backlit-session.target"' "$systemd_units_log" >/dev/null || fail "session systemd target was not planned"
+grep -F '"service_units":4' "$systemd_units_log" >/dev/null || fail "session systemd launch plan did not include all services"
+grep -F '"import_environment_command":"systemctl --user import-environment WAYLAND_DISPLAY XDG_CURRENT_DESKTOP DESKTOP_SESSION"' "$systemd_units_log" >/dev/null || fail "session systemd environment import was not planned"
+grep -F '"start_target_command":"systemctl --user start backlit-session.target"' "$systemd_units_log" >/dev/null || fail "session systemd target start was not planned"
+grep -F '"stop_target_command":"systemctl --user stop backlit-session.target"' "$systemd_units_log" >/dev/null || fail "session systemd target stop was not planned"
 grep -F '"units_present":true' "$systemd_units_log" >/dev/null || fail "session systemd units were not all present"
 grep -F '"exec_starts":true' "$systemd_units_log" >/dev/null || fail "session systemd ExecStart contract did not verify"
 grep -F '"startup_order":true' "$systemd_units_log" >/dev/null || fail "session systemd startup order did not verify"
@@ -211,6 +229,7 @@ cat > "$out_dir/manifest.json" <<EOF
   "artifacts": {
     "session_desktop": "$session_desktop",
     "settings_desktop": "$settings_desktop",
+    "session_target": "$session_target",
     "compositor_service": "$compositor_service",
     "shell_service": "$shell_service",
     "notification_daemon_service": "$notification_service",
@@ -228,6 +247,8 @@ cat > "$out_dir/manifest.json" <<EOF
   "checks": {
     "desktop_exec_resolves": true,
     "settings_desktop_exec_resolves": true,
+    "session_systemd_target": true,
+    "session_systemd_launch_plan": true,
     "systemd_exec_resolves": true,
     "session_systemd_units": true,
     "systemd_journal_output": true,

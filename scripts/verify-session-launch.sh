@@ -57,7 +57,16 @@ cargo run -p backlit-session -- \
   --systemd-unit-dir packaging/systemd > "$systemd_units_log" 2> "$systemd_units_err"
 
 grep '"event":"session.systemd_units_verified"' "$systemd_units_log" >/dev/null
+grep '"event":"session.systemd_launch_plan"' "$systemd_units_log" >/dev/null
 grep '"passed":true' "$systemd_units_log" >/dev/null
+grep '"session_target_ready":true' "$systemd_units_log" >/dev/null
+grep '"session_target_wants_services":true' "$systemd_units_log" >/dev/null
+grep '"launch_plan_ready":true' "$systemd_units_log" >/dev/null
+grep '"target":"backlit-session.target"' "$systemd_units_log" >/dev/null
+grep '"service_units":4' "$systemd_units_log" >/dev/null
+grep '"import_environment_command":"systemctl --user import-environment WAYLAND_DISPLAY XDG_CURRENT_DESKTOP DESKTOP_SESSION"' "$systemd_units_log" >/dev/null
+grep '"start_target_command":"systemctl --user start backlit-session.target"' "$systemd_units_log" >/dev/null
+grep '"stop_target_command":"systemctl --user stop backlit-session.target"' "$systemd_units_log" >/dev/null
 grep '"units_present":true' "$systemd_units_log" >/dev/null
 grep '"exec_starts":true' "$systemd_units_log" >/dev/null
 grep '"startup_order":true' "$systemd_units_log" >/dev/null
@@ -148,6 +157,8 @@ cat > "$out_dir/manifest.json" <<EOF
     "desktop_exec": "$session_exec",
     "headless_session_launch_ready": true,
     "session_systemd_units": true,
+    "session_systemd_target": true,
+    "session_systemd_launch_plan": true,
     "drm_session_checked": true,
     "drm_session_ready": $drm_session_ready,
     "drm_session_expected_ready": $drm_session_expected_ready,

@@ -31,6 +31,7 @@ MVP 0 is the development harness:
 - Portal security smoke for denied direct capture and consented portal-mediated flows.
 - Deterministic demo GUI renderer.
 - Headless session launch verification.
+- Backlit user systemd target and dry-run session launch plan for starting/stopping runtime services.
 - Viewable GUI preview renderer with verified session services.
 - Parallels GUI preview export from Ubuntu guest artifacts to the host workspace.
 - Basic MVP protocol smoke registry.
@@ -45,8 +46,8 @@ MVP 0 is the development harness:
 - GitHub Actions Linux E2E workflow with artifact upload and local contract verification.
 - MVP 0 contract verifier that checks the executable harness still covers the design deliverables and, inside E2E, validates the generated artifact manifests.
 - Parallels runner for repeatable macOS-to-Ubuntu guest verification with the active guest user's logind session and runtime directory.
-- Packaging contract verifier for session desktop entry, systemd units, and Debian package split.
-- Staged session install verifier for fake `/usr` layout, launch command resolution, and headless GUI verification from staged binaries.
+- Packaging contract verifier for session desktop entry, Backlit user target, systemd units, and Debian package split.
+- Staged session install verifier for fake `/usr` layout, systemd launch-plan resolution, launch command resolution, and headless GUI verification from staged binaries.
 - CI.
 - Packaging skeleton.
 
