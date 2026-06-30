@@ -22,6 +22,7 @@ packaging_dir="$out_dir/packaging-contract"
 package_manifests_dir="$out_dir/package-manifests"
 debian_package_build_dir="$out_dir/debian-package-build"
 debian_package_install_dir="$out_dir/debian-package-install"
+debian_system_install_dir="$out_dir/debian-system-install"
 staged_install_dir="$out_dir/staged-session-install"
 systemd_activation_dir="$out_dir/systemd-activation"
 launch_readiness_dir="$out_dir/launch-readiness"
@@ -56,6 +57,7 @@ cargo clippy --workspace --all-targets -- -D warnings
 ./scripts/verify-package-manifests.sh "$package_manifests_dir"
 ./scripts/verify-debian-package-build.sh "$debian_package_build_dir"
 ./scripts/verify-debian-package-install.sh "$debian_package_install_dir"
+./scripts/verify-debian-system-install.sh "$debian_system_install_dir" "$debian_package_build_dir"
 ./scripts/verify-staged-session-install.sh "$staged_install_dir"
 ./scripts/verify-systemd-activation.sh "$systemd_activation_dir"
 ./scripts/verify-launch-readiness.sh "$launch_readiness_dir"
@@ -99,6 +101,7 @@ cat > "$out_dir/manifest.json" <<EOF
     "package_manifests_manifest": "$package_manifests_dir/manifest.json",
     "debian_package_build_manifest": "$debian_package_build_dir/manifest.json",
     "debian_package_install_manifest": "$debian_package_install_dir/manifest.json",
+    "debian_system_install_manifest": "$debian_system_install_dir/manifest.json",
     "staged_session_install_manifest": "$staged_install_dir/manifest.json",
     "systemd_activation_manifest": "$systemd_activation_dir/manifest.json",
     "launch_readiness_manifest": "$launch_readiness_dir/manifest.json",
@@ -129,6 +132,7 @@ cat > "$out_dir/manifest.json" <<EOF
     "package_manifests": true,
     "debian_package_build": true,
     "debian_package_install": true,
+    "debian_system_install": true,
     "staged_session_install": true,
     "systemd_activation": true,
     "launch_readiness": true,

@@ -30,6 +30,7 @@ Current launch-readiness checks:
 - `scripts/verify-package-manifests.sh` verifies the `fastgui-core` bare-session package contract and Debian `.install` file ownership for runtime binaries, session units, desktop entries, portal backend, and development verifiers.
 - `scripts/verify-debian-package-build.sh` builds and inspects real `fastgui-*` `.deb` artifacts on Linux so `fastgui-core` is no longer only a control-file promise.
 - `scripts/verify-debian-package-install.sh` installs the `fastgui-core` package closure into a disposable dpkg root and runs `backlit-session` from the installed `/usr/bin` tree, proving the package output still launches and verifies the GUI/session path.
+- `scripts/verify-debian-system-install.sh` is root and opt-in only; in the Parallels guest it installs the `fastgui-core` package closure into the real dpkg database, runs `/usr/bin/backlit-session --backend=headless --verify --verify-services --verify-clean-exit`, verifies settings from `/usr/bin`, and purges the packages afterward.
 - `backlit-perf --verify` verifies a deterministic 60-frame drag pacing smoke with zero dropped frames and pointer-to-frame p99 under 16 ms.
 - `backlit-compositor -- --smoke-test` verifies direct-scanout eligibility policy for opaque fullscreen dmabuf surfaces, including overlay and SHM blockers.
 - `backlit-notification-daemon --verify` verifies notification service behavior that the session launches with shell services.
@@ -47,4 +48,4 @@ Current launch-readiness checks:
 - The Linux E2E manifest includes the notification-daemon manifest.
 - The Linux E2E manifest includes the settings-daemon manifest.
 - The Linux E2E manifest includes the DRM session smoke manifest.
-- Parallels Ubuntu E2E maps the active `parallels` logind session before running the guest verifier, exports the guest manifests and GUI preview back to the host, and is expected to report `xdg_runtime_dir_owned_by_user: true`, `session_local: true`, `drm_card_access_ready: true`, `input_broker_ready: true`, `drm_expected_ready: true`, `drm_ready: true`, `drm_session_smoke_ready: true`, and `dpkg_root_install: true`.
+- Parallels Ubuntu E2E maps the active `parallels` logind session before running the guest verifier, runs the opt-in root system-install verifier, exports the guest manifests and GUI preview back to the host, and is expected to report `xdg_runtime_dir_owned_by_user: true`, `session_local: true`, `drm_card_access_ready: true`, `input_broker_ready: true`, `drm_expected_ready: true`, `drm_ready: true`, `drm_session_smoke_ready: true`, `dpkg_root_install: true`, and `actual_system_dpkg_install: true`.

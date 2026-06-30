@@ -238,6 +238,7 @@ for verifier in \
   verify-package-manifests.sh \
   verify-debian-package-build.sh \
   verify-debian-package-install.sh \
+  verify-debian-system-install.sh \
   verify-launch-performance.sh \
   verify-launch-readiness.sh \
   verify-session-launch.sh \
@@ -282,6 +283,7 @@ require_deb_contains fastgui-portal usr/bin/backlit-portal-backend
 require_deb_contains fastgui-dev-tools usr/lib/backlit/dev-tools/verify-linux-e2e.sh
 require_deb_contains fastgui-dev-tools usr/lib/backlit/dev-tools/verify-debian-package-build.sh
 require_deb_contains fastgui-dev-tools usr/lib/backlit/dev-tools/verify-debian-package-install.sh
+require_deb_contains fastgui-dev-tools usr/lib/backlit/dev-tools/verify-debian-system-install.sh
 
 test "$(grep -c '^ Package: fastgui-core$' "$out_dir/fastgui-core.info")" = "1" || fail "fastgui-core info missing package field"
 test "$(grep -c '^ Package: fastgui-desktop$' "$out_dir/fastgui-desktop.info")" = "1" || fail "fastgui-desktop info missing package field"

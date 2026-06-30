@@ -105,7 +105,7 @@ The Parallels runner bootstraps an Ubuntu guest, updates a clean checkout from `
 ./scripts/render-parallels-gui-preview.sh
 ```
 
-The E2E runner verifies the full Ubuntu path, then copies a compact evidence bundle back to `target/linux-e2e-parallels/`: the guest E2E manifest, GUI smoke/preview manifests, launch-readiness and DRM session-smoke manifests, Debian package build/install manifests, nested Wayland manifest, MVP contract manifest, and the E2E GUI preview image. The preview runner renders the Backlit preview inside Ubuntu, copies the generated PPM/session logs/manifest back to `target/gui-preview-parallels/`, and converts the PPM to a local PNG on macOS when possible.
+The E2E runner verifies the full Ubuntu path, runs an opt-in root system-install smoke inside the disposable guest, then copies a compact evidence bundle back to `target/linux-e2e-parallels/`: the guest E2E manifest, GUI smoke/preview manifests, launch-readiness and DRM session-smoke manifests, Debian package build/install/system-install manifests, nested Wayland manifest, MVP contract manifest, and the E2E GUI preview image. The preview runner renders the Backlit preview inside Ubuntu, copies the generated PPM/session logs/manifest back to `target/gui-preview-parallels/`, and converts the PPM to a local PNG on macOS when possible.
 
 The runners read a local credential file that is ignored by Git:
 
@@ -132,7 +132,7 @@ The Linux-side verifier can also be run directly inside any Ubuntu checkout:
 ./scripts/verify-linux-e2e.sh
 ```
 
-It runs `cargo fmt`, workspace tests, `cargo clippy`, the deterministic GUI smoke verifier, the preview renderer, compositor-runtime verifier, launch-performance verifier, launcher desktop discovery verifier, resource-budget verifier, notification-daemon verifier, settings-daemon verifier, service-lifecycle verifier, settings-app verifier, portal-security verifier, crash-log verifier, CI contract verifier, packaging contract verifier, package-manifest verifier, Debian package-build verifier, Debian package-install verifier, staged session install verifier, systemd activation verifier, launch-readiness verifier, session launch verifier, session clean-exit verifier, nested Wayland smoke verifier, and MVP 0 contract verifier, then writes `target/linux-e2e/manifest.json`.
+It runs `cargo fmt`, workspace tests, `cargo clippy`, the deterministic GUI smoke verifier, the preview renderer, compositor-runtime verifier, launch-performance verifier, launcher desktop discovery verifier, resource-budget verifier, notification-daemon verifier, settings-daemon verifier, service-lifecycle verifier, settings-app verifier, portal-security verifier, crash-log verifier, CI contract verifier, packaging contract verifier, package-manifest verifier, Debian package-build verifier, Debian package-install verifier, Debian system-install verifier, staged session install verifier, systemd activation verifier, launch-readiness verifier, session launch verifier, session clean-exit verifier, nested Wayland smoke verifier, and MVP 0 contract verifier, then writes `target/linux-e2e/manifest.json`.
 
 ## GUI Linux VM Workflow
 
@@ -221,6 +221,7 @@ cargo run -p backlit-session -- --backend=headless --screenshot target/backlit-s
 ./scripts/verify-package-manifests.sh
 ./scripts/verify-debian-package-build.sh
 ./scripts/verify-debian-package-install.sh
+./scripts/verify-debian-system-install.sh
 ./scripts/verify-staged-session-install.sh
 ./scripts/verify-systemd-activation.sh
 ./scripts/verify-nested-wayland-smoke.sh
@@ -382,6 +383,8 @@ It writes `target/packaging-contract/manifest.json` by default.
 ## Staged Session Install Verification
 
 The Debian package-build verifier assembles the `fastgui-*` package roots from `packaging/debian/*.install`, builds `.deb` artifacts with `dpkg-deb` on Linux, and inspects `fastgui-core`, runtime package contents, and package dependencies. The Debian package-install verifier installs the `fastgui-core` dependency closure into a disposable `dpkg --root` tree, checks dpkg status, then runs `backlit-session --backend=headless --verify --verify-services --verify-clean-exit` from the installed `/usr/bin` tree. On non-Debian hosts both write expected-blocked manifests so the same E2E script remains usable from macOS.
+
+The Debian system-install verifier is intentionally guarded: it only mutates the host when run as root with `BACKLIT_ALLOW_SYSTEM_PACKAGE_INSTALL=1`. In that mode it installs the freshly built `fastgui-core` closure into the real dpkg database, verifies `/usr/bin/backlit-session`, user systemd units, settings, services, GUI launch, and clean exit, then purges the packages before writing its manifest. Without root or the explicit environment variable it writes an expected-blocked manifest.
 
 The staged install verifier builds the session, compositor, shell, and settings daemon binaries, lays them out under a fake `/usr`, installs the session desktop entry, `backlit-session.target`, and user systemd units, and verifies that all launch commands resolve to staged executables. The systemd activation verifier separately proves the session launcher can execute the target import/start/stop command sequence:
 

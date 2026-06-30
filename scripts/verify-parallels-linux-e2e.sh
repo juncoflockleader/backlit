@@ -123,6 +123,7 @@ uploaded_packaging_verifier="/tmp/backlit-verify-packaging-contract.sh"
 uploaded_package_manifests_verifier="/tmp/backlit-verify-package-manifests.sh"
 uploaded_debian_package_build_verifier="/tmp/backlit-verify-debian-package-build.sh"
 uploaded_debian_package_install_verifier="/tmp/backlit-verify-debian-package-install.sh"
+uploaded_debian_system_install_verifier="/tmp/backlit-verify-debian-system-install.sh"
 uploaded_staged_install_verifier="/tmp/backlit-verify-staged-session-install.sh"
 uploaded_systemd_activation_verifier="/tmp/backlit-verify-systemd-activation.sh"
 uploaded_nested_verifier="/tmp/backlit-verify-nested-wayland-smoke.sh"
@@ -220,6 +221,7 @@ install -m 0755 -o "\$guest_user" -g "\$guest_user" "\$uploaded_packaging_verifi
 install -m 0755 -o "\$guest_user" -g "\$guest_user" "\$uploaded_package_manifests_verifier" "\$repo_dir/scripts/verify-package-manifests.sh"
 install -m 0755 -o "\$guest_user" -g "\$guest_user" "\$uploaded_debian_package_build_verifier" "\$repo_dir/scripts/verify-debian-package-build.sh"
 install -m 0755 -o "\$guest_user" -g "\$guest_user" "\$uploaded_debian_package_install_verifier" "\$repo_dir/scripts/verify-debian-package-install.sh"
+install -m 0755 -o "\$guest_user" -g "\$guest_user" "\$uploaded_debian_system_install_verifier" "\$repo_dir/scripts/verify-debian-system-install.sh"
 install -m 0755 -o "\$guest_user" -g "\$guest_user" "\$uploaded_staged_install_verifier" "\$repo_dir/scripts/verify-staged-session-install.sh"
 install -m 0755 -o "\$guest_user" -g "\$guest_user" "\$uploaded_systemd_activation_verifier" "\$repo_dir/scripts/verify-systemd-activation.sh"
 install -m 0755 -o "\$guest_user" -g "\$guest_user" "\$uploaded_nested_verifier" "\$repo_dir/scripts/verify-nested-wayland-smoke.sh"
@@ -230,6 +232,12 @@ source \"\\\$HOME/.cargo/env\"
 cd \"\$repo_dir\"
 scripts/verify-linux-e2e.sh \"\$e2e_out_dir\"
 "
+
+cd "\$repo_dir"
+BACKLIT_ALLOW_SYSTEM_PACKAGE_INSTALL=1 scripts/verify-debian-system-install.sh \
+  "\$e2e_out_dir/debian-system-install" \
+  "\$e2e_out_dir/debian-package-build"
+chown -R "\$guest_user:\$guest_user" "\$repo_dir/\$e2e_out_dir/debian-system-install"
 EOF
 chmod 700 "$root_runner"
 
@@ -251,6 +259,7 @@ upload_script "$repo_root/scripts/verify-packaging-contract.sh" "/tmp/backlit-ve
 upload_script "$repo_root/scripts/verify-package-manifests.sh" "/tmp/backlit-verify-package-manifests.sh"
 upload_script "$repo_root/scripts/verify-debian-package-build.sh" "/tmp/backlit-verify-debian-package-build.sh"
 upload_script "$repo_root/scripts/verify-debian-package-install.sh" "/tmp/backlit-verify-debian-package-install.sh"
+upload_script "$repo_root/scripts/verify-debian-system-install.sh" "/tmp/backlit-verify-debian-system-install.sh"
 upload_script "$repo_root/scripts/verify-staged-session-install.sh" "/tmp/backlit-verify-staged-session-install.sh"
 upload_script "$repo_root/scripts/verify-systemd-activation.sh" "/tmp/backlit-verify-systemd-activation.sh"
 upload_script "$repo_root/scripts/verify-nested-wayland-smoke.sh" "/tmp/backlit-verify-nested-wayland-smoke.sh"
@@ -268,6 +277,7 @@ host_launch_readiness_manifest="$host_out_dir/launch-readiness-manifest.json"
 host_drm_session_smoke_manifest="$host_out_dir/drm-session-smoke-manifest.json"
 host_debian_package_build_manifest="$host_out_dir/debian-package-build-manifest.json"
 host_debian_package_install_manifest="$host_out_dir/debian-package-install-manifest.json"
+host_debian_system_install_manifest="$host_out_dir/debian-system-install-manifest.json"
 host_nested_wayland_manifest="$host_out_dir/nested-wayland-manifest.json"
 host_mvp0_contract_manifest="$host_out_dir/mvp0-contract-manifest.json"
 host_ppm="$host_out_dir/gui-preview-backlit-session.ppm"
@@ -282,6 +292,7 @@ rm -f \
   "$host_drm_session_smoke_manifest" \
   "$host_debian_package_build_manifest" \
   "$host_debian_package_install_manifest" \
+  "$host_debian_system_install_manifest" \
   "$host_nested_wayland_manifest" \
   "$host_mvp0_contract_manifest" \
   "$host_ppm" \
@@ -295,6 +306,7 @@ download_file "$guest_e2e_dir/launch-readiness/manifest.json" "$host_launch_read
 download_file "$guest_e2e_dir/drm-session-smoke/manifest.json" "$host_drm_session_smoke_manifest"
 download_file "$guest_e2e_dir/debian-package-build/manifest.json" "$host_debian_package_build_manifest"
 download_file "$guest_e2e_dir/debian-package-install/manifest.json" "$host_debian_package_install_manifest"
+download_file "$guest_e2e_dir/debian-system-install/manifest.json" "$host_debian_system_install_manifest"
 download_file "$guest_e2e_dir/nested-wayland/manifest.json" "$host_nested_wayland_manifest"
 download_file "$guest_e2e_dir/mvp0-contract/manifest.json" "$host_mvp0_contract_manifest"
 download_file "$guest_e2e_dir/gui-preview/backlit-session.ppm" "$host_ppm"
@@ -364,6 +376,11 @@ require_contains "$host_debian_package_install_manifest" '"dpkg_root_install": t
 require_contains "$host_debian_package_install_manifest" '"session_gui_from_extracted_debs": true'
 require_contains "$host_debian_package_install_manifest" '"session_services_from_extracted_debs": true'
 require_contains "$host_debian_package_install_manifest" '"session_clean_exit_from_extracted_debs": true'
+require_contains "$host_debian_system_install_manifest" '"system_install_performed": true'
+require_contains "$host_debian_system_install_manifest" '"actual_system_dpkg_install": true'
+require_contains "$host_debian_system_install_manifest" '"usr_bin_session_launch": true'
+require_contains "$host_debian_system_install_manifest" '"session_services_from_system_install": true'
+require_contains "$host_debian_system_install_manifest" '"packages_purged_after_verification": true'
 require_contains "$host_nested_wayland_manifest" '"session_wayland_clean_exit": true'
 require_contains "$host_mvp0_contract_manifest" '"artifact_manifests_checked": true'
 
@@ -383,6 +400,7 @@ cat > "$host_out_dir/manifest.json" <<EOF
     "drm_session_smoke_manifest": "$host_drm_session_smoke_manifest",
     "debian_package_build_manifest": "$host_debian_package_build_manifest",
     "debian_package_install_manifest": "$host_debian_package_install_manifest",
+    "debian_system_install_manifest": "$host_debian_system_install_manifest",
     "nested_wayland_manifest": "$host_nested_wayland_manifest",
     "mvp0_contract_manifest": "$host_mvp0_contract_manifest",
     "gui_preview_ppm": "$host_ppm",
@@ -401,6 +419,8 @@ cat > "$host_out_dir/manifest.json" <<EOF
     "debian_package_build": true,
     "debian_package_install": true,
     "dpkg_root_install": true,
+    "debian_system_install": true,
+    "actual_system_dpkg_install": true,
     "nested_wayland": true,
     "mvp0_contract": true,
     "ppm_bytes": $ppm_bytes,

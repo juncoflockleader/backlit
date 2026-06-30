@@ -50,6 +50,7 @@ require_executable scripts/verify-packaging-contract.sh
 require_executable scripts/verify-package-manifests.sh
 require_executable scripts/verify-debian-package-build.sh
 require_executable scripts/verify-debian-package-install.sh
+require_executable scripts/verify-debian-system-install.sh
 require_executable scripts/verify-staged-session-install.sh
 require_executable scripts/verify-nested-wayland-smoke.sh
 require_executable scripts/verify-session-clean-exit.sh
@@ -118,6 +119,7 @@ require_contains scripts/verify-linux-e2e.sh './scripts/verify-packaging-contrac
 require_contains scripts/verify-linux-e2e.sh './scripts/verify-package-manifests.sh'
 require_contains scripts/verify-linux-e2e.sh './scripts/verify-debian-package-build.sh'
 require_contains scripts/verify-linux-e2e.sh './scripts/verify-debian-package-install.sh'
+require_contains scripts/verify-linux-e2e.sh './scripts/verify-debian-system-install.sh'
 require_contains scripts/verify-linux-e2e.sh './scripts/verify-staged-session-install.sh'
 require_contains scripts/verify-linux-e2e.sh './scripts/verify-systemd-activation.sh'
 require_contains scripts/verify-linux-e2e.sh './scripts/verify-drm-session-smoke.sh'
@@ -126,7 +128,9 @@ require_contains scripts/verify-parallels-linux-e2e.sh '"name": "backlit-paralle
 require_contains scripts/verify-parallels-linux-e2e.sh '"guest_e2e_passed": true'
 require_contains scripts/verify-parallels-linux-e2e.sh '"parallels_drm_launch_ready": true'
 require_contains scripts/verify-parallels-linux-e2e.sh '"dpkg_root_install": true'
+require_contains scripts/verify-parallels-linux-e2e.sh '"actual_system_dpkg_install": true'
 require_contains scripts/verify-parallels-linux-e2e.sh 'debian-package-install-manifest.json'
+require_contains scripts/verify-parallels-linux-e2e.sh 'debian-system-install-manifest.json'
 require_contains scripts/verify-parallels-linux-e2e.sh 'drm-session-smoke-manifest.json'
 require_contains scripts/verify-session-launch.sh '--verify-systemd-units'
 require_contains scripts/verify-session-launch.sh 'XDG_RUNTIME_DIR XDG_SESSION_ID XDG_SEAT XDG_SESSION_TYPE WAYLAND_DISPLAY XDG_CURRENT_DESKTOP DESKTOP_SESSION'
@@ -187,6 +191,7 @@ if [ -n "$artifact_root" ] && [ -d "$artifact_root" ]; then
   require_file "$artifact_root/package-manifests/manifest.json"
   require_file "$artifact_root/debian-package-build/manifest.json"
   require_file "$artifact_root/debian-package-install/manifest.json"
+  require_file "$artifact_root/debian-system-install/manifest.json"
   require_file "$artifact_root/staged-session-install/manifest.json"
   require_file "$artifact_root/launch-readiness/manifest.json"
   require_file "$artifact_root/session-clean-exit/manifest.json"
@@ -335,6 +340,20 @@ if [ -n "$artifact_root" ] && [ -d "$artifact_root" ]; then
   else
     require_contains "$artifact_root/debian-package-install/manifest.json" '"install_blocked_expected": true'
   fi
+  require_contains "$artifact_root/debian-system-install/manifest.json" '"system_install_checked": true'
+  if grep '"system_install_performed": true' "$artifact_root/debian-system-install/manifest.json" >/dev/null; then
+    require_contains "$artifact_root/debian-system-install/manifest.json" '"actual_system_dpkg_install": true'
+    require_contains "$artifact_root/debian-system-install/manifest.json" '"dpkg_database_status": true'
+    require_contains "$artifact_root/debian-system-install/manifest.json" '"usr_bin_session_launch": true'
+    require_contains "$artifact_root/debian-system-install/manifest.json" '"systemd_units_from_system_install": true'
+    require_contains "$artifact_root/debian-system-install/manifest.json" '"session_gui_from_system_install": true'
+    require_contains "$artifact_root/debian-system-install/manifest.json" '"session_services_from_system_install": true'
+    require_contains "$artifact_root/debian-system-install/manifest.json" '"session_clean_exit_from_system_install": true'
+    require_contains "$artifact_root/debian-system-install/manifest.json" '"settings_app_from_system_install": true'
+    require_contains "$artifact_root/debian-system-install/manifest.json" '"packages_purged_after_verification": true'
+  else
+    require_contains "$artifact_root/debian-system-install/manifest.json" '"install_blocked_expected": true'
+  fi
   require_contains "$artifact_root/staged-session-install/manifest.json" '"desktop_exec_resolves": true'
   require_contains "$artifact_root/staged-session-install/manifest.json" '"settings_desktop_exec_resolves": true'
   require_contains "$artifact_root/staged-session-install/manifest.json" '"session_systemd_units": true'
@@ -442,6 +461,7 @@ cat > "$out_dir/manifest.json" <<EOF
     "package_manifests": true,
     "debian_package_build": true,
     "debian_package_install": true,
+    "debian_system_install": true,
     "staged_session_install": true,
     "drm_session_smoke": true,
     "ci_gate": true

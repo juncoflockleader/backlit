@@ -3,6 +3,7 @@ usr/lib/backlit/dev-tools/verify-compositor-runtime.sh
 usr/lib/backlit/dev-tools/verify-package-manifests.sh
 usr/lib/backlit/dev-tools/verify-debian-package-build.sh
 usr/lib/backlit/dev-tools/verify-debian-package-install.sh
+usr/lib/backlit/dev-tools/verify-debian-system-install.sh
 usr/lib/backlit/dev-tools/verify-launch-performance.sh
 usr/lib/backlit/dev-tools/verify-launch-readiness.sh
 usr/lib/backlit/dev-tools/verify-session-launch.sh
