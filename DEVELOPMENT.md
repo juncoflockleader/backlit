@@ -159,6 +159,7 @@ MVP 0 includes a deterministic headless GUI harness. It does not replace nested 
 
 Artifacts are written to `target/gui-smoke/`:
 
+- `manifest.json`: top-level verification summary.
 - `backlit-session.ppm`: deterministic session screenshot.
 - `demo-client.ppm`: deterministic demo client screenshot.
 - `*.jsonl`: structured launch and verification events.

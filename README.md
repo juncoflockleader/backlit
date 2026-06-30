@@ -19,4 +19,6 @@ cargo run -p backlit-perf -- --verify
 ./scripts/verify-gui-smoke.sh
 ```
 
+The smoke verifier writes a top-level artifact manifest to `target/gui-smoke/manifest.json`.
+
 See [DEVELOPMENT.md](DEVELOPMENT.md) for environment setup, VM workflow, project layout, and contribution rules.
