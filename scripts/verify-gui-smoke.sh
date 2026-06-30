@@ -94,6 +94,12 @@ grep '"targeted_damage_surfaces":1' "$out_dir/perf.jsonl" >/dev/null
 grep '"post_damage_idle_surfaces":0' "$out_dir/perf.jsonl" >/dev/null
 grep '"no_idle_redraw":true' "$out_dir/perf.jsonl" >/dev/null
 grep '"targeted_damage_ok":true' "$out_dir/perf.jsonl" >/dev/null
+grep '"pointer_frame_budget_us":16000' "$out_dir/perf.jsonl" >/dev/null
+grep '"drag_frames":60' "$out_dir/perf.jsonl" >/dev/null
+grep '"drag_dropped_frames":0' "$out_dir/perf.jsonl" >/dev/null
+grep '"drag_dropped_frame_budget":0' "$out_dir/perf.jsonl" >/dev/null
+grep '"drag_damage_ok":true' "$out_dir/perf.jsonl" >/dev/null
+grep '"drag_frame_pacing_ok":true' "$out_dir/perf.jsonl" >/dev/null
 grep '"event":"shell.verified"' "$out_dir/shell.jsonl" >/dev/null
 grep '"required_components":4' "$out_dir/shell.jsonl" >/dev/null
 grep '"event":"launcher.verified"' "$out_dir/launcher.jsonl" >/dev/null
@@ -178,6 +184,7 @@ cat > "$out_dir/manifest.json" <<EOF
     "surface_lifecycle": true,
     "no_idle_redraw": true,
     "targeted_damage": true,
+    "drag_frame_pacing": true,
     "shell_crash_isolated": true,
     "clipboard_generation": 3,
     "session_windows_after_launch": 4,

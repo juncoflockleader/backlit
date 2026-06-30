@@ -38,6 +38,10 @@ fn run() -> Result<(), String> {
                     FieldValue::U64(report.budgets.present_budget_us),
                 ),
                 (
+                    "pointer_frame_budget_us",
+                    FieldValue::U64(report.budgets.pointer_frame_budget_us),
+                ),
+                (
                     "non_background_pixels",
                     FieldValue::U64(report.non_background_pixels),
                 ),
@@ -66,6 +70,28 @@ fn run() -> Result<(), String> {
                 (
                     "targeted_damage_ok",
                     FieldValue::Bool(report.targeted_damage_ok),
+                ),
+                ("drag_frames", FieldValue::U64(report.drag_frames)),
+                (
+                    "drag_dropped_frames",
+                    FieldValue::U64(report.drag_dropped_frames),
+                ),
+                (
+                    "drag_dropped_frame_budget",
+                    FieldValue::U64(report.drag_dropped_frame_budget),
+                ),
+                (
+                    "drag_max_frame_us",
+                    FieldValue::U64(report.drag_max_frame_us),
+                ),
+                (
+                    "pointer_frame_p99_us",
+                    FieldValue::U64(report.pointer_frame_p99_us),
+                ),
+                ("drag_damage_ok", FieldValue::Bool(report.drag_damage_ok)),
+                (
+                    "drag_frame_pacing_ok",
+                    FieldValue::Bool(report.drag_frame_pacing_ok),
                 ),
                 (
                     "screenshot_verified",
@@ -149,6 +175,15 @@ impl Config {
                     .next()
                     .ok_or_else(|| String::from("missing value for --present-budget-us"))?;
                 config.budgets.present_budget_us = parse_u64("--present-budget-us", &value)?;
+            } else if let Some(value) = arg.strip_prefix("--pointer-frame-budget-us=") {
+                config.budgets.pointer_frame_budget_us =
+                    parse_u64("--pointer-frame-budget-us", value)?;
+            } else if arg == "--pointer-frame-budget-us" {
+                let value = args
+                    .next()
+                    .ok_or_else(|| String::from("missing value for --pointer-frame-budget-us"))?;
+                config.budgets.pointer_frame_budget_us =
+                    parse_u64("--pointer-frame-budget-us", &value)?;
             } else {
                 return Err(format!("unknown flag: {arg}"));
             }
@@ -176,7 +211,7 @@ fn print_help() {
 backlit-perf
 
 Usage:
-  backlit-perf [--verify] [--width=800] [--height=520] [--render-budget-ms=500] [--present-budget-us=50000]
+  backlit-perf [--verify] [--width=800] [--height=520] [--render-budget-ms=500] [--present-budget-us=50000] [--pointer-frame-budget-us=16000]
 
 Flags:
   --verify             Fail when the smoke report exceeds the configured budgets.
@@ -184,6 +219,8 @@ Flags:
   --height             Demo GUI render height.
   --render-budget-ms   Maximum headless GUI render time.
   --present-budget-us  Maximum headless backend present time.
+  --pointer-frame-budget-us
+                       Maximum pointer-to-frame latency for drag frames.
 "
     );
 }

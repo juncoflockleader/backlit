@@ -30,6 +30,7 @@ MVP 0 is the development harness:
 - Basic MVP protocol smoke registry.
 - Headless performance smoke checks.
 - Headless frame damage smoke for no idle redraws and targeted surface damage.
+- Headless drag-frame pacing smoke for dropped-frame and pointer-to-frame latency budgets.
 - Launch performance budget verifier for session GUI readiness, shell readiness, and terminal hotkey spawn.
 - Linux resource budget verifier for bounded idle CPU and compositor+shell RSS probes.
 - JSON metrics.

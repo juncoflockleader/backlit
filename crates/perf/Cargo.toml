@@ -12,7 +12,7 @@ backlit-common = { path = "../common" }
 backlit-compositor-backend = { path = "../compositor-backend" }
 backlit-demo-client = { path = "../demo-client" }
 backlit-protocols = { path = "../protocols" }
+backlit-window-policy = { path = "../window-policy" }
 
 [lib]
 path = "src/lib.rs"
-

@@ -61,6 +61,7 @@ dependencies = [
  "backlit-compositor-backend",
  "backlit-demo-client",
  "backlit-protocols",
+ "backlit-window-policy",
 ]
 
 [[package]]

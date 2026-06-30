@@ -3,11 +3,15 @@ use std::time::Instant;
 use backlit_compositor_backend::HeadlessCompositor;
 use backlit_demo_client::{render_demo_gui, verify_demo_gui};
 use backlit_protocols::protocol_smoke_report;
+use backlit_window_policy::WindowPolicy;
+
+const DRAG_FRAME_COUNT: u64 = 60;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct PerfBudgets {
     pub render_budget_ms: u64,
     pub present_budget_us: u64,
+    pub pointer_frame_budget_us: u64,
 }
 
 impl Default for PerfBudgets {
@@ -15,6 +19,7 @@ impl Default for PerfBudgets {
         Self {
             render_budget_ms: 500,
             present_budget_us: 50_000,
+            pointer_frame_budget_us: 16_000,
         }
     }
 }
@@ -35,6 +40,13 @@ pub struct PerfSmokeReport {
     pub frames_presented: u64,
     pub no_idle_redraw: bool,
     pub targeted_damage_ok: bool,
+    pub drag_frames: u64,
+    pub drag_dropped_frames: u64,
+    pub drag_dropped_frame_budget: u64,
+    pub drag_max_frame_us: u64,
+    pub pointer_frame_p99_us: u64,
+    pub drag_damage_ok: bool,
+    pub drag_frame_pacing_ok: bool,
     pub screenshot_verified: bool,
     pub protocols_verified: bool,
     pub budgets: PerfBudgets,
@@ -46,8 +58,10 @@ impl PerfSmokeReport {
             && self.protocols_verified
             && self.no_idle_redraw
             && self.targeted_damage_ok
+            && self.drag_frame_pacing_ok
             && self.render_ms <= self.budgets.render_budget_ms
             && self.present_us <= self.budgets.present_budget_us
+            && self.pointer_frame_p99_us <= self.budgets.pointer_frame_budget_us
     }
 }
 
@@ -79,6 +93,7 @@ pub fn run_perf_smoke(width: u32, height: u32, budgets: PerfBudgets) -> PerfSmok
     let no_idle_redraw =
         idle_frame.damaged_surfaces == 0 && post_damage_idle_frame.damaged_surfaces == 0;
     let targeted_damage_ok = targeted_frame.damaged_surfaces == 1;
+    let drag_report = run_drag_pacing_smoke(budgets.pointer_frame_budget_us);
 
     PerfSmokeReport {
         render_ms,
@@ -95,9 +110,85 @@ pub fn run_perf_smoke(width: u32, height: u32, budgets: PerfBudgets) -> PerfSmok
         frames_presented: post_damage_idle_frame.frame,
         no_idle_redraw,
         targeted_damage_ok,
+        drag_frames: drag_report.frames,
+        drag_dropped_frames: drag_report.dropped_frames,
+        drag_dropped_frame_budget: drag_report.dropped_frame_budget,
+        drag_max_frame_us: drag_report.max_frame_us,
+        pointer_frame_p99_us: drag_report.pointer_frame_p99_us,
+        drag_damage_ok: drag_report.damage_ok,
+        drag_frame_pacing_ok: drag_report.passed(),
         screenshot_verified: verification.passed(),
         protocols_verified: protocol_report.passed(),
         budgets,
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct DragPacingReport {
+    frames: u64,
+    dropped_frames: u64,
+    dropped_frame_budget: u64,
+    max_frame_us: u64,
+    pointer_frame_p99_us: u64,
+    damage_ok: bool,
+    pointer_frame_budget_us: u64,
+}
+
+impl DragPacingReport {
+    fn passed(&self) -> bool {
+        self.damage_ok
+            && self.dropped_frames <= self.dropped_frame_budget
+            && self.pointer_frame_p99_us <= self.pointer_frame_budget_us
+    }
+}
+
+fn run_drag_pacing_smoke(pointer_frame_budget_us: u64) -> DragPacingReport {
+    let mut compositor = HeadlessCompositor::default();
+    let client = compositor.connect_client("drag-smoke-client");
+    let surface = compositor
+        .submit_surface(client, "drag-terminal", 800, 600)
+        .expect("drag smoke client should be registered");
+    let _initial_frame = compositor.present();
+
+    let mut policy = WindowPolicy::default();
+    let window = policy.add_window("drag-terminal", (800, 600));
+    let mut frame_times = Vec::with_capacity(DRAG_FRAME_COUNT as usize);
+    let mut damage_ok = true;
+
+    for frame in 0..DRAG_FRAME_COUNT {
+        let started = Instant::now();
+        let offset = frame as i32;
+        let moved = policy.move_window(window, 64 + offset, 64 + offset);
+        compositor
+            .mark_damaged(surface)
+            .expect("drag smoke surface should be registered");
+        let presented = compositor.present();
+        let elapsed_us = started.elapsed().as_micros() as u64;
+
+        damage_ok = damage_ok && moved && presented.damaged_surfaces == 1;
+        frame_times.push(elapsed_us);
+    }
+
+    frame_times.sort_unstable();
+    let max_frame_us = frame_times.last().copied().unwrap_or(0);
+    let p99_index = ((frame_times.len() * 99) + 99) / 100;
+    let pointer_frame_p99_us = frame_times
+        .get(p99_index.saturating_sub(1))
+        .copied()
+        .unwrap_or(0);
+    let dropped_frames = frame_times
+        .iter()
+        .filter(|elapsed_us| **elapsed_us > pointer_frame_budget_us)
+        .count() as u64;
+
+    DragPacingReport {
+        frames: DRAG_FRAME_COUNT,
+        dropped_frames,
+        dropped_frame_budget: 0,
+        max_frame_us,
+        pointer_frame_p99_us,
+        damage_ok,
+        pointer_frame_budget_us,
     }
 }
 
@@ -121,6 +212,12 @@ mod tests {
         assert_eq!(report.frames_presented, 4);
         assert!(report.no_idle_redraw);
         assert!(report.targeted_damage_ok);
+        assert_eq!(report.drag_frames, 60);
+        assert_eq!(report.drag_dropped_frames, 0);
+        assert_eq!(report.drag_dropped_frame_budget, 0);
+        assert!(report.drag_damage_ok);
+        assert!(report.drag_frame_pacing_ok);
+        assert!(report.pointer_frame_p99_us <= report.budgets.pointer_frame_budget_us);
     }
 
     #[test]
@@ -131,6 +228,7 @@ mod tests {
             PerfBudgets {
                 render_budget_ms: 0,
                 present_budget_us: 0,
+                pointer_frame_budget_us: 0,
             },
         );
 
