@@ -28,6 +28,7 @@ fn run() -> Result<(), String> {
     let session_id = environment.session_id.as_deref().unwrap_or("");
     let seat = environment.seat.as_deref().unwrap_or("");
     let session_type = environment.session_type.as_deref().unwrap_or("");
+    let session_state = environment.session_state.as_deref().unwrap_or("");
 
     println!(
         "{}",
@@ -64,6 +65,19 @@ fn run() -> Result<(), String> {
                 ("session_id", FieldValue::Str(session_id)),
                 ("seat", FieldValue::Str(seat)),
                 ("session_type", FieldValue::Str(session_type)),
+                ("session_state", FieldValue::Str(session_state)),
+                (
+                    "logind_session_verified",
+                    FieldValue::Bool(environment.logind_session_verified),
+                ),
+                (
+                    "session_active",
+                    FieldValue::Bool(environment.session_active)
+                ),
+                (
+                    "session_remote",
+                    FieldValue::Bool(environment.session_remote)
+                ),
             ],
         )
     );

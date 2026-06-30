@@ -41,6 +41,40 @@ if [ -n "${XDG_SESSION_ID:-}" ]; then
   session_present=true
 fi
 
+session_active=false
+session_remote=false
+session_state=""
+session_seat="${XDG_SEAT:-}"
+session_type="${XDG_SESSION_TYPE:-}"
+if [ "$session_present" = true ] && command -v loginctl >/dev/null 2>&1; then
+  session_active_value="$(loginctl show-session "$XDG_SESSION_ID" -p Active --value 2>/dev/null || true)"
+  session_remote_value="$(loginctl show-session "$XDG_SESSION_ID" -p Remote --value 2>/dev/null || true)"
+  session_state="$(loginctl show-session "$XDG_SESSION_ID" -p State --value 2>/dev/null || true)"
+  logind_seat="$(loginctl show-session "$XDG_SESSION_ID" -p Seat --value 2>/dev/null || true)"
+  logind_type="$(loginctl show-session "$XDG_SESSION_ID" -p Type --value 2>/dev/null || true)"
+  if [ "$session_active_value" = "yes" ]; then
+    session_active=true
+  fi
+  if [ "$session_remote_value" = "yes" ]; then
+    session_remote=true
+  fi
+  if [ -n "$logind_seat" ]; then
+    session_seat="$logind_seat"
+  fi
+  if [ -n "$logind_type" ]; then
+    session_type="$logind_type"
+  fi
+fi
+
+session_local=false
+if [ "$session_active" = true ] \
+  && [ "$session_remote" = false ] \
+  && [ -n "$session_seat" ] \
+  && [ -n "$session_type" ] \
+  && [ "$session_type" != "unspecified" ]; then
+  session_local=true
+fi
+
 runtime_owned_by_user=false
 if [ "$(uname -s)" = "Linux" ] && [ "$runtime_present" = true ]; then
   runtime_owner_uid="$(stat -c '%u' "$XDG_RUNTIME_DIR" 2>/dev/null || printf unknown)"
@@ -60,6 +94,7 @@ if [ "$(uname -s)" = "Linux" ] \
   && [ "$runtime_present" = true ] \
   && [ "$runtime_owned_by_user" = true ] \
   && [ "$session_present" = true ] \
+  && [ "$session_local" = true ] \
   && [ "$drm_node_count" -gt 0 ] \
   && [ "$input_event_nodes" -gt 0 ]; then
   drm_expected_ready=true
@@ -92,6 +127,9 @@ if [ "$drm_expected_ready" = true ]; then
   grep '"backend":"drm"' "$session_log" >/dev/null
   grep '"ready":true' "$session_log" >/dev/null
   grep '"xdg_runtime_dir_owned_by_user":true' "$session_log" >/dev/null
+  grep '"logind_session_verified":true' "$session_log" >/dev/null
+  grep '"session_active":true' "$session_log" >/dev/null
+  grep '"session_remote":false' "$session_log" >/dev/null
   grep '"event":"session.gui_ready"' "$session_log" >/dev/null
   grep '"event":"session.verified"' "$session_log" >/dev/null
   grep '"event":"session.launch_spawn"' "$session_log" >/dev/null
@@ -163,6 +201,12 @@ cat > "$out_dir/manifest.json" <<EOF
     "xdg_runtime_dir_present": $runtime_present,
     "xdg_runtime_dir_owned_by_user": $runtime_owned_by_user,
     "session_present": $session_present,
+    "session_active": $session_active,
+    "session_remote": $session_remote,
+    "session_local": $session_local,
+    "session_state": "$session_state",
+    "seat": "$session_seat",
+    "session_type": "$session_type",
     "drm_card_nodes": $drm_card_nodes,
     "drm_render_nodes": $drm_render_nodes,
     "input_event_nodes": $input_event_nodes,

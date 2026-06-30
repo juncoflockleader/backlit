@@ -13,6 +13,7 @@ Current launch-readiness checks:
 - DRM/KMS preflight requires at least one `/dev/dri/card*` or `/dev/dri/renderD*` node.
 - DRM/KMS preflight requires `/dev/input/event*` devices for the future libinput path.
 - DRM/KMS preflight requires `XDG_SESSION_ID` so logind/libseat authorization can be added behind the same contract.
+- DRM/KMS preflight requires logind to verify that the session is active, local, seated, and has a concrete session type such as `tty` or `wayland`.
 - `scripts/verify-launch-readiness.sh` records whether the host is DRM launch-ready or expected-blocked.
 - `backlit-session --preflight-only` verifies backend launch prerequisites through the actual session entrypoint before rendering starts.
 - `scripts/verify-session-launch.sh` verifies the desktop session entry, headless session launch, and DRM session launch preflight.
@@ -37,4 +38,4 @@ Current launch-readiness checks:
 - The Linux E2E manifest includes the notification-daemon manifest.
 - The Linux E2E manifest includes the settings-daemon manifest.
 - The Linux E2E manifest includes the DRM session smoke manifest.
-- Parallels Ubuntu E2E maps the active `parallels` logind session before running the guest verifier and is expected to report `xdg_runtime_dir_owned_by_user: true`, `drm_expected_ready: true`, `drm_ready: true`, and `drm_session_smoke_ready: true`.
+- Parallels Ubuntu E2E maps the active `parallels` logind session before running the guest verifier and is expected to report `xdg_runtime_dir_owned_by_user: true`, `session_local: true`, `drm_expected_ready: true`, `drm_ready: true`, and `drm_session_smoke_ready: true`.

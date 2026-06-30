@@ -2,6 +2,8 @@ use std::fmt;
 use std::fs;
 #[cfg(target_os = "linux")]
 use std::os::unix::fs::MetadataExt;
+#[cfg(target_os = "linux")]
+use std::process::Command;
 use std::str::FromStr;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -46,6 +48,10 @@ pub struct BackendPreflightEnvironment {
     pub session_id: Option<String>,
     pub seat: Option<String>,
     pub session_type: Option<String>,
+    pub session_state: Option<String>,
+    pub logind_session_verified: bool,
+    pub session_active: bool,
+    pub session_remote: bool,
 }
 
 impl BackendPreflightEnvironment {
@@ -62,6 +68,10 @@ impl BackendPreflightEnvironment {
             session_id: None,
             seat: None,
             session_type: None,
+            session_state: None,
+            logind_session_verified: false,
+            session_active: false,
+            session_remote: false,
         }
     }
 
@@ -78,6 +88,7 @@ impl BackendPreflightEnvironment {
         environment.session_id = std::env::var("XDG_SESSION_ID").ok();
         environment.seat = std::env::var("XDG_SEAT").ok();
         environment.session_type = std::env::var("XDG_SESSION_TYPE").ok();
+        environment.refresh_logind_session_status();
         environment.drm_card_nodes = count_entries_with_prefix("/dev/dri", "card");
         environment.drm_render_nodes = count_entries_with_prefix("/dev/dri", "renderD");
         environment.input_event_nodes = count_entries_with_prefix("/dev/input", "event");
@@ -112,8 +123,43 @@ impl BackendPreflightEnvironment {
         self
     }
 
+    pub fn with_active_local_session(
+        mut self,
+        value: impl Into<String>,
+        seat: impl Into<String>,
+        session_type: impl Into<String>,
+    ) -> Self {
+        self.session_id = Some(value.into());
+        self.seat = Some(seat.into());
+        self.session_type = Some(session_type.into());
+        self.session_state = Some(String::from("active"));
+        self.logind_session_verified = true;
+        self.session_active = true;
+        self.session_remote = false;
+        self
+    }
+
     pub fn drm_node_count(&self) -> u64 {
         self.drm_card_nodes + self.drm_render_nodes
+    }
+
+    fn refresh_logind_session_status(&mut self) {
+        let Some(session_id) = self.session_id.as_deref() else {
+            return;
+        };
+
+        if let Some(status) = logind_session_status(session_id, self.target_os.as_str()) {
+            self.logind_session_verified = true;
+            self.session_active = status.active;
+            self.session_remote = status.remote;
+            self.session_state = string_option(status.state);
+            if !status.seat.is_empty() {
+                self.seat = Some(status.seat);
+            }
+            if !status.session_type.is_empty() {
+                self.session_type = Some(status.session_type);
+            }
+        }
     }
 }
 
@@ -248,15 +294,59 @@ fn preflight_drm(environment: &BackendPreflightEnvironment) -> BackendPreflightR
         );
     }
 
+    if !environment.logind_session_verified {
+        return BackendPreflightReport::blocked(
+            BackendKind::Drm,
+            "unverified-logind-session",
+            "DRM/KMS backend expects loginctl session metadata for active/local seat validation",
+        );
+    }
+
+    if !environment.session_active {
+        return BackendPreflightReport::blocked(
+            BackendKind::Drm,
+            "inactive-logind-session",
+            "DRM/KMS backend requires an active logind session",
+        );
+    }
+
+    if environment.session_remote {
+        return BackendPreflightReport::blocked(
+            BackendKind::Drm,
+            "remote-logind-session",
+            "DRM/KMS backend requires a local logind session, not a remote one",
+        );
+    }
+
+    if missing(environment.seat.as_deref()) {
+        return BackendPreflightReport::blocked(
+            BackendKind::Drm,
+            "missing-seat",
+            "DRM/KMS backend requires a local logind seat",
+        );
+    }
+
+    if missing(environment.session_type.as_deref())
+        || environment.session_type.as_deref() == Some("unspecified")
+    {
+        return BackendPreflightReport::blocked(
+            BackendKind::Drm,
+            "unspecified-session-type",
+            "DRM/KMS backend requires a concrete logind session type such as tty or wayland",
+        );
+    }
+
     BackendPreflightReport::ready(
         BackendKind::Drm,
-        "ready-preliminary",
+        "ready-active-local-session",
         format!(
-            "Linux launch environment has XDG_RUNTIME_DIR, {} DRM card nodes, {} DRM render nodes, {} input event nodes, and session {}",
+            "Linux launch environment has XDG_RUNTIME_DIR, {} DRM card nodes, {} DRM render nodes, {} input event nodes, and active local {} session {} on {}",
             environment.drm_card_nodes,
             environment.drm_render_nodes,
             environment.input_event_nodes,
-            environment.session_id.as_deref().unwrap_or("unknown")
+            environment.session_type.as_deref().unwrap_or("unknown"),
+            environment.session_id.as_deref().unwrap_or("unknown"),
+            environment.seat.as_deref().unwrap_or("unknown")
         ),
     )
 }
@@ -342,6 +432,82 @@ fn current_effective_uid() -> Option<u32> {
         let rest = line.strip_prefix("Uid:")?;
         rest.split_whitespace().nth(1)?.parse().ok()
     })
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct LogindSessionStatus {
+    active: bool,
+    remote: bool,
+    seat: String,
+    session_type: String,
+    state: String,
+}
+
+#[cfg(target_os = "linux")]
+fn logind_session_status(session_id: &str, target_os: &str) -> Option<LogindSessionStatus> {
+    if target_os != "linux" {
+        return None;
+    }
+
+    let output = Command::new("loginctl")
+        .args([
+            "show-session",
+            session_id,
+            "-p",
+            "Active",
+            "-p",
+            "Remote",
+            "-p",
+            "Seat",
+            "-p",
+            "Type",
+            "-p",
+            "State",
+        ])
+        .output()
+        .ok()?;
+
+    if !output.status.success() {
+        return None;
+    }
+
+    let stdout = String::from_utf8(output.stdout).ok()?;
+    let mut status = LogindSessionStatus {
+        active: false,
+        remote: false,
+        seat: String::new(),
+        session_type: String::new(),
+        state: String::new(),
+    };
+
+    for line in stdout.lines() {
+        let Some((key, value)) = line.split_once('=') else {
+            continue;
+        };
+        match key {
+            "Active" => status.active = value == "yes",
+            "Remote" => status.remote = value == "yes",
+            "Seat" => status.seat = value.to_string(),
+            "Type" => status.session_type = value.to_string(),
+            "State" => status.state = value.to_string(),
+            _ => {}
+        }
+    }
+
+    Some(status)
+}
+
+#[cfg(not(target_os = "linux"))]
+fn logind_session_status(_session_id: &str, _target_os: &str) -> Option<LogindSessionStatus> {
+    None
+}
+
+fn string_option(value: String) -> Option<String> {
+    if value.is_empty() {
+        None
+    } else {
+        Some(value)
+    }
 }
 
 impl FromStr for BackendKind {
@@ -944,7 +1110,7 @@ mod tests {
     }
 
     #[test]
-    fn drm_preflight_is_ready_with_runtime_devices_and_session() {
+    fn drm_preflight_requires_verified_logind_session_state() {
         let environment = BackendPreflightEnvironment::for_target("linux")
             .with_xdg_runtime_dir("/run/user/1000")
             .with_drm_nodes(1, 1)
@@ -953,7 +1119,74 @@ mod tests {
 
         let report = super::preflight_backend_with_environment(BackendKind::Drm, &environment);
 
+        assert!(!report.ready);
+        assert_eq!(report.code, "unverified-logind-session");
+    }
+
+    #[test]
+    fn drm_preflight_requires_active_local_session() {
+        let mut inactive = BackendPreflightEnvironment::for_target("linux")
+            .with_xdg_runtime_dir("/run/user/1000")
+            .with_drm_nodes(1, 1)
+            .with_input_event_nodes(2)
+            .with_active_local_session("1", "seat0", "wayland");
+        inactive.session_active = false;
+
+        let report = super::preflight_backend_with_environment(BackendKind::Drm, &inactive);
+
+        assert!(!report.ready);
+        assert_eq!(report.code, "inactive-logind-session");
+
+        let mut remote = BackendPreflightEnvironment::for_target("linux")
+            .with_xdg_runtime_dir("/run/user/1000")
+            .with_drm_nodes(1, 1)
+            .with_input_event_nodes(2)
+            .with_active_local_session("1", "seat0", "wayland");
+        remote.session_remote = true;
+
+        let report = super::preflight_backend_with_environment(BackendKind::Drm, &remote);
+
+        assert!(!report.ready);
+        assert_eq!(report.code, "remote-logind-session");
+    }
+
+    #[test]
+    fn drm_preflight_requires_seat_and_specific_session_type() {
+        let mut missing_seat = BackendPreflightEnvironment::for_target("linux")
+            .with_xdg_runtime_dir("/run/user/1000")
+            .with_drm_nodes(1, 1)
+            .with_input_event_nodes(2)
+            .with_active_local_session("1", "seat0", "wayland");
+        missing_seat.seat = None;
+
+        let report = super::preflight_backend_with_environment(BackendKind::Drm, &missing_seat);
+
+        assert!(!report.ready);
+        assert_eq!(report.code, "missing-seat");
+
+        let unspecified_type = BackendPreflightEnvironment::for_target("linux")
+            .with_xdg_runtime_dir("/run/user/1000")
+            .with_drm_nodes(1, 1)
+            .with_input_event_nodes(2)
+            .with_active_local_session("1", "seat0", "unspecified");
+
+        let report = super::preflight_backend_with_environment(BackendKind::Drm, &unspecified_type);
+
+        assert!(!report.ready);
+        assert_eq!(report.code, "unspecified-session-type");
+    }
+
+    #[test]
+    fn drm_preflight_is_ready_with_runtime_devices_and_session() {
+        let environment = BackendPreflightEnvironment::for_target("linux")
+            .with_xdg_runtime_dir("/run/user/1000")
+            .with_drm_nodes(1, 1)
+            .with_input_event_nodes(2)
+            .with_active_local_session("1", "seat0", "wayland");
+
+        let report = super::preflight_backend_with_environment(BackendKind::Drm, &environment);
+
         assert!(report.ready, "{report:?}");
-        assert_eq!(report.code, "ready-preliminary");
+        assert_eq!(report.code, "ready-active-local-session");
     }
 }
