@@ -190,6 +190,7 @@ cargo run -p backlit-session -- --backend=headless --screenshot target/backlit-s
 ./scripts/render-gui-preview.sh
 ./scripts/render-parallels-gui-preview.sh
 ./scripts/verify-gui-smoke.sh
+./scripts/verify-ci-contract.sh
 ./scripts/verify-packaging-contract.sh
 ./scripts/verify-staged-session-install.sh
 ./scripts/verify-nested-wayland-smoke.sh
@@ -225,6 +226,14 @@ To render the same preview inside the Ubuntu Parallels guest and copy it back fo
 ```
 
 This writes host-side artifacts under `target/gui-preview-parallels/`, including `backlit-session.png` on macOS.
+
+CI is defined in `.github/workflows/linux-e2e.yml` and is contract-checked locally:
+
+```bash
+./scripts/verify-ci-contract.sh
+```
+
+The workflow installs Ubuntu dependencies, Rust `rustfmt` and `clippy`, runs `./scripts/verify-linux-e2e.sh target/linux-e2e-ci`, and uploads the resulting artifacts.
 
 ```bash
 ./scripts/verify-gui-smoke.sh

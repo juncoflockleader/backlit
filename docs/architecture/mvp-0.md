@@ -28,6 +28,7 @@ MVP 0 is the development harness:
 - Headless performance smoke checks.
 - JSON metrics.
 - Linux E2E verifier for fmt, tests, clippy, GUI smoke, packaging contract, and nested Wayland smoke inside an Ubuntu guest.
+- GitHub Actions Linux E2E workflow with artifact upload and local contract verification.
 - Parallels runner for repeatable macOS-to-Ubuntu guest verification.
 - Packaging contract verifier for session desktop entry, systemd units, and Debian package split.
 - Staged session install verifier for fake `/usr` layout, launch command resolution, and headless GUI verification from staged binaries.
