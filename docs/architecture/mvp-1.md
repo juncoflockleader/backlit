@@ -17,6 +17,7 @@ Current launch-readiness checks:
 - `scripts/verify-session-launch.sh` verifies the desktop session entry, headless session launch, and DRM session launch preflight.
 - `backlit-session --verify-launch-spawn` verifies that the `Super+Enter` terminal route can spawn a process with `WAYLAND_DISPLAY` set.
 - `backlit-input --verify` verifies the policy-level input contract that future libinput events must satisfy: terminal hotkey routing, app-switcher focus changes, pointer focus, title-bar move, resize-grip resize, and clean pointer grab release.
+- `backlit-session --verify` verifies workspace switching and left/right window snapping through the same window-policy layer used for focus and movement.
 - `backlit-surface --verify` verifies the policy-level xdg-shell toplevel contract: create, configure, ack, map into window policy, focus, maximize, fullscreen, close request, and clean removal.
 - `backlit-perf --verify` verifies a deterministic 60-frame drag pacing smoke with zero dropped frames and pointer-to-frame p99 under 16 ms.
 - `backlit-compositor -- --smoke-test` verifies direct-scanout eligibility policy for opaque fullscreen dmabuf surfaces, including overlay and SHM blockers.

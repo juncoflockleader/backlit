@@ -394,11 +394,16 @@ pub fn run_input_smoke() -> InputSmokeReport {
 }
 
 fn window_at(policy: &WindowPolicy, x: i32, y: i32) -> Option<WindowId> {
+    let active_workspace = policy.active_workspace();
     policy
         .windows()
         .iter()
         .rev()
-        .find(|window| window.state != WindowState::Minimized && contains(window.geometry, x, y))
+        .find(|window| {
+            window.workspace == active_workspace
+                && window.state != WindowState::Minimized
+                && contains(window.geometry, x, y)
+        })
         .map(|window| window.id)
 }
 

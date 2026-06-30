@@ -120,6 +120,8 @@ if [ -n "$artifact_root" ] && [ -d "$artifact_root" ]; then
   require_contains "$artifact_root/gui-smoke/manifest.json" '"session_settings_service": true'
   require_contains "$artifact_root/gui-smoke/manifest.json" '"session_launch_spawn": true'
   require_contains "$artifact_root/gui-smoke/manifest.json" '"session_move_resize": true'
+  require_contains "$artifact_root/gui-smoke/manifest.json" '"session_workspace_switch": true'
+  require_contains "$artifact_root/gui-smoke/manifest.json" '"session_snap": true'
   require_contains "$artifact_root/gui-smoke/manifest.json" '"golden_checksum": true'
   require_contains "$artifact_root/gui-preview/manifest.json" '"session_verified": true'
   require_contains "$artifact_root/gui-preview/manifest.json" '"session_services": true'
@@ -155,6 +157,8 @@ if [ -n "$artifact_root" ] && [ -d "$artifact_root" ]; then
   if grep '"drm_session_smoke_ready": true' "$artifact_root/drm-session-smoke/manifest.json" >/dev/null; then
     require_contains "$artifact_root/drm-session-smoke/manifest.json" '"drm_session_clean_exit": true'
     require_contains "$artifact_root/drm-session-smoke/manifest.json" '"settings_service": true'
+    require_contains "$artifact_root/drm-session-smoke/manifest.json" '"workspace_switch": true'
+    require_contains "$artifact_root/drm-session-smoke/manifest.json" '"snap": true'
   else
     require_contains "$artifact_root/drm-session-smoke/manifest.json" '"drm_session_smoke_blocked_expected": true'
   fi
@@ -167,6 +171,8 @@ if [ -n "$artifact_root" ] && [ -d "$artifact_root" ]; then
     require_contains "$artifact_root/nested-wayland/manifest.json" '"session_wayland_client_spawn": true'
     require_contains "$artifact_root/nested-wayland/manifest.json" '"session_wayland_services": true'
     require_contains "$artifact_root/nested-wayland/manifest.json" '"session_settings_service": true'
+    require_contains "$artifact_root/nested-wayland/manifest.json" '"session_workspace_switch": true'
+    require_contains "$artifact_root/nested-wayland/manifest.json" '"session_snap": true'
     require_contains "$artifact_root/nested-wayland/manifest.json" '"session_wayland_clean_exit": true'
   fi
 fi
@@ -194,6 +200,8 @@ cat > "$out_dir/manifest.json" <<EOF
     "portal_security": true,
     "input_smoke": true,
     "surface_lifecycle": true,
+    "workspace_switch": true,
+    "window_snap": true,
     "frame_damage": true,
     "direct_scanout": true,
     "drag_frame_pacing": true,

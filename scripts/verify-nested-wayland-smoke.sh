@@ -101,6 +101,9 @@ grep '"compositor_ready":true' "$out_dir/session.jsonl" >/dev/null
 grep '"shell_ready":true' "$out_dir/session.jsonl" >/dev/null
 grep '"settings_ready":true' "$out_dir/session.jsonl" >/dev/null
 grep '"children_exited_cleanly":true' "$out_dir/session.jsonl" >/dev/null
+grep '"workspace_switch_ok":true' "$out_dir/session.jsonl" >/dev/null
+grep '"snap_left_ok":true' "$out_dir/session.jsonl" >/dev/null
+grep '"snap_right_ok":true' "$out_dir/session.jsonl" >/dev/null
 grep '"windows_before_shutdown":3' "$out_dir/session.jsonl" >/dev/null
 grep '"windows_closed":3' "$out_dir/session.jsonl" >/dev/null
 grep '"windows_after_shutdown":0' "$out_dir/session.jsonl" >/dev/null
@@ -133,6 +136,8 @@ cat > "$out_dir/manifest.json" <<EOF
     "session_wayland_client_spawn": true,
     "session_wayland_services": true,
     "session_settings_service": true,
+    "session_workspace_switch": true,
+    "session_snap": true,
     "session_wayland_clean_exit": true
   }
 }

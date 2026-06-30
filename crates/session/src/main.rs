@@ -17,7 +17,7 @@ use backlit_input::run_input_smoke;
 use backlit_launcher::{default_catalog, resolve_command, LaunchTarget};
 use backlit_shortcuts::{resolve_shortcut, ShortcutAction};
 use backlit_surface::run_surface_lifecycle_smoke;
-use backlit_window_policy::{OutputLayout, WindowPolicy, WindowState};
+use backlit_window_policy::{OutputLayout, SnapTarget, WindowPolicy, WindowState, WorkspaceId};
 
 fn main() {
     if let Err(error) = run() {
@@ -160,6 +160,26 @@ fn run() -> Result<(), String> {
                 (
                     "fullscreen_uses_output",
                     FieldValue::Bool(interaction_report.fullscreen_uses_output),
+                ),
+                (
+                    "workspace_switch_ok",
+                    FieldValue::Bool(interaction_report.workspace_switch_ok),
+                ),
+                (
+                    "workspace_hidden_windows",
+                    FieldValue::U64(interaction_report.workspace_hidden_windows),
+                ),
+                (
+                    "workspace_restored_focus",
+                    FieldValue::Bool(interaction_report.workspace_restored_focus),
+                ),
+                (
+                    "snap_left_ok",
+                    FieldValue::Bool(interaction_report.snap_left_ok),
+                ),
+                (
+                    "snap_right_ok",
+                    FieldValue::Bool(interaction_report.snap_right_ok),
                 ),
                 (
                     "close_fallback_focus_ok",
@@ -754,6 +774,11 @@ struct InteractionReport {
     resized_width: u64,
     maximize_uses_work_area: bool,
     fullscreen_uses_output: bool,
+    workspace_switch_ok: bool,
+    workspace_hidden_windows: u64,
+    workspace_restored_focus: bool,
+    snap_left_ok: bool,
+    snap_right_ok: bool,
     close_fallback_focus_ok: bool,
     windows_after_close: u64,
     keyboard_input_ok: bool,
@@ -776,6 +801,11 @@ impl InteractionReport {
             && self.minimize_skips_focus
             && self.maximize_uses_work_area
             && self.fullscreen_uses_output
+            && self.workspace_switch_ok
+            && self.workspace_hidden_windows == 1
+            && self.workspace_restored_focus
+            && self.snap_left_ok
+            && self.snap_right_ok
             && self.close_fallback_focus_ok
             && self.windows_after_close == 3
             && self.keyboard_input_ok
@@ -853,6 +883,60 @@ fn verify_session_interactions(policy: &WindowPolicy, layout: OutputLayout) -> I
         })
         .unwrap_or(false);
 
+    let workspace_window = focused;
+    let (workspace_switch_ok, workspace_hidden_windows, workspace_restored_focus) =
+        workspace_window
+            .map(|id| {
+                let moved = policy.move_window_to_workspace(id, WorkspaceId(2));
+                let hidden_windows = policy.windows_on_workspace(WorkspaceId(2)) as u64;
+                let switched = policy.switch_workspace(WorkspaceId(2));
+                let focused_on_workspace = policy.focused() == Some(id);
+                let switched_back = policy.switch_workspace(WorkspaceId(1));
+                let restored_focus = switched_back
+                    && policy.focused().is_some()
+                    && policy
+                        .focused()
+                        .and_then(|focused| policy.window(focused))
+                        .map(|window| {
+                            window.workspace == WorkspaceId(1)
+                                && window.state != WindowState::Minimized
+                        })
+                        .unwrap_or(false);
+
+                (
+                    moved && switched && focused_on_workspace,
+                    hidden_windows,
+                    restored_focus,
+                )
+            })
+            .unwrap_or((false, 0, false));
+
+    let snap_window = policy.focused();
+    let left_half = backlit_window_policy::Rect::new(
+        layout.work_area().x,
+        layout.work_area().y,
+        layout.work_area().width / 2,
+        layout.work_area().height,
+    );
+    let right_half = backlit_window_policy::Rect::new(
+        layout.work_area().x + layout.work_area().width / 2,
+        layout.work_area().y,
+        layout.work_area().width - layout.work_area().width / 2,
+        layout.work_area().height,
+    );
+    let (snap_left_ok, snap_right_ok) = snap_window
+        .map(|id| {
+            let left = policy.snap_window(id, layout.work_area(), SnapTarget::LeftHalf)
+                && policy.window(id).map(|window| window.geometry) == Some(left_half)
+                && policy.window(id).map(|window| window.state) == Some(WindowState::Snapped);
+            let right = policy.snap_window(id, layout.work_area(), SnapTarget::RightHalf)
+                && policy.window(id).map(|window| window.geometry) == Some(right_half)
+                && policy.window(id).map(|window| window.state) == Some(WindowState::Snapped);
+
+            (left, right)
+        })
+        .unwrap_or((false, false));
+
     let close_fallback_focus_ok = policy.close_focused_window().is_some()
         && policy.focused().is_some()
         && policy
@@ -883,6 +967,11 @@ fn verify_session_interactions(policy: &WindowPolicy, layout: OutputLayout) -> I
         resized_width,
         maximize_uses_work_area,
         fullscreen_uses_output,
+        workspace_switch_ok,
+        workspace_hidden_windows,
+        workspace_restored_focus,
+        snap_left_ok,
+        snap_right_ok,
         close_fallback_focus_ok,
         windows_after_close,
         keyboard_input_ok,

@@ -55,6 +55,6 @@ When a Parallels Ubuntu VM is available, the full Linux guest verification can b
 ./scripts/render-parallels-gui-preview.sh
 ```
 
-The session smoke path also verifies input and toplevel lifecycle interactions: app switching, terminal launch resolution, pointer-driven focus, move/resize routing, xdg-shell-style map/configure/maximize/fullscreen/close behavior, clean session shutdown, and deterministic terminal spawn with `WAYLAND_DISPLAY` propagation.
+The session smoke path also verifies input and toplevel lifecycle interactions: app switching, terminal launch resolution, pointer-driven focus, move/resize routing, workspace switching, left/right window snapping, xdg-shell-style map/configure/maximize/fullscreen/close behavior, clean session shutdown, and deterministic terminal spawn with `WAYLAND_DISPLAY` propagation.
 
 See [DEVELOPMENT.md](DEVELOPMENT.md) for environment setup, VM workflow, project layout, and contribution rules.

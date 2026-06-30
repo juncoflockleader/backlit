@@ -71,6 +71,11 @@ grep '"minimize_skips_focus":true' "$out_dir/session.jsonl" >/dev/null
 grep '"resized_width":920' "$out_dir/session.jsonl" >/dev/null
 grep '"maximize_uses_work_area":true' "$out_dir/session.jsonl" >/dev/null
 grep '"fullscreen_uses_output":true' "$out_dir/session.jsonl" >/dev/null
+grep '"workspace_switch_ok":true' "$out_dir/session.jsonl" >/dev/null
+grep '"workspace_hidden_windows":1' "$out_dir/session.jsonl" >/dev/null
+grep '"workspace_restored_focus":true' "$out_dir/session.jsonl" >/dev/null
+grep '"snap_left_ok":true' "$out_dir/session.jsonl" >/dev/null
+grep '"snap_right_ok":true' "$out_dir/session.jsonl" >/dev/null
 grep '"close_fallback_focus_ok":true' "$out_dir/session.jsonl" >/dev/null
 grep '"keyboard_input_ok":true' "$out_dir/session.jsonl" >/dev/null
 grep '"pointer_input_ok":true' "$out_dir/session.jsonl" >/dev/null
@@ -222,6 +227,8 @@ cat > "$out_dir/manifest.json" <<EOF
     "session_settings_service": true,
     "session_clean_exit": true,
     "session_move_resize": true,
+    "session_workspace_switch": true,
+    "session_snap": true,
     "session_minimize_skips_focus": true,
     "session_close_fallback_focus": true,
     "session_input": true,

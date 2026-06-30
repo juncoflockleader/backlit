@@ -1,6 +1,9 @@
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct WindowId(pub u64);
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub struct WorkspaceId(pub u32);
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Rect {
     pub x: i32,
@@ -50,6 +53,15 @@ pub enum WindowState {
     Maximized,
     Fullscreen,
     Minimized,
+    Snapped,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum SnapTarget {
+    LeftHalf,
+    RightHalf,
+    TopHalf,
+    BottomHalf,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -58,6 +70,7 @@ pub struct Window {
     pub title: String,
     pub geometry: Rect,
     pub state: WindowState,
+    pub workspace: WorkspaceId,
     restore_geometry: Option<Rect>,
 }
 
@@ -67,6 +80,8 @@ pub struct WindowPolicy {
     focused: Option<WindowId>,
     next_id: u64,
     next_offset: i32,
+    active_workspace: WorkspaceId,
+    workspace_count: u32,
 }
 
 impl Default for WindowPolicy {
@@ -76,6 +91,8 @@ impl Default for WindowPolicy {
             focused: None,
             next_id: 1,
             next_offset: 0,
+            active_workspace: WorkspaceId(1),
+            workspace_count: 4,
         }
     }
 }
@@ -93,6 +110,7 @@ impl WindowPolicy {
             title: title.into(),
             geometry,
             state: WindowState::Normal,
+            workspace: self.active_workspace,
             restore_geometry: None,
         });
         self.focused = Some(id);
@@ -123,7 +141,11 @@ impl WindowPolicy {
     }
 
     pub fn focus(&mut self, id: WindowId) -> bool {
-        if self.windows.iter().any(|window| window.id == id) {
+        if self
+            .windows
+            .iter()
+            .any(|window| self.window_focusable_on_active_workspace(window) && window.id == id)
+        {
             self.focused = Some(id);
             true
         } else {
@@ -159,7 +181,7 @@ impl WindowPolicy {
                 (start_index + len - offset) % len
             };
 
-            if self.windows[next_index].state != WindowState::Minimized {
+            if self.window_focusable_on_active_workspace(&self.windows[next_index]) {
                 let id = self.windows[next_index].id;
                 self.focused = Some(id);
                 return Some(id);
@@ -214,6 +236,37 @@ impl WindowPolicy {
         self.place_window_in_state(id, output_area, WindowState::Fullscreen)
     }
 
+    pub fn snap_window(&mut self, id: WindowId, work_area: Rect, target: SnapTarget) -> bool {
+        let geometry = match target {
+            SnapTarget::LeftHalf => Rect::new(
+                work_area.x,
+                work_area.y,
+                work_area.width / 2,
+                work_area.height,
+            ),
+            SnapTarget::RightHalf => Rect::new(
+                work_area.x + work_area.width / 2,
+                work_area.y,
+                work_area.width - work_area.width / 2,
+                work_area.height,
+            ),
+            SnapTarget::TopHalf => Rect::new(
+                work_area.x,
+                work_area.y,
+                work_area.width,
+                work_area.height / 2,
+            ),
+            SnapTarget::BottomHalf => Rect::new(
+                work_area.x,
+                work_area.y + work_area.height / 2,
+                work_area.width,
+                work_area.height - work_area.height / 2,
+            ),
+        };
+
+        self.place_window_in_state(id, geometry, WindowState::Snapped)
+    }
+
     pub fn minimize_window(&mut self, id: WindowId) -> bool {
         match self.window_mut(id) {
             Some(window) => {
@@ -238,6 +291,55 @@ impl WindowPolicy {
             }
             None => false,
         }
+    }
+
+    pub fn switch_workspace(&mut self, workspace: WorkspaceId) -> bool {
+        if !self.workspace_exists(workspace) {
+            return false;
+        }
+
+        self.active_workspace = workspace;
+        self.focused = self.last_focusable_window();
+        true
+    }
+
+    pub fn move_window_to_workspace(&mut self, id: WindowId, workspace: WorkspaceId) -> bool {
+        if !self.workspace_exists(workspace) {
+            return false;
+        }
+
+        match self.window_mut(id) {
+            Some(window) => {
+                window.workspace = workspace;
+                if self.focused == Some(id) && workspace != self.active_workspace {
+                    self.focused = self.last_focusable_window();
+                }
+                true
+            }
+            None => false,
+        }
+    }
+
+    pub fn active_workspace(&self) -> WorkspaceId {
+        self.active_workspace
+    }
+
+    pub fn workspace_count(&self) -> u32 {
+        self.workspace_count
+    }
+
+    pub fn windows_on_workspace(&self, workspace: WorkspaceId) -> usize {
+        self.windows
+            .iter()
+            .filter(|window| window.workspace == workspace)
+            .count()
+    }
+
+    pub fn visible_windows(&self) -> impl Iterator<Item = &Window> {
+        let active_workspace = self.active_workspace;
+        self.windows
+            .iter()
+            .filter(move |window| window.workspace == active_workspace)
     }
 
     pub fn focused(&self) -> Option<WindowId> {
@@ -274,14 +376,22 @@ impl WindowPolicy {
         self.windows
             .iter()
             .rev()
-            .find(|window| window.state != WindowState::Minimized)
+            .find(|window| self.window_focusable_on_active_workspace(window))
             .map(|window| window.id)
+    }
+
+    fn workspace_exists(&self, workspace: WorkspaceId) -> bool {
+        (1..=self.workspace_count).contains(&workspace.0)
+    }
+
+    fn window_focusable_on_active_workspace(&self, window: &Window) -> bool {
+        window.workspace == self.active_workspace && window.state != WindowState::Minimized
     }
 }
 
 #[cfg(test)]
 mod tests {
-    use super::{OutputLayout, WindowPolicy, WindowState};
+    use super::{OutputLayout, SnapTarget, WindowPolicy, WindowState, WorkspaceId};
 
     #[test]
     fn new_windows_take_focus() {
@@ -390,6 +500,31 @@ mod tests {
     }
 
     #[test]
+    fn snaps_windows_to_work_area_halves() {
+        let mut policy = WindowPolicy::default();
+        let id = policy.add_window("terminal", (800, 600));
+        let original = policy.window(id).unwrap().geometry;
+        let work_area = super::Rect::new(0, 42, 1920, 1038);
+
+        assert!(policy.snap_window(id, work_area, SnapTarget::LeftHalf));
+        assert_eq!(
+            policy.window(id).unwrap().geometry,
+            super::Rect::new(0, 42, 960, 1038)
+        );
+        assert_eq!(policy.window(id).unwrap().state, WindowState::Snapped);
+
+        assert!(policy.snap_window(id, work_area, SnapTarget::RightHalf));
+        assert_eq!(
+            policy.window(id).unwrap().geometry,
+            super::Rect::new(960, 42, 960, 1038)
+        );
+
+        assert!(policy.restore_window(id));
+        assert_eq!(policy.window(id).unwrap().geometry, original);
+        assert_eq!(policy.window(id).unwrap().state, WindowState::Normal);
+    }
+
+    #[test]
     fn output_layout_reserves_panel_work_area() {
         let layout = OutputLayout::new(1920, 1080, 42);
 
@@ -412,5 +547,28 @@ mod tests {
         assert!(policy.restore_window(second));
         assert!(policy.focus(second));
         assert_eq!(policy.window(second).unwrap().state, WindowState::Normal);
+    }
+
+    #[test]
+    fn switches_workspaces_and_hides_other_windows_from_focus() {
+        let mut policy = WindowPolicy::default();
+        let first = policy.add_window("terminal", (800, 600));
+        let second = policy.add_window("browser", (1200, 800));
+
+        assert_eq!(policy.active_workspace(), WorkspaceId(1));
+        assert_eq!(policy.visible_windows().count(), 2);
+        assert!(policy.move_window_to_workspace(second, WorkspaceId(2)));
+        assert_eq!(policy.windows_on_workspace(WorkspaceId(1)), 1);
+        assert_eq!(policy.windows_on_workspace(WorkspaceId(2)), 1);
+        assert_eq!(policy.focused(), Some(first));
+        assert!(!policy.focus(second));
+
+        assert!(policy.switch_workspace(WorkspaceId(2)));
+        assert_eq!(policy.focused(), Some(second));
+        assert_eq!(policy.visible_windows().count(), 1);
+        assert!(!policy.switch_workspace(WorkspaceId(5)));
+
+        assert!(policy.switch_workspace(WorkspaceId(1)));
+        assert_eq!(policy.focused(), Some(first));
     }
 }

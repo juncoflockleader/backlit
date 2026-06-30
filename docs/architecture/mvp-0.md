@@ -17,6 +17,8 @@ MVP 0 is the development harness:
 - Session interaction smoke for app switching and terminal launch resolution.
 - Session service orchestration smoke for launching compositor, shell, and settings daemon probes from `backlit-session`.
 - Session move/resize smoke through pure window policy.
+- Workspace switching smoke that hides non-active workspace windows from focus and pointer routing.
+- Window snap smoke for left/right work-area tiling.
 - Minimized-window focus skipping in session smoke.
 - Focus fallback after closing a window.
 - Clean session shutdown smoke for closing managed windows and clearing focus across headless, nested Wayland, and launch-ready DRM paths.

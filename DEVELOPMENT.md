@@ -300,6 +300,8 @@ Session verification also checks output-aware geometry: maximized windows use th
 
 Move and resize behavior is also verified through the session smoke path before maximize/fullscreen checks run.
 
+Workspace switching and left/right window snapping are verified through the session smoke path too: a moved window is hidden from the active workspace until switching to its workspace, and snapped windows occupy the expected work-area halves.
+
 Minimized windows are kept in policy state but skipped by focus cycling; this is verified in the session smoke path.
 
 Closing the focused window is verified too, including fallback focus that skips minimized windows.

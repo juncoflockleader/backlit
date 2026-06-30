@@ -90,6 +90,9 @@ if [ "$drm_expected_ready" = true ]; then
   grep '"shell_ready":true' "$session_log" >/dev/null
   grep '"settings_ready":true' "$session_log" >/dev/null
   grep '"children_exited_cleanly":true' "$session_log" >/dev/null
+  grep '"workspace_switch_ok":true' "$session_log" >/dev/null
+  grep '"snap_left_ok":true' "$session_log" >/dev/null
+  grep '"snap_right_ok":true' "$session_log" >/dev/null
   grep '"windows_before_shutdown":3' "$session_log" >/dev/null
   grep '"windows_closed":3' "$session_log" >/dev/null
   grep '"windows_after_shutdown":0' "$session_log" >/dev/null
@@ -137,6 +140,8 @@ cat > "$out_dir/manifest.json" <<EOF
     "drm_session_smoke_blocked_expected": $drm_session_smoke_blocked_expected,
     "drm_session_clean_exit": $drm_session_clean_exit,
     "settings_service": $drm_session_smoke_ready,
+    "workspace_switch": $drm_session_smoke_ready,
+    "snap": $drm_session_smoke_ready,
     "xdg_runtime_dir_present": $runtime_present,
     "session_present": $session_present,
     "drm_card_nodes": $drm_card_nodes,
