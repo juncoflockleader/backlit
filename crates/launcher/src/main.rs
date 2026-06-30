@@ -4,7 +4,7 @@ use std::process::{self, Command};
 use backlit_common::metrics::{event_json, FieldValue};
 use backlit_launcher::{
     default_catalog, default_desktop_entry_dirs, discover_desktop_entries_in_dirs, resolve_command,
-    verify_catalog, LaunchCommand, LaunchTarget,
+    verify_catalog, DesktopEntry, LaunchCommand, LaunchTarget,
 };
 
 fn main() {
@@ -59,40 +59,8 @@ fn run() -> Result<(), String> {
         );
     }
 
-    if config.spawn_smoke {
-        let target = config.target.unwrap_or(LaunchTarget::Terminal);
-        let command = resolve_command(&catalog, target)
-            .ok_or_else(|| format!("missing launch target {}", target.as_str()))?;
-        let report = run_spawn_smoke(command, &config)?;
-
-        println!(
-            "{}",
-            event_json(
-                "launcher.spawn",
-                &[
-                    ("target", FieldValue::Str(target.as_str())),
-                    ("dry_run", FieldValue::Bool(false)),
-                    ("program", FieldValue::Str(report.program.as_str())),
-                    ("arg_count", FieldValue::U64(report.arg_count as u64)),
-                    ("spawned", FieldValue::Bool(report.spawned)),
-                    ("exit_success", FieldValue::Bool(report.exit_success)),
-                    ("status_code", FieldValue::U64(report.status_code)),
-                    ("status_allowed", FieldValue::Bool(report.status_allowed),),
-                    (
-                        "wayland_display_set",
-                        FieldValue::Bool(report.wayland_display_set),
-                    ),
-                ],
-            )
-        );
-
-        if config.verify && !report.passed() {
-            return Err(String::from("launcher spawn smoke failed"));
-        }
-    }
-
     let (desktop_entries, desktop_dirs, default_desktop_dirs) = if config.no_desktop_discovery {
-        (0, 0, false)
+        (Vec::new(), 0, false)
     } else {
         let (dirs, default_desktop_dirs) = config.desktop_dirs();
         let desktop_dirs = dirs.len();
@@ -108,14 +76,40 @@ fn run() -> Result<(), String> {
                         ("id", FieldValue::Str(entry.id.as_str())),
                         ("name", FieldValue::Str(entry.name.as_str())),
                         ("program", FieldValue::Str(entry.command_program())),
+                        (
+                            "arg_count",
+                            FieldValue::U64(entry.command_args().len() as u64)
+                        ),
+                        ("exec", FieldValue::Str(entry.exec.as_str())),
                         ("terminal", FieldValue::Bool(entry.terminal)),
                     ],
                 )
             );
         }
 
-        (entries.len(), desktop_dirs, default_desktop_dirs)
+        (entries, desktop_dirs, default_desktop_dirs)
     };
+
+    if let Some(selector) = config.desktop_entry.as_deref() {
+        let entry = resolve_desktop_entry(&desktop_entries, selector)
+            .ok_or_else(|| format!("missing desktop entry '{selector}'"))?;
+        println!(
+            "{}",
+            event_json(
+                "launcher.desktop_resolve",
+                &[
+                    ("id", FieldValue::Str(entry.id.as_str())),
+                    ("name", FieldValue::Str(entry.name.as_str())),
+                    ("program", FieldValue::Str(entry.command_program())),
+                    (
+                        "arg_count",
+                        FieldValue::U64(entry.command_args().len() as u64)
+                    ),
+                    ("exec", FieldValue::Str(entry.exec.as_str())),
+                ],
+            )
+        );
+    }
 
     println!(
         "{}",
@@ -125,11 +119,77 @@ fn run() -> Result<(), String> {
                 ("enabled", FieldValue::Bool(!config.no_desktop_discovery),),
                 ("default_dirs", FieldValue::Bool(default_desktop_dirs)),
                 ("dirs", FieldValue::U64(desktop_dirs as u64)),
-                ("entries", FieldValue::U64(desktop_entries as u64)),
+                ("entries", FieldValue::U64(desktop_entries.len() as u64)),
                 ("required", FieldValue::Bool(config.require_desktop_entries),),
             ],
         )
     );
+
+    if config.spawn_smoke {
+        if let Some(selector) = config.desktop_entry.as_deref() {
+            let entry = resolve_desktop_entry(&desktop_entries, selector)
+                .ok_or_else(|| format!("missing desktop entry '{selector}'"))?;
+            let (program, args) = desktop_spawn_invocation(entry, &config);
+            let report = run_process_spawn(program, args, &config)?;
+
+            println!(
+                "{}",
+                event_json(
+                    "launcher.desktop_spawn",
+                    &[
+                        ("id", FieldValue::Str(entry.id.as_str())),
+                        ("name", FieldValue::Str(entry.name.as_str())),
+                        ("dry_run", FieldValue::Bool(false)),
+                        ("program", FieldValue::Str(report.program.as_str())),
+                        ("arg_count", FieldValue::U64(report.arg_count as u64)),
+                        ("spawned", FieldValue::Bool(report.spawned)),
+                        ("exit_success", FieldValue::Bool(report.exit_success)),
+                        ("status_code", FieldValue::U64(report.status_code)),
+                        ("status_allowed", FieldValue::Bool(report.status_allowed),),
+                        (
+                            "wayland_display_set",
+                            FieldValue::Bool(report.wayland_display_set),
+                        ),
+                    ],
+                )
+            );
+
+            if config.verify && !report.passed() {
+                return Err(String::from("launcher desktop spawn smoke failed"));
+            }
+        } else {
+            let target = config.target.unwrap_or(LaunchTarget::Terminal);
+            let command = resolve_command(&catalog, target)
+                .ok_or_else(|| format!("missing launch target {}", target.as_str()))?;
+            let (program, args) = spawn_invocation(command, &config);
+            let report = run_process_spawn(program, args, &config)?;
+
+            println!(
+                "{}",
+                event_json(
+                    "launcher.spawn",
+                    &[
+                        ("target", FieldValue::Str(target.as_str())),
+                        ("dry_run", FieldValue::Bool(false)),
+                        ("program", FieldValue::Str(report.program.as_str())),
+                        ("arg_count", FieldValue::U64(report.arg_count as u64)),
+                        ("spawned", FieldValue::Bool(report.spawned)),
+                        ("exit_success", FieldValue::Bool(report.exit_success)),
+                        ("status_code", FieldValue::U64(report.status_code)),
+                        ("status_allowed", FieldValue::Bool(report.status_allowed),),
+                        (
+                            "wayland_display_set",
+                            FieldValue::Bool(report.wayland_display_set),
+                        ),
+                    ],
+                )
+            );
+
+            if config.verify && !report.passed() {
+                return Err(String::from("launcher spawn smoke failed"));
+            }
+        }
+    }
 
     let report = verify_catalog(&catalog);
     println!(
@@ -154,7 +214,10 @@ fn run() -> Result<(), String> {
                     "empty_programs",
                     FieldValue::U64(report.empty_programs.len() as u64),
                 ),
-                ("desktop_entries", FieldValue::U64(desktop_entries as u64)),
+                (
+                    "desktop_entries",
+                    FieldValue::U64(desktop_entries.len() as u64)
+                ),
                 ("desktop_dirs", FieldValue::U64(desktop_dirs as u64)),
                 (
                     "host_desktop_discovery",
@@ -164,7 +227,8 @@ fn run() -> Result<(), String> {
         )
     );
 
-    if config.verify && (!report.passed() || config.require_desktop_entries && desktop_entries == 0)
+    if config.verify
+        && (!report.passed() || config.require_desktop_entries && desktop_entries.is_empty())
     {
         return Err(String::from("launcher catalog verification failed"));
     }
@@ -180,6 +244,7 @@ struct Config {
     spawn_args: Vec<String>,
     allowed_status_codes: Vec<i32>,
     wayland_display: Option<String>,
+    desktop_entry: Option<String>,
     no_desktop_discovery: bool,
     require_desktop_entries: bool,
     spawn_smoke: bool,
@@ -219,6 +284,13 @@ impl Config {
                 config.desktop_dirs.push(
                     args.next()
                         .ok_or_else(|| String::from("missing value for --desktop-dir"))?,
+                );
+            } else if let Some(value) = arg.strip_prefix("--desktop-entry=") {
+                config.desktop_entry = Some(value.to_string());
+            } else if arg == "--desktop-entry" {
+                config.desktop_entry = Some(
+                    args.next()
+                        .ok_or_else(|| String::from("missing value for --desktop-entry"))?,
                 );
             } else if arg == "--no-desktop-discovery" {
                 config.no_desktop_discovery = true;
@@ -307,8 +379,20 @@ impl SpawnReport {
     }
 }
 
-fn run_spawn_smoke(command: &LaunchCommand, config: &Config) -> Result<SpawnReport, String> {
-    let (program, args) = spawn_invocation(command, config);
+fn resolve_desktop_entry<'a>(
+    entries: &'a [DesktopEntry],
+    selector: &str,
+) -> Option<&'a DesktopEntry> {
+    entries
+        .iter()
+        .find(|entry| entry.id == selector || entry.name == selector)
+}
+
+fn run_process_spawn(
+    program: String,
+    args: Vec<String>,
+    config: &Config,
+) -> Result<SpawnReport, String> {
     let wayland_display = config
         .wayland_display
         .clone()
@@ -356,19 +440,39 @@ fn spawn_invocation(command: &LaunchCommand, config: &Config) -> (String, Vec<St
     (program, args)
 }
 
+fn desktop_spawn_invocation(entry: &DesktopEntry, config: &Config) -> (String, Vec<String>) {
+    let program = config
+        .spawn_program
+        .clone()
+        .unwrap_or_else(|| entry.program.clone());
+    let args = if config.spawn_program.is_some() {
+        config.spawn_args.clone()
+    } else {
+        entry
+            .args
+            .iter()
+            .cloned()
+            .chain(config.spawn_args.iter().cloned())
+            .collect()
+    };
+
+    (program, args)
+}
+
 fn print_help() {
     println!(
         "\
 backlit-launcher
 
 Usage:
-  backlit-launcher [--verify] [--list] [--target=terminal|browser|settings] [--desktop-dir=DIR] [--spawn-smoke]
+  backlit-launcher [--verify] [--list] [--target=terminal|browser|settings] [--desktop-dir=DIR] [--desktop-entry=ID] [--spawn-smoke]
 
 Flags:
   --verify  Fail if the required launch catalog is incomplete.
   --list    Emit the required launch catalog as JSON.
   --target  Resolve a single target in dry-run mode.
   --desktop-dir  Discover visible .desktop application entries from DIR. May repeat. Defaults to XDG app dirs.
+  --desktop-entry  Resolve or spawn a discovered .desktop entry by id or name.
   --no-desktop-discovery  Skip .desktop application discovery.
   --require-desktop-entries  Fail verification if no visible .desktop entries are discovered.
   --spawn-smoke  Spawn the selected launch target or override program and verify it exits successfully.
@@ -382,8 +486,8 @@ Flags:
 
 #[cfg(test)]
 mod tests {
-    use super::{spawn_invocation, Config};
-    use backlit_launcher::{LaunchTarget, REQUIRED_TARGETS};
+    use super::{desktop_spawn_invocation, spawn_invocation, Config};
+    use backlit_launcher::{DesktopEntry, LaunchTarget, REQUIRED_TARGETS};
 
     #[test]
     fn parses_spawn_smoke_flags() {
@@ -395,6 +499,8 @@ mod tests {
             "true",
             "--desktop-dir",
             "crates/launcher/fixtures",
+            "--desktop-entry",
+            "org.backlit.SpawnProbe.desktop",
             "--require-desktop-entries",
             "--spawn-arg",
             "--help",
@@ -408,6 +514,10 @@ mod tests {
         assert!(config.spawn_smoke);
         assert_eq!(config.spawn_program.as_deref(), Some("true"));
         assert_eq!(config.desktop_dirs, ["crates/launcher/fixtures"]);
+        assert_eq!(
+            config.desktop_entry.as_deref(),
+            Some("org.backlit.SpawnProbe.desktop")
+        );
         assert!(config.require_desktop_entries);
         assert_eq!(config.spawn_args, ["--help"]);
         assert_eq!(config.allowed_status_codes, [230]);
@@ -455,5 +565,30 @@ mod tests {
         assert_eq!(program, "true");
         assert_eq!(args, ["--version"]);
         assert_eq!(REQUIRED_TARGETS.len(), 3);
+    }
+
+    #[test]
+    fn appends_spawn_args_to_desktop_entry_command() {
+        let config = Config::parse([
+            "--desktop-entry",
+            "org.backlit.SpawnProbe.desktop",
+            "--spawn-smoke",
+            "--spawn-arg",
+            "--extra",
+        ])
+        .expect("config should parse");
+        let entry = DesktopEntry {
+            id: String::from("org.backlit.SpawnProbe.desktop"),
+            name: String::from("Spawn Probe"),
+            exec: String::from("sh -c true"),
+            program: String::from("sh"),
+            args: vec![String::from("-c"), String::from("true")],
+            terminal: false,
+        };
+
+        let (program, args) = desktop_spawn_invocation(&entry, &config);
+
+        assert_eq!(program, "sh");
+        assert_eq!(args, ["-c", "true", "--extra"]);
     }
 }

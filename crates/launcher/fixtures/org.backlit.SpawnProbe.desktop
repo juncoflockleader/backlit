@@ -1,0 +1,5 @@
+[Desktop Entry]
+Type=Application
+Name=Spawn Probe
+Exec=sh -c "test \"$WAYLAND_DISPLAY\" = backlit-0" %U
+Terminal=false

@@ -8,6 +8,7 @@ out_dir="${1:-target/launcher-desktop-discovery}"
 mkdir -p "$out_dir"
 
 fixture_log="$out_dir/fixture-launcher.jsonl"
+fixture_spawn_log="$out_dir/fixture-desktop-spawn.jsonl"
 host_log="$out_dir/host-launcher.jsonl"
 
 fail() {
@@ -57,10 +58,26 @@ cargo run -p backlit-launcher -- \
 grep '"event":"launcher.desktop_discovery"' "$fixture_log" >/dev/null
 grep '"default_dirs":false' "$fixture_log" >/dev/null
 grep '"required":true' "$fixture_log" >/dev/null
-grep '"desktop_entries":3' "$fixture_log" >/dev/null
+grep '"desktop_entries":4' "$fixture_log" >/dev/null
 grep '"desktop_dirs":1' "$fixture_log" >/dev/null
 fixture_desktop_entries="$(desktop_entry_events "$fixture_log")"
-test "$fixture_desktop_entries" -eq 3 || fail "fixture desktop discovery expected 3 entries"
+test "$fixture_desktop_entries" -eq 4 || fail "fixture desktop discovery expected 4 entries"
+
+cargo run -p backlit-launcher -- \
+  --verify \
+  --desktop-dir=crates/launcher/fixtures \
+  --desktop-entry=org.backlit.SpawnProbe.desktop \
+  --spawn-smoke \
+  --wayland-display=backlit-0 > "$fixture_spawn_log"
+
+grep '"event":"launcher.desktop_resolve"' "$fixture_spawn_log" >/dev/null
+grep '"event":"launcher.desktop_spawn"' "$fixture_spawn_log" >/dev/null
+grep '"id":"org.backlit.SpawnProbe.desktop"' "$fixture_spawn_log" >/dev/null
+grep '"program":"sh"' "$fixture_spawn_log" >/dev/null
+grep '"arg_count":2' "$fixture_spawn_log" >/dev/null
+grep '"spawned":true' "$fixture_spawn_log" >/dev/null
+grep '"exit_success":true' "$fixture_spawn_log" >/dev/null
+grep '"wayland_display_set":true' "$fixture_spawn_log" >/dev/null
 
 raw_default_desktop_files="$(count_default_desktop_files)"
 host_desktop_entries_required=false
@@ -90,11 +107,14 @@ cat > "$out_dir/manifest.json" <<EOF
   "target_os": "$(uname -s)",
   "artifacts": {
     "fixture_log": "$fixture_log",
+    "fixture_spawn_log": "$fixture_spawn_log",
     "host_log": "$host_log"
   },
   "checks": {
     "fixture_desktop_discovery": true,
     "fixture_desktop_entries": $fixture_desktop_entries,
+    "fixture_desktop_spawn": true,
+    "fixture_desktop_exec_args": 2,
     "host_default_desktop_discovery": true,
     "host_raw_desktop_files": $raw_default_desktop_files,
     "host_desktop_entries": $host_desktop_entries,

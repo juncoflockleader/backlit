@@ -21,6 +21,12 @@ cargo run -p backlit-launcher -- \
   --spawn-smoke \
   --spawn-program=true \
   --wayland-display=backlit-0 > "$out_dir/launcher-spawn.jsonl"
+cargo run -p backlit-launcher -- \
+  --verify \
+  --desktop-dir=crates/launcher/fixtures \
+  --desktop-entry=org.backlit.SpawnProbe.desktop \
+  --spawn-smoke \
+  --wayland-display=backlit-0 > "$out_dir/launcher-desktop-spawn.jsonl"
 cargo run -p backlit-shortcuts -- --verify --list --resolve=Super+Enter > "$out_dir/shortcuts.jsonl"
 cargo run -p backlit-input -- --verify > "$out_dir/input.jsonl"
 cargo run -p backlit-surface -- --verify > "$out_dir/surface.jsonl"
@@ -209,13 +215,21 @@ grep '"lock_screen_unlock_prompt_visible":true' "$out_dir/shell.jsonl" >/dev/nul
 grep '"lock_screen_password_field_focused":true' "$out_dir/shell.jsonl" >/dev/null
 grep '"event":"launcher.verified"' "$out_dir/launcher.jsonl" >/dev/null
 grep '"required_targets":3' "$out_dir/launcher.jsonl" >/dev/null
-grep '"desktop_entries":3' "$out_dir/launcher.jsonl" >/dev/null
+grep '"desktop_entries":4' "$out_dir/launcher.jsonl" >/dev/null
 grep '"target":"terminal"' "$out_dir/launcher.jsonl" >/dev/null
 grep '"event":"launcher.spawn"' "$out_dir/launcher-spawn.jsonl" >/dev/null
 grep '"target":"terminal"' "$out_dir/launcher-spawn.jsonl" >/dev/null
 grep '"spawned":true' "$out_dir/launcher-spawn.jsonl" >/dev/null
 grep '"exit_success":true' "$out_dir/launcher-spawn.jsonl" >/dev/null
 grep '"wayland_display_set":true' "$out_dir/launcher-spawn.jsonl" >/dev/null
+grep '"event":"launcher.desktop_resolve"' "$out_dir/launcher-desktop-spawn.jsonl" >/dev/null
+grep '"event":"launcher.desktop_spawn"' "$out_dir/launcher-desktop-spawn.jsonl" >/dev/null
+grep '"id":"org.backlit.SpawnProbe.desktop"' "$out_dir/launcher-desktop-spawn.jsonl" >/dev/null
+grep '"program":"sh"' "$out_dir/launcher-desktop-spawn.jsonl" >/dev/null
+grep '"arg_count":2' "$out_dir/launcher-desktop-spawn.jsonl" >/dev/null
+grep '"spawned":true' "$out_dir/launcher-desktop-spawn.jsonl" >/dev/null
+grep '"exit_success":true' "$out_dir/launcher-desktop-spawn.jsonl" >/dev/null
+grep '"wayland_display_set":true' "$out_dir/launcher-desktop-spawn.jsonl" >/dev/null
 grep '"event":"shortcut.verified"' "$out_dir/shortcuts.jsonl" >/dev/null
 grep '"required_bindings":6' "$out_dir/shortcuts.jsonl" >/dev/null
 grep '"action":"launch-terminal"' "$out_dir/shortcuts.jsonl" >/dev/null
@@ -334,6 +348,7 @@ cat > "$out_dir/manifest.json" <<EOF
     "shell_log": "$out_dir/shell.jsonl",
     "launcher_log": "$out_dir/launcher.jsonl",
     "launcher_spawn_log": "$out_dir/launcher-spawn.jsonl",
+    "launcher_desktop_spawn_log": "$out_dir/launcher-desktop-spawn.jsonl",
     "shortcuts_log": "$out_dir/shortcuts.jsonl",
     "input_log": "$out_dir/input.jsonl",
     "surface_log": "$out_dir/surface.jsonl",
@@ -365,8 +380,10 @@ cat > "$out_dir/manifest.json" <<EOF
     "shell_app_switcher": true,
     "shell_lock_screen": true,
     "launcher_required_targets": 3,
-    "desktop_entries": 3,
+    "desktop_entries": 4,
     "launcher_spawn": true,
+    "launcher_desktop_spawn": true,
+    "launcher_desktop_exec_args": 2,
     "shortcut_required_bindings": 6,
     "keyboard_input": true,
     "pointer_input": true,

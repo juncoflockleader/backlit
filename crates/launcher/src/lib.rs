@@ -138,15 +138,18 @@ pub struct DesktopEntry {
     pub id: String,
     pub name: String,
     pub exec: String,
+    pub program: String,
+    pub args: Vec<String>,
     pub terminal: bool,
 }
 
 impl DesktopEntry {
     pub fn command_program(&self) -> &str {
-        self.exec
-            .split_whitespace()
-            .next()
-            .unwrap_or(self.exec.as_str())
+        self.program.as_str()
+    }
+
+    pub fn command_args(&self) -> &[String] {
+        &self.args
     }
 }
 
@@ -154,8 +157,24 @@ impl DesktopEntry {
 pub enum DesktopEntryError {
     MissingName,
     MissingExec,
+    InvalidExec,
     NotApplication,
     Hidden,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct DesktopExecCommand {
+    pub program: String,
+    pub args: Vec<String>,
+}
+
+impl DesktopExecCommand {
+    pub fn shell_words(&self) -> String {
+        std::iter::once(self.program.as_str())
+            .chain(self.args.iter().map(String::as_str))
+            .collect::<Vec<_>>()
+            .join(" ")
+    }
 }
 
 pub fn parse_desktop_entry(
@@ -191,7 +210,7 @@ pub fn parse_desktop_entry(
         match key {
             "Type" => entry_type = Some(value.to_string()),
             "Name" => name = Some(value.to_string()),
-            "Exec" => exec = Some(strip_exec_field_codes(value)),
+            "Exec" => exec = Some(value.to_string()),
             "Terminal" => terminal = value.eq_ignore_ascii_case("true"),
             "Hidden" => hidden = value.eq_ignore_ascii_case("true"),
             "NoDisplay" => no_display = value.eq_ignore_ascii_case("true"),
@@ -207,14 +226,19 @@ pub fn parse_desktop_entry(
         return Err(DesktopEntryError::Hidden);
     }
 
+    let exec = exec
+        .filter(|exec| !exec.trim().is_empty())
+        .ok_or(DesktopEntryError::MissingExec)?;
+    let exec_command = parse_exec_command(&exec)?;
+
     Ok(DesktopEntry {
         id: id.into(),
         name: name
             .filter(|name| !name.trim().is_empty())
             .ok_or(DesktopEntryError::MissingName)?,
-        exec: exec
-            .filter(|exec| !exec.trim().is_empty())
-            .ok_or(DesktopEntryError::MissingExec)?,
+        exec: exec_command.shell_words(),
+        program: exec_command.program,
+        args: exec_command.args,
         terminal,
     })
 }
@@ -308,20 +332,90 @@ fn default_desktop_entry_dirs_from(
     dirs
 }
 
+pub fn parse_exec_command(value: &str) -> Result<DesktopExecCommand, DesktopEntryError> {
+    let words = tokenize_exec(value)?;
+    let mut cleaned = Vec::new();
+
+    for word in words {
+        let stripped = strip_exec_field_codes(&word);
+        if !stripped.is_empty() {
+            cleaned.push(stripped);
+        }
+    }
+
+    let mut cleaned = cleaned.into_iter();
+    let program = cleaned.next().ok_or(DesktopEntryError::InvalidExec)?;
+    let args = cleaned.collect();
+
+    Ok(DesktopExecCommand { program, args })
+}
+
+fn tokenize_exec(value: &str) -> Result<Vec<String>, DesktopEntryError> {
+    let mut words = Vec::new();
+    let mut current = String::new();
+    let mut in_quotes = false;
+    let mut escaped = false;
+
+    for character in value.chars() {
+        if escaped {
+            current.push(character);
+            escaped = false;
+            continue;
+        }
+
+        match character {
+            '\\' => escaped = true,
+            '"' => in_quotes = !in_quotes,
+            character if character.is_whitespace() && !in_quotes => {
+                if !current.is_empty() {
+                    words.push(std::mem::take(&mut current));
+                }
+            }
+            _ => current.push(character),
+        }
+    }
+
+    if escaped || in_quotes {
+        return Err(DesktopEntryError::InvalidExec);
+    }
+
+    if !current.is_empty() {
+        words.push(current);
+    }
+
+    Ok(words)
+}
+
 fn strip_exec_field_codes(value: &str) -> String {
-    value
-        .split_whitespace()
-        .filter(|word| !matches!(*word, "%f" | "%F" | "%u" | "%U" | "%i" | "%c" | "%k"))
-        .collect::<Vec<_>>()
-        .join(" ")
+    let mut stripped = String::new();
+    let mut chars = value.chars();
+
+    while let Some(character) = chars.next() {
+        if character != '%' {
+            stripped.push(character);
+            continue;
+        }
+
+        match chars.next() {
+            Some('%') => stripped.push('%'),
+            Some('f' | 'F' | 'u' | 'U' | 'i' | 'c' | 'k' | 'd' | 'D' | 'n' | 'N' | 'v' | 'm') => {}
+            Some(other) => {
+                stripped.push('%');
+                stripped.push(other);
+            }
+            None => stripped.push('%'),
+        }
+    }
+
+    stripped
 }
 
 #[cfg(test)]
 mod tests {
     use super::{
         default_catalog, default_desktop_entry_dirs_from, discover_desktop_entries_in_dirs,
-        parse_desktop_entry, resolve_command, verify_catalog, DesktopEntryError, LaunchTarget,
-        REQUIRED_TARGETS,
+        parse_desktop_entry, parse_exec_command, resolve_command, verify_catalog,
+        DesktopEntryError, LaunchTarget, REQUIRED_TARGETS,
     };
     use std::fs;
     use std::time::{SystemTime, UNIX_EPOCH};
@@ -378,6 +472,30 @@ Terminal=false
         assert_eq!(entry.name, "Terminal");
         assert_eq!(entry.exec, "foot");
         assert_eq!(entry.command_program(), "foot");
+        assert!(entry.command_args().is_empty());
+    }
+
+    #[test]
+    fn parses_quoted_desktop_exec_and_removes_field_codes() {
+        let command = parse_exec_command("sh -c \"test \\\"$WAYLAND_DISPLAY\\\" = backlit-0\" %U")
+            .expect("exec command should parse");
+
+        assert_eq!(command.program, "sh");
+        assert_eq!(
+            command.args,
+            ["-c", "test \"$WAYLAND_DISPLAY\" = backlit-0"]
+        );
+        assert_eq!(
+            command.shell_words(),
+            "sh -c test \"$WAYLAND_DISPLAY\" = backlit-0"
+        );
+    }
+
+    #[test]
+    fn rejects_unbalanced_desktop_exec_quotes() {
+        let error = parse_exec_command("sh -c \"unterminated").unwrap_err();
+
+        assert_eq!(error, DesktopEntryError::InvalidExec);
     }
 
     #[test]

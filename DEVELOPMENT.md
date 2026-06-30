@@ -320,7 +320,7 @@ Crash logging is covered by `backlit-session-supervisor --verify` and `./scripts
 
 The static demo render is guarded by checksum `5635038614353063225`. The session preview render is policy-driven and guarded by checksum `15888844850457870477`; update either only when an intentional visual change is made.
 
-The launcher catalog is verified in dry-run mode for the first required targets: terminal, browser, and settings.
+The launcher catalog is verified in dry-run mode for the first required targets: terminal, browser, and settings. The launcher also parses visible freedesktop `.desktop` entries, including quoted `Exec=` arguments and field-code removal, then spawns a discovered fixture entry with `WAYLAND_DISPLAY` set so app-launch plumbing is executable before the real compositor loop lands.
 
 The launcher discovers visible `.desktop` entries from XDG application directories by default. Smoke tests keep a fixture directory for deterministic parser coverage, while `verify-launcher-desktop-discovery.sh` also checks host app discovery and requires visible entries on Linux hosts that actually have desktop files installed.
 

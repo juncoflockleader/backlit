@@ -34,6 +34,7 @@ require_executable scripts/verify-session-launch.sh
 require_executable scripts/verify-drm-session-smoke.sh
 require_executable scripts/verify-session-replay.sh
 require_executable scripts/verify-compositor-socket.sh
+require_executable scripts/verify-launcher-desktop-discovery.sh
 require_executable scripts/verify-debian-package-install.sh
 require_executable scripts/verify-debian-system-install.sh
 require_executable scripts/verify-launch-performance.sh
@@ -63,6 +64,8 @@ require_contains scripts/verify-compositor-socket.sh '"session_socket_bound": tr
 require_contains scripts/verify-compositor-socket.sh '"socket_accepts_client_connection": true'
 require_contains scripts/verify-compositor-socket.sh '"demo_client_socket_launch": true'
 require_contains scripts/verify-compositor-socket.sh '"demo_client_surface_mapped": true'
+require_contains scripts/verify-launcher-desktop-discovery.sh '--desktop-entry=org.backlit.SpawnProbe.desktop'
+require_contains scripts/verify-launcher-desktop-discovery.sh '"fixture_desktop_spawn": true'
 require_contains scripts/verify-linux-e2e.sh './scripts/verify-drm-session-smoke.sh'
 require_contains scripts/verify-linux-e2e.sh './scripts/verify-mvp1-contract.sh'
 
@@ -85,6 +88,7 @@ if [ -n "$artifact_root" ] && [ -d "$artifact_root" ]; then
   require_file "$artifact_root/resource-budget/manifest.json"
   require_file "$artifact_root/compositor-runtime/manifest.json"
   require_file "$artifact_root/compositor-socket/manifest.json"
+  require_file "$artifact_root/launcher-desktop-discovery/manifest.json"
   require_file "$artifact_root/debian-package-install/manifest.json"
   require_file "$artifact_root/debian-system-install/manifest.json"
 
@@ -156,6 +160,9 @@ if [ -n "$artifact_root" ] && [ -d "$artifact_root" ]; then
   require_contains "$artifact_root/compositor-runtime/manifest.json" '"surface_policy_preview": true'
   require_contains "$artifact_root/compositor-runtime/manifest.json" '"targeted_surface_damage": true'
   require_contains "$artifact_root/compositor-runtime/manifest.json" '"client_disconnect_cleanup": true'
+  require_contains "$artifact_root/launcher-desktop-discovery/manifest.json" '"fixture_desktop_discovery": true'
+  require_contains "$artifact_root/launcher-desktop-discovery/manifest.json" '"fixture_desktop_spawn": true'
+  require_contains "$artifact_root/launcher-desktop-discovery/manifest.json" '"fixture_desktop_exec_args": 2'
 
   require_contains "$artifact_root/debian-package-install/manifest.json" '"package_install_checked": true'
   if grep '"debs_extracted": true' "$artifact_root/debian-package-install/manifest.json" >/dev/null; then
@@ -209,6 +216,7 @@ cat > "$manifest" <<EOF
     "systemd_launch_plan": true,
     "drm_session_smoke_contract": true,
     "session_replay_contract": true,
+    "desktop_entry_launch_contract": true,
     "package_install_contract": true,
     "resource_budget_contract": true,
     "compositor_socket_contract": true,

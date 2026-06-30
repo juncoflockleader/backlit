@@ -22,6 +22,7 @@ Current launch-readiness checks:
 - `backlit-session --verify-launch-spawn` verifies that the `Super+Enter` terminal route can spawn a process with `WAYLAND_DISPLAY` set.
 - `scripts/verify-nested-wayland-smoke.sh` verifies that the real terminal target (`foot`) spawns against a parent Weston Wayland socket with `WAYLAND_DISPLAY` set, recording Weston-headless's expected no-seat exit when the terminal cannot become interactive.
 - `scripts/verify-launcher-desktop-discovery.sh` verifies fixture `.desktop` parsing and host XDG application discovery for launching installed apps.
+- The launcher desktop-entry smoke parses quoted `Exec=` commands, strips freedesktop field codes, resolves a discovered fixture entry by id, and spawns it with `WAYLAND_DISPLAY` set, which keeps installed-app launch semantics executable while the real compositor loop is being brought up.
 - `backlit-input --verify` verifies the policy-level input contract that future libinput events must satisfy: terminal hotkey routing, app-switcher focus changes, pointer focus, title-bar move, resize-grip resize, and clean pointer grab release.
 - `backlit-session --verify` verifies workspace switching and left/right window snapping through the same window-policy layer used for focus and movement.
 - `backlit-session --verify` renders the preview from `WindowPolicy`, requiring policy windows, visible workspace windows, focused-window title styling, and workspace indicator checks in the generated `session.verified` metrics.
