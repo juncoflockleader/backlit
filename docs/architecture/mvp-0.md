@@ -11,6 +11,7 @@ MVP 0 is the development harness:
 - Dry-run launcher catalog for terminal, browser, and settings.
 - Keyboard shortcut routing for launcher, app switcher, and core launch targets.
 - Session interaction smoke for app switching and terminal launch resolution.
+- Output work-area policy for panel-aware maximize and fullscreen geometry.
 - Deterministic demo GUI renderer.
 - Headless session launch verification.
 - Basic MVP protocol smoke registry.

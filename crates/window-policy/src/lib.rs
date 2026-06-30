@@ -21,6 +21,30 @@ impl Rect {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct OutputLayout {
+    pub output: Rect,
+    pub panel_height: i32,
+}
+
+impl OutputLayout {
+    pub const fn new(width: i32, height: i32, panel_height: i32) -> Self {
+        Self {
+            output: Rect::new(0, 0, width, height),
+            panel_height,
+        }
+    }
+
+    pub const fn work_area(self) -> Rect {
+        Rect::new(
+            self.output.x,
+            self.output.y + self.panel_height,
+            self.output.width,
+            self.output.height - self.panel_height,
+        )
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum WindowState {
     Normal,
     Maximized,
@@ -206,7 +230,7 @@ impl WindowPolicy {
 
 #[cfg(test)]
 mod tests {
-    use super::{WindowPolicy, WindowState};
+    use super::{OutputLayout, WindowPolicy, WindowState};
 
     #[test]
     fn new_windows_take_focus() {
@@ -287,5 +311,13 @@ mod tests {
         let window = policy.window(id).unwrap();
         assert_eq!(window.geometry, output);
         assert_eq!(window.state, WindowState::Fullscreen);
+    }
+
+    #[test]
+    fn output_layout_reserves_panel_work_area() {
+        let layout = OutputLayout::new(1920, 1080, 42);
+
+        assert_eq!(layout.output, super::Rect::new(0, 0, 1920, 1080));
+        assert_eq!(layout.work_area(), super::Rect::new(0, 42, 1920, 1038));
     }
 }

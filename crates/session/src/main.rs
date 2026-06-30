@@ -10,7 +10,7 @@ use backlit_demo_client::{
 };
 use backlit_launcher::{default_catalog, LaunchTarget};
 use backlit_shortcuts::{resolve_shortcut, ShortcutAction};
-use backlit_window_policy::WindowPolicy;
+use backlit_window_policy::{OutputLayout, WindowPolicy};
 
 fn main() {
     if let Err(error) = run() {
@@ -44,6 +44,7 @@ fn run() -> Result<(), String> {
     policy.add_window("terminal", (800, 600));
     policy.add_window("settings", (720, 560));
     policy.add_window("browser", (1100, 720));
+    let layout = OutputLayout::new(config.width as i32, config.height as i32, 42);
 
     let screenshot = config
         .screenshot
@@ -62,13 +63,18 @@ fn run() -> Result<(), String> {
             ("windows", FieldValue::U64(policy.windows().len() as u64)),
             ("width", FieldValue::U64(canvas.width() as u64)),
             ("height", FieldValue::U64(canvas.height() as u64)),
+            ("work_area_y", FieldValue::U64(layout.work_area().y as u64)),
+            (
+                "work_area_height",
+                FieldValue::U64(layout.work_area().height as u64),
+            ),
             ("checksum", FieldValue::U64(canvas.checksum())),
         ],
     );
 
     if config.verify {
         let report = verify_demo_gui(&canvas);
-        let interaction_report = verify_session_interactions(&policy);
+        let interaction_report = verify_session_interactions(&policy, layout);
 
         emit(
             "session.interactions",
@@ -90,6 +96,14 @@ fn run() -> Result<(), String> {
                 (
                     "terminal_launch_resolved",
                     FieldValue::Bool(interaction_report.terminal_launch_resolved),
+                ),
+                (
+                    "maximize_uses_work_area",
+                    FieldValue::Bool(interaction_report.maximize_uses_work_area),
+                ),
+                (
+                    "fullscreen_uses_output",
+                    FieldValue::Bool(interaction_report.fullscreen_uses_output),
                 ),
             ],
         );
@@ -135,6 +149,8 @@ struct InteractionReport {
     focus_after_switcher: u64,
     windows_after_launch: u64,
     terminal_launch_resolved: bool,
+    maximize_uses_work_area: bool,
+    fullscreen_uses_output: bool,
 }
 
 impl InteractionReport {
@@ -144,10 +160,12 @@ impl InteractionReport {
             && self.focus_after_switcher != self.initial_focus
             && self.windows_after_launch == 4
             && self.terminal_launch_resolved
+            && self.maximize_uses_work_area
+            && self.fullscreen_uses_output
     }
 }
 
-fn verify_session_interactions(policy: &WindowPolicy) -> InteractionReport {
+fn verify_session_interactions(policy: &WindowPolicy, layout: OutputLayout) -> InteractionReport {
     let mut policy = policy.clone();
     let initial_focus = policy.focused().map(|id| id.0).unwrap_or(0);
 
@@ -168,11 +186,28 @@ fn verify_session_interactions(policy: &WindowPolicy) -> InteractionReport {
         policy.add_window("terminal-2", (800, 600));
     }
 
+    let focused = policy.focused();
+    let maximize_uses_work_area = focused
+        .map(|id| {
+            policy.maximize_window(id, layout.work_area())
+                && policy.window(id).map(|window| window.geometry) == Some(layout.work_area())
+        })
+        .unwrap_or(false);
+
+    let fullscreen_uses_output = focused
+        .map(|id| {
+            policy.fullscreen_window(id, layout.output)
+                && policy.window(id).map(|window| window.geometry) == Some(layout.output)
+        })
+        .unwrap_or(false);
+
     InteractionReport {
         initial_focus,
         focus_after_switcher,
         windows_after_launch: policy.windows().len() as u64,
         terminal_launch_resolved,
+        maximize_uses_work_area,
+        fullscreen_uses_output,
     }
 }
 

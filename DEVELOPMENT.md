@@ -179,6 +179,8 @@ Keyboard shortcut routing is also verified in dry-run mode for launcher, termina
 
 The session smoke path consumes those dry-run routes too: `Alt+Tab` cycles focus and `Super+Enter` resolves the terminal launch path, then records the resulting window-policy state in `session.jsonl`.
 
+Session verification also checks output-aware geometry: maximized windows use the panel-reserved work area, while fullscreen uses the whole output.
+
 Backend preflight can be run directly:
 
 ```bash
