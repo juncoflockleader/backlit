@@ -101,8 +101,26 @@ copy_file() {
 }
 
 sanitize_depends() {
-  printf '%s\n' "$1" \
-    | sed 's/\${shlibs:Depends}//g; s/\${misc:Depends}//g; s/,,*/,/g; s/^Depends:[[:space:]]*,*/Depends: /; s/,[[:space:]]*$//; s/[[:space:]][[:space:]]*/ /g'
+  printf '%s\n' "${1#Depends: }" | awk -F, '
+    {
+      out = ""
+      for (i = 1; i <= NF; i++) {
+        item = $i
+        gsub(/^[[:space:]]+/, "", item)
+        gsub(/[[:space:]]+$/, "", item)
+        if (item == "" || item == "${shlibs:Depends}" || item == "${misc:Depends}") {
+          continue
+        }
+        if (out != "") {
+          out = out ", "
+        }
+        out = out item
+      }
+      if (out != "") {
+        print "Depends: " out
+      }
+    }
+  '
 }
 
 control_field() {
@@ -163,7 +181,7 @@ write_control() {
     printf 'Maintainer: Backlit contributors <devnull@example.invalid>\n'
     if [ -n "$depends" ]; then
       sanitized_depends="$(sanitize_depends "Depends: $depends")"
-      if [ "$sanitized_depends" != "Depends: " ]; then
+      if [ -n "$sanitized_depends" ]; then
         printf '%s\n' "$sanitized_depends"
       fi
     fi
