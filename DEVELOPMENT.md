@@ -182,7 +182,7 @@ cargo run -p backlit-launcher -- --verify --list --target=terminal --desktop-dir
 cargo run -p backlit-shortcuts -- --verify --list --resolve=Super+Enter
 cargo run -p backlit-session-supervisor -- --verify
 cargo run -p backlit-clipboard -- --verify
-cargo run -p backlit-session -- --backend=headless --screenshot target/backlit-session.ppm --verify
+cargo run -p backlit-session -- --backend=headless --screenshot target/backlit-session.ppm --verify --verify-services
 ./scripts/verify-gui-smoke.sh
 ./scripts/verify-packaging-contract.sh
 ./scripts/verify-staged-session-install.sh
@@ -229,6 +229,8 @@ Keyboard shortcut routing is also verified in dry-run mode for launcher, termina
 
 The session smoke path consumes those dry-run routes too: `Alt+Tab` cycles focus and `Super+Enter` resolves the terminal launch path, then records the resulting window-policy state in `session.jsonl`.
 
+With `--verify-services`, `backlit-session` also resolves sibling `backlit-compositor` and `backlit-shell` binaries, runs their readiness probes, captures their logs, and emits `session.services_verified`.
+
 Session verification also checks output-aware geometry: maximized windows use the panel-reserved work area, while fullscreen uses the whole output.
 
 Move and resize behavior is also verified through the session smoke path before maximize/fullscreen checks run.
@@ -269,7 +271,7 @@ The staged install verifier builds the session, compositor, and shell binaries, 
 ./scripts/verify-staged-session-install.sh
 ```
 
-It then launches the staged `backlit-session` with the headless backend and `--verify`, checks the deterministic GUI output, and writes `target/staged-session-install/manifest.json`.
+It then launches the staged `backlit-session` with the headless backend, `--verify`, and `--verify-services`, checks the deterministic GUI output plus compositor/shell startup probes, and writes `target/staged-session-install/manifest.json`.
 
 ## Engineering Rules
 

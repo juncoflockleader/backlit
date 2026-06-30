@@ -82,13 +82,19 @@ require_executable "$(resolve_usr_bin "$shell_command")"
   --backend=headless \
   --socket=backlit-0 \
   --screenshot "$session_screenshot" \
-  --verify > "$session_log"
+  --verify \
+  --verify-services \
+  --service-log-dir "$out_dir/session-services" > "$session_log"
 
 require_file "$session_screenshot"
 grep -F '"event":"session.interactions"' "$session_log" >/dev/null || fail "missing session interaction event"
 grep -F '"event":"session.verified"' "$session_log" >/dev/null || fail "missing session verification event"
+grep -F '"event":"session.services_verified"' "$session_log" >/dev/null || fail "missing session services verification event"
 grep -F '"passed":true' "$session_log" >/dev/null || fail "session verification did not pass"
 grep -F '"golden_ok":true' "$session_log" >/dev/null || fail "session golden verification did not pass"
+grep -F '"compositor_ready":true' "$session_log" >/dev/null || fail "session compositor service did not become ready"
+grep -F '"shell_ready":true' "$session_log" >/dev/null || fail "session shell service did not become ready"
+grep -F '"children_exited_cleanly":true' "$session_log" >/dev/null || fail "session service probes did not exit cleanly"
 
 "$bin_dir/backlit-compositor" --backend=headless --socket=backlit-0 --smoke-test > "$compositor_log"
 grep -F '"event":"compositor.smoke_test"' "$compositor_log" >/dev/null || fail "missing compositor smoke event"
@@ -107,6 +113,7 @@ cat > "$out_dir/manifest.json" <<EOF
     "compositor_service": "$compositor_service",
     "shell_service": "$shell_service",
     "session_log": "$session_log",
+    "session_services_dir": "$out_dir/session-services",
     "session_screenshot": "$session_screenshot",
     "compositor_log": "$compositor_log",
     "shell_log": "$shell_log"
@@ -116,6 +123,7 @@ cat > "$out_dir/manifest.json" <<EOF
     "systemd_exec_resolves": true,
     "staged_session_help": true,
     "staged_session_gui": true,
+    "staged_session_services": true,
     "staged_compositor_smoke": true,
     "staged_shell_verify": true
   }

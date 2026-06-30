@@ -22,6 +22,7 @@ cargo run -p backlit-shortcuts -- --verify --list --resolve=Super+Enter
 cargo run -p backlit-session-supervisor -- --verify
 cargo run -p backlit-clipboard -- --verify
 cargo run -p backlit-shell -- --component=all --verify
+cargo run -p backlit-session -- --backend=headless --screenshot target/backlit-session.ppm --verify --verify-services
 ./scripts/verify-gui-smoke.sh
 ./scripts/verify-packaging-contract.sh
 ./scripts/verify-staged-session-install.sh

@@ -1,5 +1,7 @@
 use std::env;
-use std::process;
+use std::fs;
+use std::path::{Path, PathBuf};
+use std::process::{self, Command};
 use std::str::FromStr;
 use std::time::Instant;
 
@@ -37,7 +39,10 @@ fn run() -> Result<(), String> {
     emit(
         "session.launch",
         &config,
-        &[("verify", FieldValue::Bool(config.verify))],
+        &[
+            ("verify", FieldValue::Bool(config.verify)),
+            ("verify_services", FieldValue::Bool(config.verify_services)),
+        ],
     );
 
     let mut policy = WindowPolicy::default();
@@ -156,6 +161,15 @@ fn run() -> Result<(), String> {
         }
     }
 
+    if config.verify_services {
+        let service_report = verify_session_services(&config)?;
+        emit_service_verification(&config, &service_report);
+
+        if !service_report.passed() {
+            return Err(String::from("session service verification failed"));
+        }
+    }
+
     emit(
         "session.exit",
         &config,
@@ -166,6 +180,202 @@ fn run() -> Result<(), String> {
     );
 
     Ok(())
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct ServiceProbe {
+    resolved: bool,
+    exit_ok: bool,
+    ready: bool,
+    stdout: Vec<u8>,
+    stderr: Vec<u8>,
+}
+
+impl ServiceProbe {
+    fn missing() -> Self {
+        Self {
+            resolved: false,
+            exit_ok: false,
+            ready: false,
+            stdout: Vec::new(),
+            stderr: Vec::new(),
+        }
+    }
+
+    fn stdout_contains(&self, needle: &str) -> bool {
+        String::from_utf8_lossy(&self.stdout).contains(needle)
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct ServiceVerification {
+    compositor: ServiceProbe,
+    shell: ServiceProbe,
+    logs_written: bool,
+}
+
+impl ServiceVerification {
+    fn passed(&self) -> bool {
+        self.compositor.resolved
+            && self.compositor.exit_ok
+            && self.compositor.ready
+            && self.shell.resolved
+            && self.shell.exit_ok
+            && self.shell.ready
+    }
+
+    fn children_exited_cleanly(&self) -> bool {
+        self.compositor.exit_ok && self.shell.exit_ok
+    }
+}
+
+fn verify_session_services(config: &Config) -> Result<ServiceVerification, String> {
+    let compositor_path = sibling_binary("backlit-compositor");
+    let shell_path = sibling_binary("backlit-shell");
+
+    let compositor = run_compositor_probe(&compositor_path, config)?;
+    let shell = run_shell_probe(&shell_path, config)?;
+    let mut report = ServiceVerification {
+        compositor,
+        shell,
+        logs_written: false,
+    };
+
+    if let Some(log_dir) = &config.service_log_dir {
+        write_service_logs(Path::new(log_dir), &report)?;
+        report.logs_written = true;
+    }
+
+    Ok(report)
+}
+
+fn sibling_binary(name: &str) -> PathBuf {
+    let binary_name = binary_name(name);
+
+    if let Ok(current_exe) = env::current_exe() {
+        if let Some(parent) = current_exe.parent() {
+            return parent.join(binary_name);
+        }
+    }
+
+    PathBuf::from(binary_name)
+}
+
+fn binary_name(name: &str) -> String {
+    format!("{name}{}", env::consts::EXE_SUFFIX)
+}
+
+fn run_compositor_probe(path: &Path, config: &Config) -> Result<ServiceProbe, String> {
+    let backend_event = format!("\"backend\":\"{}\"", config.backend.as_str());
+
+    run_service_probe(
+        path,
+        &[
+            "--backend",
+            config.backend.as_str(),
+            "--socket",
+            config.socket.as_str(),
+            "--smoke-test",
+        ],
+        &[
+            String::from("\"event\":\"compositor.smoke_test\""),
+            backend_event,
+        ],
+    )
+}
+
+fn run_shell_probe(path: &Path, config: &Config) -> Result<ServiceProbe, String> {
+    run_service_probe(
+        path,
+        &[
+            "--component",
+            "all",
+            "--socket",
+            config.socket.as_str(),
+            "--verify",
+        ],
+        &[
+            String::from("\"event\":\"shell.verified\""),
+            String::from("\"passed\":true"),
+            String::from("\"required_components\":4"),
+        ],
+    )
+}
+
+fn run_service_probe(
+    path: &Path,
+    args: &[&str],
+    required_stdout: &[String],
+) -> Result<ServiceProbe, String> {
+    if !path.is_file() {
+        return Ok(ServiceProbe::missing());
+    }
+
+    let output = Command::new(path)
+        .args(args)
+        .output()
+        .map_err(|error| format!("failed to run {}: {error}", path.display()))?;
+
+    let mut probe = ServiceProbe {
+        resolved: true,
+        exit_ok: output.status.success(),
+        ready: false,
+        stdout: output.stdout,
+        stderr: output.stderr,
+    };
+    probe.ready = probe.exit_ok
+        && required_stdout
+            .iter()
+            .all(|needle| probe.stdout_contains(needle.as_str()));
+
+    Ok(probe)
+}
+
+fn write_service_logs(log_dir: &Path, report: &ServiceVerification) -> Result<(), String> {
+    fs::create_dir_all(log_dir)
+        .map_err(|error| format!("failed to create {}: {error}", log_dir.display()))?;
+    fs::write(log_dir.join("compositor.jsonl"), &report.compositor.stdout)
+        .map_err(|error| format!("failed to write compositor service log: {error}"))?;
+    fs::write(log_dir.join("compositor.stderr"), &report.compositor.stderr)
+        .map_err(|error| format!("failed to write compositor service stderr: {error}"))?;
+    fs::write(log_dir.join("shell.jsonl"), &report.shell.stdout)
+        .map_err(|error| format!("failed to write shell service log: {error}"))?;
+    fs::write(log_dir.join("shell.stderr"), &report.shell.stderr)
+        .map_err(|error| format!("failed to write shell service stderr: {error}"))?;
+    Ok(())
+}
+
+fn emit_service_verification(config: &Config, report: &ServiceVerification) {
+    emit(
+        "session.services_verified",
+        config,
+        &[
+            ("passed", FieldValue::Bool(report.passed())),
+            (
+                "compositor_resolved",
+                FieldValue::Bool(report.compositor.resolved),
+            ),
+            (
+                "compositor_ready",
+                FieldValue::Bool(report.compositor.ready),
+            ),
+            ("shell_resolved", FieldValue::Bool(report.shell.resolved)),
+            ("shell_ready", FieldValue::Bool(report.shell.ready)),
+            (
+                "children_exited_cleanly",
+                FieldValue::Bool(report.children_exited_cleanly()),
+            ),
+            ("logs_written", FieldValue::Bool(report.logs_written)),
+            (
+                "compositor_stdout_bytes",
+                FieldValue::U64(report.compositor.stdout.len() as u64),
+            ),
+            (
+                "shell_stdout_bytes",
+                FieldValue::U64(report.shell.stdout.len() as u64),
+            ),
+        ],
+    );
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -307,9 +517,11 @@ struct Config {
     backend: BackendKind,
     socket: String,
     screenshot: Option<String>,
+    service_log_dir: Option<String>,
     width: u32,
     height: u32,
     verify: bool,
+    verify_services: bool,
     help: bool,
 }
 
@@ -319,9 +531,11 @@ impl Default for Config {
             backend: BackendKind::Headless,
             socket: String::from("backlit-0"),
             screenshot: None,
+            service_log_dir: None,
             width: DEFAULT_DEMO_WIDTH,
             height: DEFAULT_DEMO_HEIGHT,
             verify: false,
+            verify_services: false,
             help: false,
         }
     }
@@ -341,6 +555,8 @@ impl Config {
                 config.help = true;
             } else if arg == "--verify" {
                 config.verify = true;
+            } else if arg == "--verify-services" {
+                config.verify_services = true;
             } else if let Some(value) = arg.strip_prefix("--backend=") {
                 config.backend = parse_backend(value)?;
             } else if arg == "--backend" {
@@ -360,6 +576,13 @@ impl Config {
                 config.screenshot = Some(
                     args.next()
                         .ok_or_else(|| String::from("missing value for --screenshot"))?,
+                );
+            } else if let Some(value) = arg.strip_prefix("--service-log-dir=") {
+                config.service_log_dir = Some(value.to_string());
+            } else if arg == "--service-log-dir" {
+                config.service_log_dir = Some(
+                    args.next()
+                        .ok_or_else(|| String::from("missing value for --service-log-dir"))?,
                 );
             } else if let Some(value) = arg.strip_prefix("--width=") {
                 config.width = parse_dimension("--width", value)?;
@@ -400,15 +623,47 @@ fn print_help() {
 backlit-session
 
 Usage:
-  backlit-session [--backend=headless|wayland|drm] [--socket=backlit-0] [--screenshot=target/backlit-session.ppm] [--verify]
+  backlit-session [--backend=headless|wayland|drm] [--socket=backlit-0] [--screenshot=target/backlit-session.ppm] [--verify] [--verify-services]
 
 Flags:
   --backend      Select compositor backend. Defaults to headless.
   --socket       Wayland socket name. Defaults to backlit-0.
   --screenshot   Write a deterministic PPM GUI screenshot.
+  --service-log-dir
+                 Write compositor and shell probe logs to this directory.
   --width        Screenshot width in pixels.
   --height       Screenshot height in pixels.
   --verify       Fail if expected GUI regions are missing.
+  --verify-services
+                 Fail if sibling compositor and shell probes cannot launch.
 "
     );
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{binary_name, Config};
+
+    #[test]
+    fn parses_service_verification_flags() {
+        let config = Config::parse([
+            "--verify",
+            "--verify-services",
+            "--service-log-dir",
+            "target/session-services",
+        ])
+        .expect("config should parse");
+
+        assert!(config.verify);
+        assert!(config.verify_services);
+        assert_eq!(
+            config.service_log_dir.as_deref(),
+            Some("target/session-services")
+        );
+    }
+
+    #[test]
+    fn binary_name_uses_platform_suffix() {
+        assert!(binary_name("backlit-compositor").starts_with("backlit-compositor"));
+    }
 }

@@ -92,6 +92,7 @@ repo_dir=$(quote_shell "$repo_dir")
 branch=$(quote_shell "$branch")
 e2e_out_dir=$(quote_shell "$e2e_out_dir")
 uploaded_verifier="/tmp/backlit-verify-linux-e2e.sh"
+uploaded_gui_smoke_verifier="/tmp/backlit-verify-gui-smoke.sh"
 uploaded_packaging_verifier="/tmp/backlit-verify-packaging-contract.sh"
 uploaded_staged_install_verifier="/tmp/backlit-verify-staged-session-install.sh"
 uploaded_nested_verifier="/tmp/backlit-verify-nested-wayland-smoke.sh"
@@ -140,6 +141,7 @@ git reset --hard \"origin/\$branch\"
 "
 
 install -m 0755 -o "\$guest_user" -g "\$guest_user" "\$uploaded_verifier" "\$repo_dir/scripts/verify-linux-e2e.sh"
+install -m 0755 -o "\$guest_user" -g "\$guest_user" "\$uploaded_gui_smoke_verifier" "\$repo_dir/scripts/verify-gui-smoke.sh"
 install -m 0755 -o "\$guest_user" -g "\$guest_user" "\$uploaded_packaging_verifier" "\$repo_dir/scripts/verify-packaging-contract.sh"
 install -m 0755 -o "\$guest_user" -g "\$guest_user" "\$uploaded_staged_install_verifier" "\$repo_dir/scripts/verify-staged-session-install.sh"
 install -m 0755 -o "\$guest_user" -g "\$guest_user" "\$uploaded_nested_verifier" "\$repo_dir/scripts/verify-nested-wayland-smoke.sh"
@@ -157,6 +159,7 @@ printf 'Using Parallels VM: %s\n' "$vm_name"
 "$prlctl_bin" list --all | grep -F "$vm_name" >/dev/null
 
 upload_script "$repo_root/scripts/verify-linux-e2e.sh" "/tmp/backlit-verify-linux-e2e.sh"
+upload_script "$repo_root/scripts/verify-gui-smoke.sh" "/tmp/backlit-verify-gui-smoke.sh"
 upload_script "$repo_root/scripts/verify-packaging-contract.sh" "/tmp/backlit-verify-packaging-contract.sh"
 upload_script "$repo_root/scripts/verify-staged-session-install.sh" "/tmp/backlit-verify-staged-session-install.sh"
 upload_script "$repo_root/scripts/verify-nested-wayland-smoke.sh" "/tmp/backlit-verify-nested-wayland-smoke.sh"

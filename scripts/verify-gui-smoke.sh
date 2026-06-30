@@ -22,13 +22,16 @@ cargo run -p backlit-session -- \
   --backend=headless \
   --socket=backlit-0 \
   --screenshot="$out_dir/backlit-session.ppm" \
-  --verify > "$out_dir/session.jsonl"
+  --verify \
+  --verify-services \
+  --service-log-dir="$out_dir/session-services" > "$out_dir/session.jsonl"
 cargo run -p backlit-demo-client -- \
   --output="$out_dir/demo-client.ppm" \
   --verify > "$out_dir/demo-client.jsonl"
 
 grep '"event":"session.verified"' "$out_dir/session.jsonl" >/dev/null
 grep '"event":"session.interactions"' "$out_dir/session.jsonl" >/dev/null
+grep '"event":"session.services_verified"' "$out_dir/session.jsonl" >/dev/null
 grep '"windows_after_launch":4' "$out_dir/session.jsonl" >/dev/null
 grep '"terminal_launch_resolved":true' "$out_dir/session.jsonl" >/dev/null
 grep '"move_resize_ok":true' "$out_dir/session.jsonl" >/dev/null
@@ -40,6 +43,10 @@ grep '"close_fallback_focus_ok":true' "$out_dir/session.jsonl" >/dev/null
 grep '"windows_after_close":3' "$out_dir/session.jsonl" >/dev/null
 grep '"passed":true' "$out_dir/session.jsonl" >/dev/null
 grep '"golden_ok":true' "$out_dir/session.jsonl" >/dev/null
+grep '"compositor_ready":true' "$out_dir/session.jsonl" >/dev/null
+grep '"shell_ready":true' "$out_dir/session.jsonl" >/dev/null
+grep '"children_exited_cleanly":true' "$out_dir/session.jsonl" >/dev/null
+grep '"logs_written":true' "$out_dir/session.jsonl" >/dev/null
 grep "\"checksum\":$expected_checksum" "$out_dir/session.jsonl" >/dev/null
 grep '"event":"backend.preflight"' "$out_dir/backend-preflight.jsonl" >/dev/null
 grep '"ready":true' "$out_dir/backend-preflight.jsonl" >/dev/null
@@ -94,6 +101,7 @@ cat > "$out_dir/manifest.json" <<EOF
     "supervisor_log": "$out_dir/supervisor.jsonl",
     "clipboard_log": "$out_dir/clipboard.jsonl",
     "session_log": "$out_dir/session.jsonl",
+    "session_services_dir": "$out_dir/session-services",
     "demo_client_log": "$out_dir/demo-client.jsonl",
     "session_screenshot": "$out_dir/backlit-session.ppm",
     "demo_client_screenshot": "$out_dir/demo-client.ppm"
@@ -107,6 +115,7 @@ cat > "$out_dir/manifest.json" <<EOF
     "shell_crash_isolated": true,
     "clipboard_generation": 3,
     "session_windows_after_launch": 4,
+    "session_services": true,
     "session_move_resize": true,
     "session_minimize_skips_focus": true,
     "session_close_fallback_focus": true,
