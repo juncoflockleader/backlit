@@ -50,11 +50,41 @@ fn run() -> Result<(), String> {
     if config.smoke_test {
         run_smoke_test(&config);
     } else {
+        let readiness = run_service_ready();
         emit(
-            "compositor.stub_ready",
+            "compositor.ready",
             &config,
-            &[("accepting_clients", FieldValue::Bool(false))],
+            &[
+                ("ready", FieldValue::Bool(readiness.passed())),
+                (
+                    "accepting_clients",
+                    FieldValue::Bool(readiness.accepting_clients),
+                ),
+                (
+                    "bootstrap_client_connected",
+                    FieldValue::Bool(readiness.bootstrap_client_connected),
+                ),
+                (
+                    "bootstrap_surface_presented",
+                    FieldValue::Bool(readiness.bootstrap_surface_presented),
+                ),
+                ("clients", FieldValue::U64(readiness.clients)),
+                ("surfaces", FieldValue::U64(readiness.surfaces)),
+                ("frames", FieldValue::U64(readiness.frames)),
+                (
+                    "damaged_surfaces",
+                    FieldValue::U64(readiness.damaged_surfaces),
+                ),
+                (
+                    "presented_pixels",
+                    FieldValue::U64(readiness.presented_pixels),
+                ),
+            ],
         );
+
+        if !readiness.passed() {
+            return Err(String::from("compositor service readiness failed"));
+        }
     }
 
     if let Some(duration_ms) = config.idle_probe_ms {
@@ -243,6 +273,51 @@ fn run_smoke_test(config: &RunConfig) {
             ("focused_window", FieldValue::U64(second.0)),
         ],
     );
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+struct CompositorReadyReport {
+    accepting_clients: bool,
+    bootstrap_client_connected: bool,
+    bootstrap_surface_presented: bool,
+    clients: u64,
+    surfaces: u64,
+    frames: u64,
+    damaged_surfaces: u64,
+    presented_pixels: u64,
+}
+
+impl CompositorReadyReport {
+    fn passed(self) -> bool {
+        self.accepting_clients
+            && self.bootstrap_client_connected
+            && self.bootstrap_surface_presented
+            && self.clients == 1
+            && self.surfaces == 1
+            && self.frames == 1
+            && self.damaged_surfaces == 1
+            && self.presented_pixels == 1
+    }
+}
+
+fn run_service_ready() -> CompositorReadyReport {
+    let mut backend = HeadlessCompositor::default();
+    let client = backend.connect_client("backlit-session-service");
+    let bootstrap_surface_presented = backend
+        .submit_surface(client, "backlit-bootstrap", 1, 1)
+        .is_ok();
+    let frame = backend.present();
+
+    CompositorReadyReport {
+        accepting_clients: !backend.clients().is_empty(),
+        bootstrap_client_connected: backend.clients().len() == 1,
+        bootstrap_surface_presented,
+        clients: frame.client_count,
+        surfaces: frame.surface_count,
+        frames: frame.frame,
+        damaged_surfaces: frame.damaged_surfaces,
+        presented_pixels: frame.total_pixels,
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -646,5 +721,16 @@ mod tests {
         assert_eq!(report.presented_surfaces, 2);
         assert_eq!(report.presented_pixels, 640 * 480 + 240 * 160);
         assert_eq!(report.windows_after_close, 0);
+    }
+
+    #[test]
+    fn compositor_service_ready_accepts_client_and_presents_bootstrap_surface() {
+        let report = super::run_service_ready();
+
+        assert!(report.passed(), "{report:?}");
+        assert!(report.accepting_clients);
+        assert_eq!(report.clients, 1);
+        assert_eq!(report.surfaces, 1);
+        assert_eq!(report.presented_pixels, 1);
     }
 }

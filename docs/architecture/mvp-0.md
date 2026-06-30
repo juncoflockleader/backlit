@@ -41,7 +41,7 @@ MVP 0 is the development harness:
 - Headless drag-frame pacing smoke for dropped-frame and pointer-to-frame latency budgets.
 - Headless direct-scanout eligibility smoke for fullscreen dmabuf surfaces and overlay/SHM blockers.
 - Launch performance budget verifier for session GUI readiness, shell readiness, and terminal hotkey spawn.
-- Linux resource budget verifier for bounded idle CPU and compositor+shell RSS probes.
+- Linux resource budget verifier for compositor service readiness, bounded idle CPU, and compositor+shell RSS probes.
 - JSON metrics.
 - Linux E2E verifier for fmt, tests, clippy, GUI smoke, launch performance, resource budgets, settings daemon policy, packaging contract, session clean exit, and nested Wayland smoke inside an Ubuntu guest.
 - GitHub Actions Linux E2E workflow with artifact upload and local contract verification.

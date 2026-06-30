@@ -137,7 +137,12 @@ trap - EXIT HUP INT TERM
 test "$compositor_status" -eq 0 || fail "compositor idle probe failed with status $compositor_status"
 test "$shell_status" -eq 0 || fail "shell idle probe failed with status $shell_status"
 
-grep '"event":"compositor.stub_ready"' "$compositor_log" >/dev/null
+grep '"event":"compositor.ready"' "$compositor_log" >/dev/null
+grep '"ready":true' "$compositor_log" >/dev/null
+grep '"accepting_clients":true' "$compositor_log" >/dev/null
+grep '"bootstrap_client_connected":true' "$compositor_log" >/dev/null
+grep '"bootstrap_surface_presented":true' "$compositor_log" >/dev/null
+grep '"presented_pixels":1' "$compositor_log" >/dev/null
 grep '"event":"compositor.idle_probe_start"' "$compositor_log" >/dev/null
 grep '"event":"compositor.idle_probe_complete"' "$compositor_log" >/dev/null
 grep '"event":"compositor.exit"' "$compositor_log" >/dev/null
@@ -194,6 +199,9 @@ cat > "$out_dir/manifest.json" <<EOF
   },
   "checks": {
     "linux_procfs_required": true,
+    "compositor_service_ready": true,
+    "compositor_accepting_clients": true,
+    "compositor_bootstrap_surface": true,
     "compositor_idle_probe": true,
     "shell_idle_probe": true,
     "idle_cpu_budget": true,

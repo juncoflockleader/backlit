@@ -117,6 +117,9 @@ require_contains scripts/verify-staged-session-install.sh '"session_systemd_targ
 require_contains scripts/verify-staged-session-install.sh '"session_systemd_launch_plan": true'
 require_contains scripts/verify-staged-session-install.sh '"staged_compositor_surface_lifecycle": true'
 require_contains scripts/verify-staged-session-install.sh '"staged_compositor_popup_lifecycle": true'
+require_contains scripts/verify-resource-budget.sh '"event":"compositor.ready"'
+require_contains scripts/verify-resource-budget.sh '"compositor_service_ready": true'
+require_contains scripts/verify-resource-budget.sh '"compositor_bootstrap_surface": true'
 require_contains scripts/verify-launch-readiness.sh '"xdg_runtime_dir_owned_by_user"'
 require_contains scripts/verify-launch-readiness.sh '"session_local"'
 require_contains scripts/verify-launch-readiness.sh '"drm_card_access_ready"'
@@ -215,6 +218,9 @@ if [ -n "$artifact_root" ] && [ -d "$artifact_root" ]; then
   require_contains "$artifact_root/launcher-desktop-discovery/manifest.json" '"host_default_desktop_discovery": true'
   require_contains "$artifact_root/resource-budget/manifest.json" '"name": "backlit-resource-budget"'
   if grep '"resource_budget_checked": true' "$artifact_root/resource-budget/manifest.json" >/dev/null; then
+    require_contains "$artifact_root/resource-budget/manifest.json" '"compositor_service_ready": true'
+    require_contains "$artifact_root/resource-budget/manifest.json" '"compositor_accepting_clients": true'
+    require_contains "$artifact_root/resource-budget/manifest.json" '"compositor_bootstrap_surface": true'
     require_contains "$artifact_root/resource-budget/manifest.json" '"idle_cpu_budget": true'
     require_contains "$artifact_root/resource-budget/manifest.json" '"idle_rss_budget": true'
   else
@@ -324,6 +330,7 @@ cat > "$out_dir/manifest.json" <<EOF
     "launch_performance": true,
     "launcher_desktop_discovery": true,
     "resource_budget": true,
+    "compositor_service_ready": true,
     "notification_daemon": true,
     "settings_daemon": true,
     "settings_app": true,

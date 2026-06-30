@@ -38,4 +38,4 @@ The Linux resource-budget regression check is:
 ./scripts/verify-resource-budget.sh
 ```
 
-It runs bounded idle probes for the compositor and shell, samples `/proc`, and verifies compositor idle CPU stays under 0.5% while combined compositor+shell RSS stays under 250 MB. Non-Linux hosts record an expected skip; use Parallels Ubuntu or another Linux host for the real budget proof.
+It runs bounded idle probes for the compositor and shell, samples `/proc`, verifies the non-smoke compositor readiness path can accept a bootstrap client and present a bootstrap surface, and verifies compositor idle CPU stays under 0.5% while combined compositor+shell RSS stays under 250 MB. Non-Linux hosts record an expected skip; use Parallels Ubuntu or another Linux host for the real budget proof.
