@@ -43,6 +43,9 @@ cargo run -p backlit-session -- \
   --verify \
   --verify-launch-spawn \
   --launch-spawn-program=true \
+  --verify-desktop-launch \
+  --desktop-dir=crates/launcher/fixtures \
+  --desktop-entry=org.backlit.SpawnProbe.desktop \
   --wayland-display=backlit-0 \
   --verify-services \
   --verify-clean-exit \
@@ -86,6 +89,7 @@ grep '"xdg_windows_after_close":0' "$out_dir/compositor.jsonl" >/dev/null
 grep '"event":"session.verified"' "$out_dir/session.jsonl" >/dev/null
 grep '"event":"session.interactions"' "$out_dir/session.jsonl" >/dev/null
 grep '"event":"session.launch_spawn"' "$out_dir/session.jsonl" >/dev/null
+grep '"event":"session.desktop_launch"' "$out_dir/session.jsonl" >/dev/null
 grep '"event":"session.services_verified"' "$out_dir/session.jsonl" >/dev/null
 grep '"event":"session.clean_exit"' "$out_dir/session.jsonl" >/dev/null
 grep '"windows_after_launch":4' "$out_dir/session.jsonl" >/dev/null
@@ -95,6 +99,11 @@ grep '"target_resolved":true' "$out_dir/session.jsonl" >/dev/null
 grep '"spawned":true' "$out_dir/session.jsonl" >/dev/null
 grep '"exit_success":true' "$out_dir/session.jsonl" >/dev/null
 grep '"wayland_display_set":true' "$out_dir/session.jsonl" >/dev/null
+grep '"entry_selector":"org.backlit.SpawnProbe.desktop"' "$out_dir/session.jsonl" >/dev/null
+grep '"entry_resolved":true' "$out_dir/session.jsonl" >/dev/null
+grep '"entry_program":"sh"' "$out_dir/session.jsonl" >/dev/null
+grep '"entry_arg_count":2' "$out_dir/session.jsonl" >/dev/null
+grep '"program_resolved":true' "$out_dir/session.jsonl" >/dev/null
 grep '"move_resize_ok":true' "$out_dir/session.jsonl" >/dev/null
 grep '"minimize_skips_focus":true' "$out_dir/session.jsonl" >/dev/null
 grep '"resized_width":920' "$out_dir/session.jsonl" >/dev/null
@@ -410,6 +419,8 @@ cat > "$out_dir/manifest.json" <<EOF
     "portal_security": true,
     "session_windows_after_launch": 4,
     "session_launch_spawn": true,
+    "session_desktop_launch": true,
+    "session_desktop_launch_entry": "org.backlit.SpawnProbe.desktop",
     "session_services": true,
     "session_compositor_demo_client": $session_compositor_demo_client,
     "session_compositor_client_blocked_expected": $session_compositor_client_blocked_expected,

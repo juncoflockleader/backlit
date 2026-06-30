@@ -57,6 +57,8 @@ require_contains scripts/verify-session-launch.sh '"session_systemd_launch_plan"
 require_contains scripts/verify-drm-session-smoke.sh '--backend=drm'
 require_contains scripts/verify-drm-session-smoke.sh '"drm_session_smoke_ready"'
 require_contains scripts/verify-drm-session-smoke.sh '"drm_session_clean_exit"'
+require_contains scripts/verify-drm-session-smoke.sh '--verify-desktop-launch'
+require_contains scripts/verify-drm-session-smoke.sh '"session_desktop_launch": $drm_session_smoke_ready'
 require_contains scripts/verify-drm-session-smoke.sh '"session_compositor_demo_client": $drm_session_smoke_ready'
 require_contains scripts/verify-session-replay.sh '"launcher_overlay_frame": true'
 require_contains scripts/verify-session-replay.sh '"app_switcher_overlay_frame": true'
@@ -126,6 +128,7 @@ if [ -n "$artifact_root" ] && [ -d "$artifact_root" ]; then
     require_contains "$artifact_root/drm-session-smoke/manifest.json" '"notification_service": true'
     require_contains "$artifact_root/drm-session-smoke/manifest.json" '"workspace_switch": true'
     require_contains "$artifact_root/drm-session-smoke/manifest.json" '"snap": true'
+    require_contains "$artifact_root/drm-session-smoke/manifest.json" '"session_desktop_launch": true'
     require_contains "$artifact_root/drm-session-smoke/manifest.json" '"session_compositor_demo_client": true'
     require_contains "$artifact_root/drm-session-smoke/manifest.json" '"input_broker_ready": true'
     drm_session_smoke_ready_artifact=true
@@ -170,6 +173,7 @@ if [ -n "$artifact_root" ] && [ -d "$artifact_root" ]; then
     require_contains "$artifact_root/debian-package-install/manifest.json" '"session_exec_from_extracted_debs": true'
     require_contains "$artifact_root/debian-package-install/manifest.json" '"session_services_from_extracted_debs": true'
     require_contains "$artifact_root/debian-package-install/manifest.json" '"session_compositor_demo_client_from_extracted_debs": true'
+    require_contains "$artifact_root/debian-package-install/manifest.json" '"session_desktop_launch_from_extracted_debs": true'
     require_contains "$artifact_root/debian-package-install/manifest.json" '"session_replay_from_extracted_debs": true'
     debian_package_install_replay_artifact=true
   else
@@ -182,6 +186,7 @@ if [ -n "$artifact_root" ] && [ -d "$artifact_root" ]; then
     require_contains "$artifact_root/debian-system-install/manifest.json" '"usr_bin_session_launch": true'
     require_contains "$artifact_root/debian-system-install/manifest.json" '"session_services_from_system_install": true'
     require_contains "$artifact_root/debian-system-install/manifest.json" '"session_compositor_demo_client_from_system_install": true'
+    require_contains "$artifact_root/debian-system-install/manifest.json" '"session_desktop_launch_from_system_install": true'
     require_contains "$artifact_root/debian-system-install/manifest.json" '"session_replay_from_system_install": true'
     require_contains "$artifact_root/debian-system-install/manifest.json" '"packages_purged_after_verification": true'
     debian_system_install_replay_artifact=true
@@ -217,6 +222,7 @@ cat > "$manifest" <<EOF
     "drm_session_smoke_contract": true,
     "session_replay_contract": true,
     "desktop_entry_launch_contract": true,
+    "session_desktop_launch_contract": true,
     "package_install_contract": true,
     "resource_budget_contract": true,
     "compositor_socket_contract": true,

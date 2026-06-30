@@ -189,6 +189,9 @@ if [ "$drm_expected_ready" = true ]; then
     --verify \
     --verify-launch-spawn \
     --launch-spawn-program=true \
+    --verify-desktop-launch \
+    --desktop-dir=crates/launcher/fixtures \
+    --desktop-entry=org.backlit.SpawnProbe.desktop \
     --wayland-display=backlit-drm-smoke \
     --verify-services \
     --verify-clean-exit \
@@ -207,6 +210,7 @@ if [ "$drm_expected_ready" = true ]; then
   grep '"event":"session.gui_ready"' "$session_log" >/dev/null
   grep '"event":"session.verified"' "$session_log" >/dev/null
   grep '"event":"session.launch_spawn"' "$session_log" >/dev/null
+  grep '"event":"session.desktop_launch"' "$session_log" >/dev/null
   grep '"event":"session.services_verified"' "$session_log" >/dev/null
   grep '"event":"session.clean_exit"' "$session_log" >/dev/null
   grep '"passed":true' "$session_log" >/dev/null
@@ -219,6 +223,11 @@ if [ "$drm_expected_ready" = true ]; then
   grep '"spawned":true' "$session_log" >/dev/null
   grep '"exit_success":true' "$session_log" >/dev/null
   grep '"wayland_display_set":true' "$session_log" >/dev/null
+  grep '"entry_selector":"org.backlit.SpawnProbe.desktop"' "$session_log" >/dev/null
+  grep '"entry_resolved":true' "$session_log" >/dev/null
+  grep '"entry_program":"sh"' "$session_log" >/dev/null
+  grep '"entry_arg_count":2' "$session_log" >/dev/null
+  grep '"program_resolved":true' "$session_log" >/dev/null
   grep '"compositor_ready":true' "$session_log" >/dev/null
   grep '"compositor_service_socket_bound":true' "$session_log" >/dev/null
   grep '"compositor_demo_client_resolved":true' "$session_log" >/dev/null
@@ -281,6 +290,7 @@ cat > "$out_dir/manifest.json" <<EOF
     "drm_session_clean_exit": $drm_session_clean_exit,
     "settings_service": $drm_session_smoke_ready,
     "session_compositor_demo_client": $drm_session_smoke_ready,
+    "session_desktop_launch": $drm_session_smoke_ready,
     "notification_service": $drm_session_smoke_ready,
     "workspace_switch": $drm_session_smoke_ready,
     "snap": $drm_session_smoke_ready,

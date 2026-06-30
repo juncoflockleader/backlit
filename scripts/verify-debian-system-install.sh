@@ -194,6 +194,9 @@ grep -F '"session_target_ready":true' "$systemd_units_log" >/dev/null || fail "s
   --verify \
   --verify-launch-spawn \
   --launch-spawn-program true \
+  --verify-desktop-launch \
+  --desktop-dir /usr/share/applications \
+  --desktop-entry org.backlit.Settings.desktop \
   --wayland-display backlit-system-install \
   --verify-services \
   --verify-clean-exit \
@@ -208,6 +211,12 @@ grep -F '"passed":true' "$session_log" >/dev/null || fail "session verification 
 grep -F '"golden_ok":true' "$session_log" >/dev/null || fail "session golden verification did not pass"
 grep -F '"spawned":true' "$session_log" >/dev/null || fail "session launch target did not spawn"
 grep -F '"wayland_display_set":true' "$session_log" >/dev/null || fail "session launch target did not receive WAYLAND_DISPLAY"
+grep -F '"event":"session.desktop_launch"' "$session_log" >/dev/null || fail "missing session desktop launch event"
+grep -F '"entry_selector":"org.backlit.Settings.desktop"' "$session_log" >/dev/null || fail "session desktop launch did not target installed Settings entry"
+grep -F '"entry_resolved":true' "$session_log" >/dev/null || fail "session desktop launch did not resolve Settings entry"
+grep -F '"entry_program":"backlit-settings"' "$session_log" >/dev/null || fail "session desktop launch did not parse Settings program"
+grep -F '"program_resolved":true' "$session_log" >/dev/null || fail "session desktop launch program did not resolve"
+grep -F '"exit_success":true' "$session_log" >/dev/null || fail "session desktop launch did not exit successfully"
 grep -F '"compositor_resolved":true' "$session_log" >/dev/null || fail "session compositor binary did not resolve from /usr/bin"
 grep -F '"compositor_ready":true' "$session_log" >/dev/null || fail "session compositor service did not become ready"
 grep -F '"compositor_demo_client_resolved":true' "$session_log" >/dev/null || fail "session demo client binary did not resolve from /usr/bin"
@@ -274,6 +283,7 @@ cat > "$manifest" <<EOF
     "session_gui_from_system_install": true,
     "session_services_from_system_install": true,
     "session_compositor_demo_client_from_system_install": true,
+    "session_desktop_launch_from_system_install": true,
     "session_replay_from_system_install": true,
     "session_clean_exit_from_system_install": true,
     "settings_app_from_system_install": true,

@@ -179,6 +179,9 @@ grep -F '"journal_output":true' "$systemd_units_log" >/dev/null || fail "session
   --verify \
   --verify-launch-spawn \
   --launch-spawn-program true \
+  --verify-desktop-launch \
+  --desktop-dir "$app_dir" \
+  --desktop-entry org.backlit.Settings.desktop \
   --wayland-display backlit-0 \
   --verify-services \
   --service-log-dir "$out_dir/session-services" > "$session_log"
@@ -193,6 +196,11 @@ grep -F '"golden_ok":true' "$session_log" >/dev/null || fail "session golden ver
 grep -F '"spawned":true' "$session_log" >/dev/null || fail "session launch target did not spawn"
 grep -F '"exit_success":true' "$session_log" >/dev/null || fail "session launch target did not exit successfully"
 grep -F '"wayland_display_set":true' "$session_log" >/dev/null || fail "session launch target did not receive WAYLAND_DISPLAY"
+grep -F '"event":"session.desktop_launch"' "$session_log" >/dev/null || fail "missing session desktop launch event"
+grep -F '"entry_selector":"org.backlit.Settings.desktop"' "$session_log" >/dev/null || fail "session desktop launch did not target staged Settings entry"
+grep -F '"entry_resolved":true' "$session_log" >/dev/null || fail "session desktop launch did not resolve Settings entry"
+grep -F '"entry_program":"backlit-settings"' "$session_log" >/dev/null || fail "session desktop launch did not parse Settings program"
+grep -F '"program_resolved":true' "$session_log" >/dev/null || fail "session desktop launch program did not resolve"
 grep -F '"compositor_ready":true' "$session_log" >/dev/null || fail "session compositor service did not become ready"
 grep -F '"shell_ready":true' "$session_log" >/dev/null || fail "session shell service did not become ready"
 grep -F '"notification_ready":true' "$session_log" >/dev/null || fail "session notification service did not become ready"
@@ -267,6 +275,7 @@ cat > "$out_dir/manifest.json" <<EOF
     "staged_demo_client_binary": true,
     "staged_session_gui": true,
     "staged_session_launch_spawn": true,
+    "staged_session_desktop_launch": true,
     "staged_session_services": true,
     "staged_compositor_smoke": true,
     "staged_compositor_surface_lifecycle": true,

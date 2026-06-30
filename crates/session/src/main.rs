@@ -19,7 +19,10 @@ use backlit_demo_client::{
 use backlit_input::{
     run_input_smoke, ButtonState, InputEvent, InputRouter, PointerButton, RoutedAction,
 };
-use backlit_launcher::{default_catalog, resolve_command, LaunchTarget};
+use backlit_launcher::{
+    default_catalog, default_desktop_entry_dirs, discover_desktop_entries_in_dirs, resolve_command,
+    DesktopEntry, LaunchTarget,
+};
 use backlit_shortcuts::{resolve_shortcut, ShortcutAction};
 use backlit_surface::run_surface_lifecycle_smoke;
 use backlit_window_policy::{
@@ -336,6 +339,15 @@ fn run() -> Result<(), String> {
 
         if !launch_spawn_report.passed() {
             return Err(String::from("session launch spawn verification failed"));
+        }
+    }
+
+    if config.verify_desktop_launch {
+        let desktop_launch_report = verify_desktop_launch(&config)?;
+        emit_desktop_launch(&config, &desktop_launch_report);
+
+        if !desktop_launch_report.passed() {
+            return Err(String::from("session desktop launch verification failed"));
         }
     }
 
@@ -2273,6 +2285,201 @@ fn emit_launch_spawn(config: &Config, report: &LaunchSpawnReport) {
     );
 }
 
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct DesktopLaunchReport {
+    entry_selector: String,
+    directories: u64,
+    discovered_entries: u64,
+    entry_resolved: bool,
+    entry_id: String,
+    entry_name: String,
+    entry_program: String,
+    entry_arg_count: u64,
+    resolved_program: String,
+    program_resolved: bool,
+    spawned: bool,
+    exit_success: bool,
+    status_code: u64,
+    wayland_display_set: bool,
+    elapsed_ms: u64,
+}
+
+impl DesktopLaunchReport {
+    fn passed(&self) -> bool {
+        self.entry_resolved
+            && self.program_resolved
+            && self.spawned
+            && self.exit_success
+            && self.wayland_display_set
+    }
+}
+
+fn verify_desktop_launch(config: &Config) -> Result<DesktopLaunchReport, String> {
+    let started = Instant::now();
+    let selector = config.desktop_entry.clone().unwrap_or_default();
+    let directories = desktop_launch_dirs(config);
+    let entries = discover_desktop_entries_in_dirs(&directories)
+        .map_err(|error| format!("failed to discover desktop entries: {error}"))?;
+    let discovered_entries = entries.len() as u64;
+    let wayland_display = config
+        .launch_wayland_display
+        .clone()
+        .or_else(|| env::var("WAYLAND_DISPLAY").ok());
+
+    let Some(entry) = resolve_desktop_entry(&entries, &selector) else {
+        return Ok(DesktopLaunchReport {
+            entry_selector: selector,
+            directories: directories.len() as u64,
+            discovered_entries,
+            entry_resolved: false,
+            entry_id: String::new(),
+            entry_name: String::new(),
+            entry_program: String::new(),
+            entry_arg_count: 0,
+            resolved_program: String::new(),
+            program_resolved: false,
+            spawned: false,
+            exit_success: false,
+            status_code: 255,
+            wayland_display_set: wayland_display.is_some(),
+            elapsed_ms: started.elapsed().as_millis() as u64,
+        });
+    };
+
+    let resolved_program = resolve_desktop_program(entry.command_program());
+    let program_resolved = !resolved_program.trim().is_empty();
+
+    if !program_resolved {
+        return Ok(DesktopLaunchReport {
+            entry_selector: selector,
+            directories: directories.len() as u64,
+            discovered_entries,
+            entry_resolved: true,
+            entry_id: entry.id.clone(),
+            entry_name: entry.name.clone(),
+            entry_program: entry.command_program().to_string(),
+            entry_arg_count: entry.command_args().len() as u64,
+            resolved_program,
+            program_resolved: false,
+            spawned: false,
+            exit_success: false,
+            status_code: 255,
+            wayland_display_set: wayland_display.is_some(),
+            elapsed_ms: started.elapsed().as_millis() as u64,
+        });
+    }
+
+    let mut child = Command::new(&resolved_program);
+    child.args(entry.command_args());
+    if let Some(display) = &wayland_display {
+        child.env("WAYLAND_DISPLAY", display);
+    }
+
+    let (spawned, exit_success, status_code) = match child.status() {
+        Ok(status) => (true, status.success(), status.code().unwrap_or(255) as u64),
+        Err(_) => (false, false, 255),
+    };
+
+    Ok(DesktopLaunchReport {
+        entry_selector: selector,
+        directories: directories.len() as u64,
+        discovered_entries,
+        entry_resolved: true,
+        entry_id: entry.id.clone(),
+        entry_name: entry.name.clone(),
+        entry_program: entry.command_program().to_string(),
+        entry_arg_count: entry.command_args().len() as u64,
+        resolved_program,
+        program_resolved,
+        spawned,
+        exit_success,
+        status_code,
+        wayland_display_set: wayland_display.is_some(),
+        elapsed_ms: started.elapsed().as_millis() as u64,
+    })
+}
+
+fn desktop_launch_dirs(config: &Config) -> Vec<PathBuf> {
+    if config.desktop_dirs.is_empty() {
+        default_desktop_entry_dirs()
+    } else {
+        config.desktop_dirs.iter().map(PathBuf::from).collect()
+    }
+}
+
+fn resolve_desktop_entry<'a>(
+    entries: &'a [DesktopEntry],
+    selector: &str,
+) -> Option<&'a DesktopEntry> {
+    entries
+        .iter()
+        .find(|entry| entry.id == selector || entry.name == selector)
+}
+
+fn resolve_desktop_program(program: &str) -> String {
+    if program.trim().is_empty() {
+        return String::new();
+    }
+
+    if program.contains('/') {
+        return program.to_string();
+    }
+
+    if let Ok(current_exe) = env::current_exe() {
+        if let Some(parent) = current_exe.parent() {
+            let sibling = parent.join(program);
+            if sibling.is_file() {
+                return sibling.to_string_lossy().into_owned();
+            }
+        }
+    }
+
+    program.to_string()
+}
+
+fn emit_desktop_launch(config: &Config, report: &DesktopLaunchReport) {
+    emit(
+        "session.desktop_launch",
+        config,
+        &[
+            ("passed", FieldValue::Bool(report.passed())),
+            (
+                "entry_selector",
+                FieldValue::Str(report.entry_selector.as_str()),
+            ),
+            ("directories", FieldValue::U64(report.directories)),
+            (
+                "discovered_entries",
+                FieldValue::U64(report.discovered_entries),
+            ),
+            ("entry_resolved", FieldValue::Bool(report.entry_resolved)),
+            ("entry_id", FieldValue::Str(report.entry_id.as_str())),
+            ("entry_name", FieldValue::Str(report.entry_name.as_str())),
+            (
+                "entry_program",
+                FieldValue::Str(report.entry_program.as_str()),
+            ),
+            ("entry_arg_count", FieldValue::U64(report.entry_arg_count)),
+            (
+                "resolved_program",
+                FieldValue::Str(report.resolved_program.as_str()),
+            ),
+            (
+                "program_resolved",
+                FieldValue::Bool(report.program_resolved),
+            ),
+            ("spawned", FieldValue::Bool(report.spawned)),
+            ("exit_success", FieldValue::Bool(report.exit_success)),
+            ("status_code", FieldValue::U64(report.status_code)),
+            (
+                "wayland_display_set",
+                FieldValue::Bool(report.wayland_display_set),
+            ),
+            ("elapsed_ms", FieldValue::U64(report.elapsed_ms)),
+        ],
+    );
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 struct CleanExitReport {
     requested: bool,
@@ -2577,6 +2784,9 @@ struct Config {
     systemctl_program: String,
     preflight_only: bool,
     verify_launch_spawn: bool,
+    verify_desktop_launch: bool,
+    desktop_dirs: Vec<String>,
+    desktop_entry: Option<String>,
     launch_spawn_program: Option<String>,
     launch_spawn_args: Vec<String>,
     launch_wayland_display: Option<String>,
@@ -2603,6 +2813,9 @@ impl Default for Config {
             systemctl_program: String::from("systemctl"),
             preflight_only: false,
             verify_launch_spawn: false,
+            verify_desktop_launch: false,
+            desktop_dirs: Vec::new(),
+            desktop_entry: None,
             launch_spawn_program: None,
             launch_spawn_args: Vec::new(),
             launch_wayland_display: None,
@@ -2658,6 +2871,29 @@ impl Config {
                 config.preflight_only = true;
             } else if arg == "--verify-launch-spawn" {
                 config.verify_launch_spawn = true;
+            } else if arg == "--verify-desktop-launch" {
+                config.verify_desktop_launch = true;
+            } else if let Some(value) = arg.strip_prefix("--desktop-dir=") {
+                config.desktop_dirs.push(value.to_string());
+            } else if arg == "--desktop-dir" {
+                config.desktop_dirs.push(
+                    args.next()
+                        .ok_or_else(|| String::from("missing value for --desktop-dir"))?,
+                );
+            } else if let Some(value) = arg.strip_prefix("--desktop-launch-dir=") {
+                config.desktop_dirs.push(value.to_string());
+            } else if arg == "--desktop-launch-dir" {
+                config.desktop_dirs.push(
+                    args.next()
+                        .ok_or_else(|| String::from("missing value for --desktop-launch-dir"))?,
+                );
+            } else if let Some(value) = arg.strip_prefix("--desktop-entry=") {
+                config.desktop_entry = Some(value.to_string());
+            } else if arg == "--desktop-entry" {
+                config.desktop_entry = Some(
+                    args.next()
+                        .ok_or_else(|| String::from("missing value for --desktop-entry"))?,
+                );
             } else if let Some(value) = arg.strip_prefix("--launch-spawn-program=") {
                 config.launch_spawn_program = Some(value.to_string());
             } else if arg == "--launch-spawn-program" {
@@ -2745,7 +2981,7 @@ fn print_help() {
 backlit-session
 
 Usage:
-  backlit-session [--backend=headless|wayland|drm] [--socket=backlit-0] [--screenshot=target/backlit-session.ppm] [--verify] [--verify-services] [--verify-systemd-units] [--verify-systemd-activation] [--activate-systemd] [--verify-launch-spawn] [--verify-clean-exit] [--scripted-replay-dir=target/session-replay/frames] [--preflight-only]
+  backlit-session [--backend=headless|wayland|drm] [--socket=backlit-0] [--screenshot=target/backlit-session.ppm] [--verify] [--verify-services] [--verify-systemd-units] [--verify-systemd-activation] [--activate-systemd] [--verify-launch-spawn] [--verify-desktop-launch] [--verify-clean-exit] [--scripted-replay-dir=target/session-replay/frames] [--preflight-only]
 
 Flags:
   --backend      Select compositor backend. Defaults to headless.
@@ -2760,6 +2996,11 @@ Flags:
                  Fail if sibling compositor, demo client, shell, and settings probes cannot launch.
   --verify-launch-spawn
                  Spawn the terminal launch target resolved from Super+Enter.
+  --verify-desktop-launch
+                 Resolve and spawn a discovered .desktop entry with WAYLAND_DISPLAY set.
+  --desktop-dir  Discover visible .desktop entries from this directory. May repeat. Defaults to XDG app dirs.
+  --desktop-entry
+                 Desktop entry id or name used by --verify-desktop-launch.
   --verify-clean-exit
                  Verify session shutdown closes managed windows and clears focus.
   --scripted-replay-dir
@@ -2814,6 +3055,11 @@ mod tests {
             "true",
             "--preflight-only",
             "--verify-launch-spawn",
+            "--verify-desktop-launch",
+            "--desktop-dir",
+            "crates/launcher/fixtures",
+            "--desktop-entry",
+            "org.backlit.SpawnProbe.desktop",
             "--launch-spawn-program",
             "true",
             "--launch-spawn-arg",
@@ -2839,6 +3085,12 @@ mod tests {
         assert_eq!(config.systemctl_program, "true");
         assert!(config.preflight_only);
         assert!(config.verify_launch_spawn);
+        assert!(config.verify_desktop_launch);
+        assert_eq!(config.desktop_dirs, ["crates/launcher/fixtures"]);
+        assert_eq!(
+            config.desktop_entry.as_deref(),
+            Some("org.backlit.SpawnProbe.desktop")
+        );
         assert_eq!(config.launch_spawn_program.as_deref(), Some("true"));
         assert_eq!(config.launch_spawn_args, ["--help"]);
         assert_eq!(config.launch_wayland_display.as_deref(), Some("wayland-1"));
