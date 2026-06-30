@@ -120,6 +120,7 @@ uploaded_session_replay_verifier="/tmp/backlit-verify-session-replay.sh"
 uploaded_drm_session_smoke_verifier="/tmp/backlit-verify-drm-session-smoke.sh"
 uploaded_service_lifecycle_verifier="/tmp/backlit-verify-service-lifecycle.sh"
 uploaded_mvp0_contract_verifier="/tmp/backlit-verify-mvp0-contract.sh"
+uploaded_mvp1_contract_verifier="/tmp/backlit-verify-mvp1-contract.sh"
 uploaded_packaging_verifier="/tmp/backlit-verify-packaging-contract.sh"
 uploaded_package_manifests_verifier="/tmp/backlit-verify-package-manifests.sh"
 uploaded_debian_package_build_verifier="/tmp/backlit-verify-debian-package-build.sh"
@@ -219,6 +220,7 @@ install -m 0755 -o "\$guest_user" -g "\$guest_user" "\$uploaded_session_replay_v
 install -m 0755 -o "\$guest_user" -g "\$guest_user" "\$uploaded_drm_session_smoke_verifier" "\$repo_dir/scripts/verify-drm-session-smoke.sh"
 install -m 0755 -o "\$guest_user" -g "\$guest_user" "\$uploaded_service_lifecycle_verifier" "\$repo_dir/scripts/verify-service-lifecycle.sh"
 install -m 0755 -o "\$guest_user" -g "\$guest_user" "\$uploaded_mvp0_contract_verifier" "\$repo_dir/scripts/verify-mvp0-contract.sh"
+install -m 0755 -o "\$guest_user" -g "\$guest_user" "\$uploaded_mvp1_contract_verifier" "\$repo_dir/scripts/verify-mvp1-contract.sh"
 install -m 0755 -o "\$guest_user" -g "\$guest_user" "\$uploaded_packaging_verifier" "\$repo_dir/scripts/verify-packaging-contract.sh"
 install -m 0755 -o "\$guest_user" -g "\$guest_user" "\$uploaded_package_manifests_verifier" "\$repo_dir/scripts/verify-package-manifests.sh"
 install -m 0755 -o "\$guest_user" -g "\$guest_user" "\$uploaded_debian_package_build_verifier" "\$repo_dir/scripts/verify-debian-package-build.sh"
@@ -258,6 +260,7 @@ upload_script "$repo_root/scripts/verify-session-replay.sh" "/tmp/backlit-verify
 upload_script "$repo_root/scripts/verify-drm-session-smoke.sh" "/tmp/backlit-verify-drm-session-smoke.sh"
 upload_script "$repo_root/scripts/verify-service-lifecycle.sh" "/tmp/backlit-verify-service-lifecycle.sh"
 upload_script "$repo_root/scripts/verify-mvp0-contract.sh" "/tmp/backlit-verify-mvp0-contract.sh"
+upload_script "$repo_root/scripts/verify-mvp1-contract.sh" "/tmp/backlit-verify-mvp1-contract.sh"
 upload_script "$repo_root/scripts/verify-packaging-contract.sh" "/tmp/backlit-verify-packaging-contract.sh"
 upload_script "$repo_root/scripts/verify-package-manifests.sh" "/tmp/backlit-verify-package-manifests.sh"
 upload_script "$repo_root/scripts/verify-debian-package-build.sh" "/tmp/backlit-verify-debian-package-build.sh"
@@ -286,6 +289,7 @@ host_debian_system_install_manifest="$host_out_dir/debian-system-install-manifes
 host_debian_system_install_replay_manifest="$host_out_dir/debian-system-install-session-replay-manifest.json"
 host_nested_wayland_manifest="$host_out_dir/nested-wayland-manifest.json"
 host_mvp0_contract_manifest="$host_out_dir/mvp0-contract-manifest.json"
+host_mvp1_contract_manifest="$host_out_dir/mvp1-contract-manifest.json"
 host_ppm="$host_out_dir/gui-preview-backlit-session.ppm"
 host_png="$host_out_dir/gui-preview-backlit-session.png"
 
@@ -304,6 +308,7 @@ rm -f \
   "$host_debian_system_install_replay_manifest" \
   "$host_nested_wayland_manifest" \
   "$host_mvp0_contract_manifest" \
+  "$host_mvp1_contract_manifest" \
   "$host_ppm" \
   "$host_png" \
   "$host_out_dir/manifest.json"
@@ -321,6 +326,7 @@ download_file "$guest_e2e_dir/debian-system-install/manifest.json" "$host_debian
 download_file "$guest_e2e_dir/debian-system-install/session-replay/manifest.json" "$host_debian_system_install_replay_manifest"
 download_file "$guest_e2e_dir/nested-wayland/manifest.json" "$host_nested_wayland_manifest"
 download_file "$guest_e2e_dir/mvp0-contract/manifest.json" "$host_mvp0_contract_manifest"
+download_file "$guest_e2e_dir/mvp1-contract/manifest.json" "$host_mvp1_contract_manifest"
 download_file "$guest_e2e_dir/gui-preview/backlit-session.ppm" "$host_ppm"
 
 preview_image="$host_ppm"
@@ -368,6 +374,7 @@ require_contains "$host_guest_manifest" '"debian_package_install": true'
 require_contains "$host_guest_manifest" '"launch_readiness": true'
 require_contains "$host_guest_manifest" '"drm_session_smoke": true'
 require_contains "$host_guest_manifest" '"nested_wayland": true'
+require_contains "$host_guest_manifest" '"mvp1_contract": true'
 require_contains "$host_gui_smoke_manifest" '"golden_checksum": true'
 require_contains "$host_gui_preview_manifest" '"session_verified": true'
 require_contains "$host_gui_preview_manifest" '"session_services": true'
@@ -408,6 +415,11 @@ require_contains "$host_debian_system_install_replay_manifest" '"launcher_overla
 require_contains "$host_debian_system_install_replay_manifest" '"app_switcher_overlay_frame": true'
 require_contains "$host_nested_wayland_manifest" '"session_wayland_clean_exit": true'
 require_contains "$host_mvp0_contract_manifest" '"artifact_manifests_checked": true'
+require_contains "$host_mvp1_contract_manifest" '"artifact_manifests_checked": true'
+require_contains "$host_mvp1_contract_manifest" '"drm_launch_ready_artifact": true'
+require_contains "$host_mvp1_contract_manifest" '"drm_session_smoke_ready_artifact": true'
+require_contains "$host_mvp1_contract_manifest" '"debian_package_install_replay_artifact": true'
+require_contains "$host_mvp1_contract_manifest" '"debian_system_install_replay_artifact": true'
 
 cat > "$host_out_dir/manifest.json" <<EOF
 {
@@ -431,6 +443,7 @@ cat > "$host_out_dir/manifest.json" <<EOF
     "debian_system_install_replay_manifest": "$host_debian_system_install_replay_manifest",
     "nested_wayland_manifest": "$host_nested_wayland_manifest",
     "mvp0_contract_manifest": "$host_mvp0_contract_manifest",
+    "mvp1_contract_manifest": "$host_mvp1_contract_manifest",
     "gui_preview_ppm": "$host_ppm",
     "gui_preview_image": "$preview_image"
   },
@@ -454,6 +467,7 @@ cat > "$host_out_dir/manifest.json" <<EOF
     "actual_system_dpkg_install": true,
     "nested_wayland": true,
     "mvp0_contract": true,
+    "mvp1_contract": true,
     "ppm_bytes": $ppm_bytes,
     "png_written": $png_written,
     "preview_format": "$preview_format",

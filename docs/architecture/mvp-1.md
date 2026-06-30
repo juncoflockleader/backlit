@@ -43,6 +43,7 @@ Current launch-readiness checks:
 - `scripts/verify-launch-performance.sh` verifies MVP launch budgets from built binaries: GUI ready under 500 ms, terminal hotkey spawn under 300 ms, and shell-ready service probes under 2 seconds.
 - `scripts/verify-resource-budget.sh` verifies Linux idle resource budgets from bounded compositor and shell probes: the non-smoke compositor path accepts a bootstrap client and presents a bootstrap surface, compositor idle CPU stays under 0.5%, and combined compositor+shell RSS stays under 250 MB.
 - `scripts/verify-drm-session-smoke.sh` runs the full DRM session path with GUI verification, launch spawn, compositor/shell/settings service probes, and clean shutdown on launch-ready Linux hosts.
+- `scripts/verify-mvp1-contract.sh` collects the MVP 1 readiness evidence into one gate. On non-launch-ready hosts it requires expected-blocked DRM artifacts; inside the Parallels Ubuntu GUI guest it requires launch-ready DRM preflight, DRM session smoke, package-installed replay, system-installed replay, nested Wayland, launch-performance, resource-budget, and compositor-runtime evidence.
 - The Linux E2E manifest includes the launch-readiness manifest.
 - The Linux E2E manifest includes the session launch manifest.
 - The Linux E2E manifest includes the launch-performance manifest.
@@ -50,4 +51,5 @@ Current launch-readiness checks:
 - The Linux E2E manifest includes the notification-daemon manifest.
 - The Linux E2E manifest includes the settings-daemon manifest.
 - The Linux E2E manifest includes the DRM session smoke manifest.
+- The Linux E2E manifest includes the MVP 1 contract manifest.
 - Parallels Ubuntu E2E maps the active `parallels` logind session before running the guest verifier, runs the opt-in root system-install verifier, exports the guest manifests and GUI preview back to the host, and is expected to report `xdg_runtime_dir_owned_by_user: true`, `session_local: true`, `drm_card_access_ready: true`, `input_broker_ready: true`, `drm_expected_ready: true`, `drm_ready: true`, `drm_session_smoke_ready: true`, `dpkg_root_install: true`, and `actual_system_dpkg_install: true`.

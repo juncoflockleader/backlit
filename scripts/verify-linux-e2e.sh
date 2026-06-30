@@ -31,6 +31,7 @@ session_replay_dir="$out_dir/session-replay"
 session_clean_exit_dir="$out_dir/session-clean-exit"
 drm_session_smoke_dir="$out_dir/drm-session-smoke"
 mvp0_contract_dir="$out_dir/mvp0-contract"
+mvp1_contract_dir="$out_dir/mvp1-contract"
 mkdir -p "$out_dir"
 
 commit="$(git rev-parse --short HEAD 2>/dev/null || printf unknown)"
@@ -75,6 +76,7 @@ if [ "$(uname -s)" = "Linux" ]; then
   nested_wayland_manifest="$out_dir/nested-wayland/manifest.json"
 fi
 
+./scripts/verify-mvp1-contract.sh "$mvp1_contract_dir" "$out_dir"
 ./scripts/verify-mvp0-contract.sh "$mvp0_contract_dir" "$out_dir"
 
 cat > "$out_dir/manifest.json" <<EOF
@@ -112,6 +114,7 @@ cat > "$out_dir/manifest.json" <<EOF
     "session_clean_exit_manifest": "$session_clean_exit_dir/manifest.json",
     "drm_session_smoke_manifest": "$drm_session_smoke_dir/manifest.json",
     "mvp0_contract_manifest": "$mvp0_contract_dir/manifest.json",
+    "mvp1_contract_manifest": "$mvp1_contract_dir/manifest.json",
     "nested_wayland_manifest": "$nested_wayland_manifest"
   },
   "checks": {
@@ -144,6 +147,7 @@ cat > "$out_dir/manifest.json" <<EOF
     "session_clean_exit": true,
     "drm_session_smoke": true,
     "mvp0_contract": true,
+    "mvp1_contract": true,
     "nested_wayland": $nested_wayland
   }
 }

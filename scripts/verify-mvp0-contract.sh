@@ -55,6 +55,7 @@ require_executable scripts/verify-staged-session-install.sh
 require_executable scripts/verify-nested-wayland-smoke.sh
 require_executable scripts/verify-session-replay.sh
 require_executable scripts/verify-session-clean-exit.sh
+require_executable scripts/verify-mvp1-contract.sh
 
 require_contains Cargo.toml '"crates/compositor"'
 require_contains Cargo.toml '"crates/compositor-backend"'
@@ -129,6 +130,7 @@ require_contains scripts/verify-linux-e2e.sh './scripts/verify-systemd-activatio
 require_contains scripts/verify-linux-e2e.sh './scripts/verify-drm-session-smoke.sh'
 require_contains scripts/verify-linux-e2e.sh './scripts/verify-session-replay.sh'
 require_contains scripts/verify-linux-e2e.sh './scripts/verify-session-clean-exit.sh'
+require_contains scripts/verify-linux-e2e.sh './scripts/verify-mvp1-contract.sh'
 require_contains scripts/verify-parallels-linux-e2e.sh '"name": "backlit-parallels-linux-e2e-export"'
 require_contains scripts/verify-parallels-linux-e2e.sh '"guest_e2e_passed": true'
 require_contains scripts/verify-parallels-linux-e2e.sh '"parallels_drm_launch_ready": true'
@@ -207,6 +209,7 @@ if [ -n "$artifact_root" ] && [ -d "$artifact_root" ]; then
   require_file "$artifact_root/launch-readiness/manifest.json"
   require_file "$artifact_root/session-clean-exit/manifest.json"
   require_file "$artifact_root/drm-session-smoke/manifest.json"
+  require_file "$artifact_root/mvp1-contract/manifest.json"
 
   require_contains "$artifact_root/gui-smoke/manifest.json" '"protocol_required_count": 7'
   require_contains "$artifact_root/gui-smoke/manifest.json" '"shell_required_roles": 5'
@@ -405,6 +408,8 @@ if [ -n "$artifact_root" ] && [ -d "$artifact_root" ]; then
   require_contains "$artifact_root/session-clean-exit/manifest.json" '"clean_exit_event": true'
   require_contains "$artifact_root/session-clean-exit/manifest.json" '"windows_after_shutdown": 0'
   require_contains "$artifact_root/session-clean-exit/manifest.json" '"focus_cleared": true'
+  require_contains "$artifact_root/mvp1-contract/manifest.json" '"name": "backlit-mvp1-contract"'
+  require_contains "$artifact_root/mvp1-contract/manifest.json" '"artifact_manifests_checked": true'
   require_contains "$artifact_root/drm-session-smoke/manifest.json" '"name": "backlit-drm-session-smoke"'
   require_contains "$artifact_root/drm-session-smoke/manifest.json" '"xdg_runtime_dir_owned_by_user":'
   require_contains "$artifact_root/drm-session-smoke/manifest.json" '"session_local":'
@@ -488,6 +493,7 @@ cat > "$out_dir/manifest.json" <<EOF
     "debian_system_install": true,
     "staged_session_install": true,
     "drm_session_smoke": true,
+    "mvp1_contract": true,
     "ci_gate": true
   }
 }

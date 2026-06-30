@@ -47,9 +47,10 @@ MVP 0 is the development harness:
 - Launch performance budget verifier for session GUI readiness, shell readiness, and terminal hotkey spawn.
 - Linux resource budget verifier for compositor service readiness, bounded idle CPU, and compositor+shell RSS probes.
 - JSON metrics.
-- Linux E2E verifier for fmt, tests, clippy, GUI smoke, launch performance, resource budgets, settings daemon policy, packaging contract, session clean exit, and nested Wayland smoke inside an Ubuntu guest.
+- Linux E2E verifier for fmt, tests, clippy, GUI smoke, launch performance, resource budgets, settings daemon policy, packaging contract, session clean exit, MVP 1 readiness contract, and nested Wayland smoke inside an Ubuntu guest.
 - GitHub Actions Linux E2E workflow with artifact upload and local contract verification.
 - MVP 0 contract verifier that checks the executable harness still covers the design deliverables and, inside E2E, validates the generated artifact manifests.
+- MVP 1 contract verifier that gathers bare-session launch readiness, DRM session smoke, package install, replay, performance, and resource-budget evidence without claiming the real compositor loop is finished.
 - Parallels runner for repeatable macOS-to-Ubuntu guest verification with the active guest user's logind session and runtime directory.
 - Parallels E2E artifact export for guest manifests, Linux-only DRM/package checks, nested Wayland evidence, MVP contract evidence, and the guest-rendered GUI preview image.
 - Packaging contract verifier for session desktop entry, Backlit user target, systemd units, and Debian package split.
