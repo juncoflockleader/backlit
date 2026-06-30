@@ -98,6 +98,15 @@ fn run() -> Result<(), String> {
                     FieldValue::Bool(interaction_report.terminal_launch_resolved),
                 ),
                 (
+                    "move_resize_ok",
+                    FieldValue::Bool(interaction_report.move_resize_ok),
+                ),
+                ("moved_x", FieldValue::U64(interaction_report.moved_x)),
+                (
+                    "resized_width",
+                    FieldValue::U64(interaction_report.resized_width),
+                ),
+                (
                     "maximize_uses_work_area",
                     FieldValue::Bool(interaction_report.maximize_uses_work_area),
                 ),
@@ -149,6 +158,9 @@ struct InteractionReport {
     focus_after_switcher: u64,
     windows_after_launch: u64,
     terminal_launch_resolved: bool,
+    move_resize_ok: bool,
+    moved_x: u64,
+    resized_width: u64,
     maximize_uses_work_area: bool,
     fullscreen_uses_output: bool,
 }
@@ -160,6 +172,7 @@ impl InteractionReport {
             && self.focus_after_switcher != self.initial_focus
             && self.windows_after_launch == 4
             && self.terminal_launch_resolved
+            && self.move_resize_ok
             && self.maximize_uses_work_area
             && self.fullscreen_uses_output
     }
@@ -187,6 +200,21 @@ fn verify_session_interactions(policy: &WindowPolicy, layout: OutputLayout) -> I
     }
 
     let focused = policy.focused();
+    let (move_resize_ok, moved_x, resized_width) = focused
+        .map(|id| {
+            let moved = policy.move_window(id, 96, 84);
+            let resized = policy.resize_window(id, 920, 640);
+            let geometry = policy.window(id).map(|window| window.geometry);
+            let ok = moved
+                && resized
+                && geometry
+                    .map(|geometry| (geometry.x, geometry.y, geometry.width, geometry.height))
+                    == Some((96, 84, 920, 640));
+
+            (ok, 96, 920)
+        })
+        .unwrap_or((false, 0, 0));
+
     let maximize_uses_work_area = focused
         .map(|id| {
             policy.maximize_window(id, layout.work_area())
@@ -206,6 +234,9 @@ fn verify_session_interactions(policy: &WindowPolicy, layout: OutputLayout) -> I
         focus_after_switcher,
         windows_after_launch: policy.windows().len() as u64,
         terminal_launch_resolved,
+        move_resize_ok,
+        moved_x,
+        resized_width,
         maximize_uses_work_area,
         fullscreen_uses_output,
     }

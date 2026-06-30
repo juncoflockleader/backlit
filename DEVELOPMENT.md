@@ -181,6 +181,8 @@ The session smoke path consumes those dry-run routes too: `Alt+Tab` cycles focus
 
 Session verification also checks output-aware geometry: maximized windows use the panel-reserved work area, while fullscreen uses the whole output.
 
+Move and resize behavior is also verified through the session smoke path before maximize/fullscreen checks run.
+
 Backend preflight can be run directly:
 
 ```bash
