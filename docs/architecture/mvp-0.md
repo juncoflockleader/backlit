@@ -32,6 +32,7 @@ MVP 0 is the development harness:
 - Settings daemon smoke for display, input, power policy validation, and dry-run logind/systemd power action plans.
 - Portal security smoke for denied direct capture and consented portal-mediated flows.
 - Deterministic demo GUI renderer.
+- Policy-driven session preview renderer that draws visible workspace windows from `WindowPolicy`, including focused-window styling and workspace indicator verification.
 - Headless session launch verification.
 - Backlit user systemd target and dry-run session launch plan for starting/stopping runtime services.
 - Long-lived `--serve` mode for compositor, shell, notification daemon, and settings daemon, with bounded lifecycle probes for automation.

@@ -36,6 +36,7 @@ name = "backlit-demo-client"
 version = "0.1.0"
 dependencies = [
  "backlit-common",
+ "backlit-window-policy",
 ]
 
 [[package]]

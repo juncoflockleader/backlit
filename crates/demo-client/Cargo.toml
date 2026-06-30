@@ -9,7 +9,7 @@ publish = false
 
 [dependencies]
 backlit-common = { path = "../common" }
+backlit-window-policy = { path = "../window-policy" }
 
 [lib]
 path = "src/lib.rs"
-

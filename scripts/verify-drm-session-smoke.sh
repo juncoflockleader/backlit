@@ -11,7 +11,7 @@ session_log="$out_dir/session.jsonl"
 session_err="$out_dir/session.stderr"
 session_screenshot="$out_dir/drm-session.ppm"
 service_log_dir="$out_dir/session-services"
-expected_checksum="5635038614353063225"
+expected_checksum="15888844850457870477"
 expected_ppm_bytes="1248015"
 
 fail() {
@@ -211,6 +211,11 @@ if [ "$drm_expected_ready" = true ]; then
   grep '"event":"session.clean_exit"' "$session_log" >/dev/null
   grep '"passed":true' "$session_log" >/dev/null
   grep '"golden_ok":true' "$session_log" >/dev/null
+  grep '"policy_windows":3' "$session_log" >/dev/null
+  grep '"visible_windows":3' "$session_log" >/dev/null
+  grep '"focused_window_visible":true' "$session_log" >/dev/null
+  grep '"focused_title_bar_ok":true' "$session_log" >/dev/null
+  grep '"workspace_indicator_ok":true' "$session_log" >/dev/null
   grep '"spawned":true' "$session_log" >/dev/null
   grep '"exit_success":true' "$session_log" >/dev/null
   grep '"wayland_display_set":true' "$session_log" >/dev/null

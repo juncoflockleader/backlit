@@ -4,7 +4,7 @@ set -eu
 out_dir="${1:-target/gui-smoke}"
 mkdir -p "$out_dir"
 
-expected_checksum="5635038614353063225"
+expected_checksum="15888844850457870477"
 expected_width="800"
 expected_height="520"
 expected_ppm_bytes="1248015"
@@ -108,6 +108,11 @@ grep '"surface_windows_after_close":0' "$out_dir/session.jsonl" >/dev/null
 grep '"windows_after_close":3' "$out_dir/session.jsonl" >/dev/null
 grep '"passed":true' "$out_dir/session.jsonl" >/dev/null
 grep '"golden_ok":true' "$out_dir/session.jsonl" >/dev/null
+grep '"policy_windows":3' "$out_dir/session.jsonl" >/dev/null
+grep '"visible_windows":3' "$out_dir/session.jsonl" >/dev/null
+grep '"focused_window_visible":true' "$out_dir/session.jsonl" >/dev/null
+grep '"focused_title_bar_ok":true' "$out_dir/session.jsonl" >/dev/null
+grep '"workspace_indicator_ok":true' "$out_dir/session.jsonl" >/dev/null
 grep '"compositor_ready":true' "$out_dir/session.jsonl" >/dev/null
 grep '"shell_ready":true' "$out_dir/session.jsonl" >/dev/null
 grep '"notification_ready":true' "$out_dir/session.jsonl" >/dev/null
@@ -378,6 +383,11 @@ cat > "$out_dir/manifest.json" <<EOF
     "session_services": true,
     "session_notification_service": true,
     "session_settings_service": true,
+    "session_policy_preview": true,
+    "session_policy_windows": 3,
+    "session_visible_windows": 3,
+    "session_focused_title_bar": true,
+    "session_workspace_indicator": true,
     "session_clean_exit": true,
     "session_move_resize": true,
     "session_workspace_switch": true,

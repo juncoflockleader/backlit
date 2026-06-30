@@ -12,7 +12,7 @@ use backlit_compositor_backend::{
     BackendPreflightReport,
 };
 use backlit_demo_client::{
-    render_demo_gui, verify_demo_gui, DEFAULT_DEMO_HEIGHT, DEFAULT_DEMO_WIDTH,
+    render_policy_gui, verify_policy_gui, DEFAULT_DEMO_HEIGHT, DEFAULT_DEMO_WIDTH,
 };
 use backlit_input::run_input_smoke;
 use backlit_launcher::{default_catalog, resolve_command, LaunchTarget};
@@ -136,17 +136,14 @@ fn run() -> Result<(), String> {
         return Ok(());
     }
 
-    let mut policy = WindowPolicy::default();
-    policy.add_window("terminal", (800, 600));
-    policy.add_window("settings", (720, 560));
-    policy.add_window("browser", (1100, 720));
     let layout = OutputLayout::new(config.width as i32, config.height as i32, 42);
+    let mut policy = initial_session_policy(layout);
 
     let screenshot = config
         .screenshot
         .clone()
         .unwrap_or_else(|| String::from("target/backlit-session.ppm"));
-    let canvas = render_demo_gui(config.width, config.height);
+    let canvas = render_policy_gui(config.width, config.height, &policy, layout);
     canvas
         .write_ppm(&screenshot)
         .map_err(|error| format!("failed to write {screenshot}: {error}"))?;
@@ -173,7 +170,7 @@ fn run() -> Result<(), String> {
     );
 
     if config.verify {
-        let report = verify_demo_gui(&canvas);
+        let report = verify_policy_gui(&canvas, &policy, layout);
         let interaction_report = verify_session_interactions(&policy, layout);
 
         emit(
@@ -296,6 +293,20 @@ fn run() -> Result<(), String> {
                 ("launcher_ok", FieldValue::Bool(report.launcher_ok)),
                 ("window_ok", FieldValue::Bool(report.window_ok)),
                 ("pointer_ok", FieldValue::Bool(report.pointer_ok)),
+                ("policy_windows", FieldValue::U64(report.policy_windows)),
+                ("visible_windows", FieldValue::U64(report.visible_windows)),
+                (
+                    "focused_window_visible",
+                    FieldValue::Bool(report.focused_window_visible),
+                ),
+                (
+                    "focused_title_bar_ok",
+                    FieldValue::Bool(report.focused_title_bar_ok),
+                ),
+                (
+                    "workspace_indicator_ok",
+                    FieldValue::Bool(report.workspace_indicator_ok),
+                ),
             ],
         );
 
@@ -345,6 +356,24 @@ fn run() -> Result<(), String> {
     );
 
     Ok(())
+}
+
+fn initial_session_policy(layout: OutputLayout) -> WindowPolicy {
+    let mut policy = WindowPolicy::default();
+    let scale_x = layout.output.width.max(320);
+    let scale_y = layout.output.height.max(220);
+    let scaled_x = |value: i32| value * scale_x / DEFAULT_DEMO_WIDTH as i32;
+    let scaled_y = |value: i32| value * scale_y / DEFAULT_DEMO_HEIGHT as i32;
+
+    let terminal = policy.add_window("terminal", (scaled_x(310).max(180), scaled_y(178).max(120)));
+    let settings = policy.add_window("settings", (scaled_x(280).max(180), scaled_y(170).max(120)));
+    let browser = policy.add_window("browser", (scaled_x(374).max(220), scaled_y(188).max(140)));
+
+    policy.move_window(terminal, scaled_x(132), scaled_y(74));
+    policy.move_window(settings, scaled_x(390), scaled_y(132));
+    policy.move_window(browser, scaled_x(214), scaled_y(260));
+
+    policy
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]

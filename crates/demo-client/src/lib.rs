@@ -2,6 +2,8 @@ use std::fs;
 use std::io;
 use std::path::Path;
 
+use backlit_window_policy::{OutputLayout, Rect, WindowPolicy, WindowState};
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Color {
     pub red: u8,
@@ -22,13 +24,18 @@ const LAUNCHER: Color = Color::rgb(43, 51, 66);
 const WINDOW: Color = Color::rgb(248, 248, 246);
 const WINDOW_SHADOW: Color = Color::rgb(7, 10, 14);
 const TITLE_BAR: Color = Color::rgb(61, 84, 111);
+const FOCUSED_TITLE_BAR: Color = Color::rgb(43, 112, 153);
+const FOCUS_RING: Color = Color::rgb(78, 211, 119);
 const TERMINAL: Color = Color::rgb(23, 27, 30);
 const GRAPH: Color = Color::rgb(223, 148, 67);
 const POINTER: Color = Color::rgb(255, 255, 255);
+const WORKSPACE_ACTIVE: Color = Color::rgb(42, 129, 196);
+const WORKSPACE_INACTIVE: Color = Color::rgb(155, 166, 181);
 
 pub const DEFAULT_DEMO_WIDTH: u32 = 800;
 pub const DEFAULT_DEMO_HEIGHT: u32 = 520;
 pub const GOLDEN_DEMO_CHECKSUM: u64 = 5_635_038_614_353_063_225;
+pub const SESSION_PREVIEW_CHECKSUM: u64 = 15_888_844_850_457_870_477;
 
 #[derive(Debug, Clone)]
 pub struct Canvas {
@@ -136,6 +143,38 @@ impl VerificationReport {
     }
 }
 
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct PolicyPreviewReport {
+    pub non_background_pixels: u64,
+    pub checksum: u64,
+    pub golden_ok: bool,
+    pub panel_ok: bool,
+    pub launcher_ok: bool,
+    pub window_ok: bool,
+    pub pointer_ok: bool,
+    pub policy_windows: u64,
+    pub visible_windows: u64,
+    pub focused_window_visible: bool,
+    pub focused_title_bar_ok: bool,
+    pub workspace_indicator_ok: bool,
+}
+
+impl PolicyPreviewReport {
+    pub fn passed(&self) -> bool {
+        self.non_background_pixels > 10_000
+            && self.panel_ok
+            && self.launcher_ok
+            && self.window_ok
+            && self.pointer_ok
+            && self.policy_windows >= self.visible_windows
+            && self.visible_windows > 0
+            && self.focused_window_visible
+            && self.focused_title_bar_ok
+            && self.workspace_indicator_ok
+            && self.golden_ok
+    }
+}
+
 pub fn render_demo_gui(width: u32, height: u32) -> Canvas {
     let width = width.max(320);
     let height = height.max(220);
@@ -149,6 +188,42 @@ pub fn render_demo_gui(width: u32, height: u32) -> Canvas {
     draw_metrics(&mut canvas, 414, 178, 226, 68);
     draw_window(&mut canvas, 214, 260, 374, 188, WINDOW, "browser");
     draw_browser_content(&mut canvas, 238, 306, 322, 96);
+    draw_pointer(
+        &mut canvas,
+        width.saturating_sub(168),
+        height.saturating_sub(116),
+    );
+
+    canvas
+}
+
+pub fn render_policy_gui(
+    width: u32,
+    height: u32,
+    policy: &WindowPolicy,
+    layout: OutputLayout,
+) -> Canvas {
+    let width = width.max(320);
+    let height = height.max(220);
+    let mut canvas = Canvas::new(width, height, BACKGROUND);
+
+    draw_panel(&mut canvas);
+    draw_workspace_indicator(&mut canvas, policy);
+    draw_launcher(&mut canvas);
+
+    for window in policy
+        .visible_windows()
+        .filter(|window| window.state != WindowState::Minimized)
+    {
+        draw_policy_window(
+            &mut canvas,
+            window.geometry,
+            window.title.as_str(),
+            policy.focused() == Some(window.id),
+            layout,
+        );
+    }
+
     draw_pointer(
         &mut canvas,
         width.saturating_sub(168),
@@ -186,6 +261,58 @@ pub fn verify_demo_gui(canvas: &Canvas) -> VerificationReport {
     }
 }
 
+pub fn verify_policy_gui(
+    canvas: &Canvas,
+    policy: &WindowPolicy,
+    _layout: OutputLayout,
+) -> PolicyPreviewReport {
+    let non_background_pixels = canvas
+        .pixels
+        .iter()
+        .filter(|pixel| **pixel != BACKGROUND)
+        .count() as u64;
+
+    let checksum = canvas.checksum();
+    let golden_ok = if canvas.width == DEFAULT_DEMO_WIDTH && canvas.height == DEFAULT_DEMO_HEIGHT {
+        checksum == SESSION_PREVIEW_CHECKSUM
+    } else {
+        true
+    };
+    let visible_windows = policy
+        .visible_windows()
+        .filter(|window| window.state != WindowState::Minimized)
+        .count() as u64;
+    let focused_window = policy
+        .focused()
+        .and_then(|focused| policy.window(focused))
+        .filter(|window| window.state != WindowState::Minimized)
+        .filter(|window| window.workspace == policy.active_workspace());
+    let focused_window_visible = focused_window.is_some();
+    let focused_title_bar_ok = focused_window
+        .and_then(|window| sample_title_pixel(canvas, window.geometry))
+        == Some(FOCUSED_TITLE_BAR);
+
+    PolicyPreviewReport {
+        non_background_pixels,
+        checksum,
+        golden_ok,
+        panel_ok: canvas.pixel(104, 18) == Some(PANEL),
+        launcher_ok: canvas.pixel(10, 78) == Some(LAUNCHER),
+        window_ok: focused_window
+            .and_then(|window| sample_window_body_pixel(canvas, window.geometry))
+            == Some(WINDOW),
+        pointer_ok: canvas.pixel(
+            canvas.width.saturating_sub(168),
+            canvas.height.saturating_sub(116),
+        ) == Some(POINTER),
+        policy_windows: policy.windows().len() as u64,
+        visible_windows,
+        focused_window_visible,
+        focused_title_bar_ok,
+        workspace_indicator_ok: active_workspace_pixel(canvas, policy) == Some(WORKSPACE_ACTIVE),
+    }
+}
+
 fn fnv1a(hash: u64, byte: u8) -> u64 {
     (hash ^ byte as u64).wrapping_mul(0x00000100000001b3)
 }
@@ -200,6 +327,17 @@ fn draw_panel(canvas: &mut Canvas) {
     canvas.fill_rect(right + 100, 13, 48, 16, Color::rgb(32, 38, 50));
 }
 
+fn draw_workspace_indicator(canvas: &mut Canvas, policy: &WindowPolicy) {
+    for index in 0..policy.workspace_count() {
+        let color = if index + 1 == policy.active_workspace().0 {
+            WORKSPACE_ACTIVE
+        } else {
+            WORKSPACE_INACTIVE
+        };
+        canvas.fill_rect(112 + index * 18, 16, 10, 10, color);
+    }
+}
+
 fn draw_launcher(canvas: &mut Canvas) {
     canvas.fill_rect(0, 42, 74, canvas.height().saturating_sub(42), LAUNCHER);
 
@@ -207,6 +345,188 @@ fn draw_launcher(canvas: &mut Canvas) {
         let y = 68 + index * 42;
         canvas.fill_rect(19, y, 36, 28, Color::rgb(88, 101, 124));
         canvas.fill_rect(26, y + 7, 22, 14, Color::rgb(236, 238, 241));
+    }
+}
+
+fn draw_policy_window(
+    canvas: &mut Canvas,
+    geometry: Rect,
+    title: &str,
+    focused: bool,
+    layout: OutputLayout,
+) {
+    if geometry.width <= 0 || geometry.height <= 0 {
+        return;
+    }
+
+    let clipped = clip_rect(canvas, geometry);
+    if clipped.is_none() {
+        return;
+    }
+
+    if geometry != layout.output {
+        fill_rect_i32(
+            canvas,
+            Rect::new(
+                geometry.x + 6,
+                geometry.y + 8,
+                geometry.width,
+                geometry.height,
+            ),
+            WINDOW_SHADOW,
+        );
+    }
+
+    fill_rect_i32(canvas, geometry, WINDOW);
+
+    let title_height = geometry.height.min(32);
+    let title_color = if focused {
+        FOCUSED_TITLE_BAR
+    } else {
+        TITLE_BAR
+    };
+    fill_rect_i32(
+        canvas,
+        Rect::new(geometry.x, geometry.y, geometry.width, title_height),
+        title_color,
+    );
+
+    if focused {
+        draw_focus_ring(canvas, geometry);
+    }
+
+    fill_rect_i32(
+        canvas,
+        Rect::new(geometry.x + 12, geometry.y + 11, 10, 10),
+        Color::rgb(232, 87, 74),
+    );
+    fill_rect_i32(
+        canvas,
+        Rect::new(geometry.x + 29, geometry.y + 11, 10, 10),
+        Color::rgb(235, 181, 82),
+    );
+    fill_rect_i32(
+        canvas,
+        Rect::new(geometry.x + 46, geometry.y + 11, 10, 10),
+        Color::rgb(82, 168, 93),
+    );
+    draw_label_bars_i32(canvas, geometry.x + 72, geometry.y + 12, title.len() as u32);
+    draw_policy_window_content(canvas, geometry, title);
+}
+
+fn draw_focus_ring(canvas: &mut Canvas, geometry: Rect) {
+    fill_rect_i32(
+        canvas,
+        Rect::new(geometry.x, geometry.y, geometry.width, 3),
+        FOCUS_RING,
+    );
+    fill_rect_i32(
+        canvas,
+        Rect::new(geometry.x, geometry.y, 3, geometry.height),
+        FOCUS_RING,
+    );
+    fill_rect_i32(
+        canvas,
+        Rect::new(
+            geometry.x,
+            geometry.y + geometry.height - 3,
+            geometry.width,
+            3,
+        ),
+        FOCUS_RING,
+    );
+    fill_rect_i32(
+        canvas,
+        Rect::new(
+            geometry.x + geometry.width - 3,
+            geometry.y,
+            3,
+            geometry.height,
+        ),
+        FOCUS_RING,
+    );
+}
+
+fn draw_policy_window_content(canvas: &mut Canvas, geometry: Rect, title: &str) {
+    let content = Rect::new(
+        geometry.x + 22,
+        geometry.y + 50,
+        geometry.width - 44,
+        geometry.height - 70,
+    );
+
+    if content.width <= 0 || content.height <= 0 {
+        return;
+    }
+
+    if title.contains("terminal") {
+        draw_terminal_content(canvas, content);
+    } else if title.contains("settings") {
+        draw_settings_content(canvas, content);
+    } else {
+        draw_browser_content_i32(canvas, content);
+    }
+}
+
+fn draw_terminal_content(canvas: &mut Canvas, content: Rect) {
+    fill_rect_i32(canvas, content, TERMINAL);
+
+    for index in 0..5 {
+        let y = content.y + 14 + index * 15;
+        if y + 5 > content.y + content.height {
+            break;
+        }
+        fill_rect_i32(
+            canvas,
+            Rect::new(content.x + 14, y, 12, 5),
+            Color::rgb(82, 213, 112),
+        );
+        fill_rect_i32(
+            canvas,
+            Rect::new(content.x + 34, y, 90 + index * 18, 5),
+            Color::rgb(217, 225, 220),
+        );
+    }
+}
+
+fn draw_settings_content(canvas: &mut Canvas, content: Rect) {
+    fill_rect_i32(canvas, content, Color::rgb(234, 236, 231));
+
+    for index in 0..6 {
+        let bar_height = 12 + index * 6;
+        let bar_x = content.x + 18 + index * 28;
+        fill_rect_i32(
+            canvas,
+            Rect::new(
+                bar_x,
+                content.y + content.height - 12 - bar_height,
+                15,
+                bar_height,
+            ),
+            GRAPH,
+        );
+    }
+}
+
+fn draw_browser_content_i32(canvas: &mut Canvas, content: Rect) {
+    fill_rect_i32(canvas, content, Color::rgb(236, 241, 244));
+    fill_rect_i32(
+        canvas,
+        Rect::new(content.x + 18, content.y + 18, content.width - 36, 16),
+        PANEL_ACCENT,
+    );
+
+    for index in 0..4 {
+        fill_rect_i32(
+            canvas,
+            Rect::new(
+                content.x + 20,
+                content.y + 48 + index * 14,
+                content.width - 44 - index * 24,
+                6,
+            ),
+            Color::rgb(99, 110, 122),
+        );
     }
 }
 
@@ -279,9 +599,75 @@ fn draw_pointer(canvas: &mut Canvas, x: u32, y: u32) {
     canvas.fill_rect(x + 9, y + 20, 12, 5, Color::rgb(30, 34, 41));
 }
 
+fn draw_label_bars_i32(canvas: &mut Canvas, x: i32, y: i32, count: u32) {
+    for index in 0..count.min(12) {
+        let width = 4 + (index % 3) * 3;
+        fill_rect_i32(
+            canvas,
+            Rect::new(x + (index * 10) as i32, y, width as i32, 8),
+            Color::rgb(232, 238, 246),
+        );
+    }
+}
+
+fn fill_rect_i32(canvas: &mut Canvas, rect: Rect, color: Color) {
+    let Some((x, y, width, height)) = clip_rect(canvas, rect) else {
+        return;
+    };
+    canvas.fill_rect(x, y, width, height, color);
+}
+
+fn clip_rect(canvas: &Canvas, rect: Rect) -> Option<(u32, u32, u32, u32)> {
+    let min_x = rect.x.max(0).min(canvas.width() as i32);
+    let min_y = rect.y.max(0).min(canvas.height() as i32);
+    let max_x = rect
+        .x
+        .saturating_add(rect.width)
+        .max(0)
+        .min(canvas.width() as i32);
+    let max_y = rect
+        .y
+        .saturating_add(rect.height)
+        .max(0)
+        .min(canvas.height() as i32);
+
+    if max_x <= min_x || max_y <= min_y {
+        return None;
+    }
+
+    Some((
+        min_x as u32,
+        min_y as u32,
+        (max_x - min_x) as u32,
+        (max_y - min_y) as u32,
+    ))
+}
+
+fn sample_title_pixel(canvas: &Canvas, geometry: Rect) -> Option<Color> {
+    sample_rect_pixel(canvas, Rect::new(geometry.x + 8, geometry.y + 8, 1, 1))
+}
+
+fn sample_window_body_pixel(canvas: &Canvas, geometry: Rect) -> Option<Color> {
+    sample_rect_pixel(canvas, Rect::new(geometry.x + 8, geometry.y + 40, 1, 1))
+}
+
+fn active_workspace_pixel(canvas: &Canvas, policy: &WindowPolicy) -> Option<Color> {
+    let workspace_index = policy.active_workspace().0.saturating_sub(1);
+    canvas.pixel(114 + workspace_index * 18, 18)
+}
+
+fn sample_rect_pixel(canvas: &Canvas, rect: Rect) -> Option<Color> {
+    let (x, y, _, _) = clip_rect(canvas, rect)?;
+    canvas.pixel(x, y)
+}
+
 #[cfg(test)]
 mod tests {
-    use super::{render_demo_gui, verify_demo_gui, Color, GOLDEN_DEMO_CHECKSUM};
+    use super::{
+        render_demo_gui, render_policy_gui, verify_demo_gui, verify_policy_gui, Color, BACKGROUND,
+        FOCUSED_TITLE_BAR, GOLDEN_DEMO_CHECKSUM, SESSION_PREVIEW_CHECKSUM,
+    };
+    use backlit_window_policy::{OutputLayout, WindowPolicy, WorkspaceId};
 
     #[test]
     fn renders_minimum_size_preview() {
@@ -300,5 +686,41 @@ mod tests {
         assert!(report.golden_ok, "{report:?}");
         assert_eq!(report.checksum, GOLDEN_DEMO_CHECKSUM);
         assert_eq!(canvas.pixel(104, 18), Some(Color::rgb(235, 238, 242)));
+    }
+
+    #[test]
+    fn renders_policy_preview_from_visible_workspace() {
+        let layout = OutputLayout::new(800, 520, 42);
+        let mut policy = WindowPolicy::default();
+        let terminal = policy.add_window("terminal", (310, 178));
+        let settings = policy.add_window("settings", (280, 170));
+        let browser = policy.add_window("browser", (374, 188));
+        assert!(policy.move_window(terminal, 132, 74));
+        assert!(policy.move_window(settings, 390, 132));
+        assert!(policy.move_window(browser, 214, 260));
+
+        let canvas = render_policy_gui(800, 520, &policy, layout);
+        let report = verify_policy_gui(&canvas, &policy, layout);
+
+        assert!(report.passed(), "{report:?}");
+        assert_eq!(report.visible_windows, 3);
+        assert_eq!(report.policy_windows, 3);
+        assert!(report.focused_window_visible);
+        assert_eq!(canvas.pixel(222, 268), Some(FOCUSED_TITLE_BAR));
+        assert_eq!(report.checksum, SESSION_PREVIEW_CHECKSUM);
+    }
+
+    #[test]
+    fn hides_windows_from_inactive_workspaces() {
+        let layout = OutputLayout::new(800, 520, 42);
+        let mut policy = WindowPolicy::default();
+        let hidden = policy.add_window("hidden", (180, 120));
+        assert!(policy.move_window(hidden, 520, 360));
+        assert!(policy.move_window_to_workspace(hidden, WorkspaceId(2)));
+
+        let canvas = render_policy_gui(800, 520, &policy, layout);
+
+        assert_eq!(policy.visible_windows().count(), 0);
+        assert_eq!(canvas.pixel(528, 368), Some(BACKGROUND));
     }
 }

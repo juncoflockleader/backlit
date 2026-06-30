@@ -314,7 +314,7 @@ Portal security is covered by `backlit-portal-backend --verify`, which denies di
 
 Crash logging is covered by `backlit-session-supervisor --verify` and `./scripts/verify-crash-logs.sh`. The supervisor emits structured crash-log records for shell and compositor failures, and packaged user services explicitly send stdout/stderr to the systemd journal with stable `SyslogIdentifier` values and `RUST_BACKTRACE=1`.
 
-The default GUI render is guarded by checksum `5635038614353063225`; update it only when an intentional visual change is made.
+The static demo render is guarded by checksum `5635038614353063225`. The session preview render is policy-driven and guarded by checksum `15888844850457870477`; update either only when an intentional visual change is made.
 
 The launcher catalog is verified in dry-run mode for the first required targets: terminal, browser, and settings.
 
@@ -328,7 +328,7 @@ Input routing is verified by `backlit-input --verify`, which feeds deterministic
 
 Surface lifecycle is verified by `backlit-surface --verify`, which proves the xdg-shell-style path from toplevel creation through initial configure/ack/commit, focus, popup mapping, maximize, fullscreen, close request, and clean window removal. `backlit-compositor -- --smoke-test` also drives that xdg toplevel and popup path through the compositor smoke by mapping configured surfaces into the headless backend frame before maximizing, fullscreening, and closing them.
 
-The session smoke path consumes those routes too: `Alt+Tab` cycles focus and `Super+Enter` resolves the terminal launch path, pointer input verifies focus/move/resize routing, surface lifecycle verifies map/configure/close behavior, spawns the terminal launch target with `WAYLAND_DISPLAY` set when `--verify-launch-spawn` is enabled, then records the resulting window-policy state in `session.jsonl`.
+The session smoke path consumes those routes too: `Alt+Tab` cycles focus and `Super+Enter` resolves the terminal launch path, pointer input verifies focus/move/resize routing, surface lifecycle verifies map/configure/close behavior, spawns the terminal launch target with `WAYLAND_DISPLAY` set when `--verify-launch-spawn` is enabled, renders the preview from `WindowPolicy`, then records the resulting window-policy state in `session.jsonl`.
 
 With `--verify-services`, `backlit-session` also resolves sibling `backlit-compositor`, `backlit-shell`, `backlit-notification-daemon`, and `backlit-settings-daemon` binaries, runs their readiness probes, captures their logs, and emits `session.services_verified`.
 

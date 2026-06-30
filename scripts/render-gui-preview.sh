@@ -11,7 +11,7 @@ session_ppm="$out_dir/backlit-session.ppm"
 session_png="$out_dir/backlit-session.png"
 session_log="$out_dir/session.jsonl"
 service_log_dir="$out_dir/session-services"
-expected_checksum="5635038614353063225"
+expected_checksum="15888844850457870477"
 expected_ppm_bytes="1248015"
 
 cargo build \
@@ -33,6 +33,11 @@ grep '"event":"session.verified"' "$session_log" >/dev/null
 grep '"event":"session.services_verified"' "$session_log" >/dev/null
 grep '"passed":true' "$session_log" >/dev/null
 grep '"golden_ok":true' "$session_log" >/dev/null
+grep '"policy_windows":3' "$session_log" >/dev/null
+grep '"visible_windows":3' "$session_log" >/dev/null
+grep '"focused_window_visible":true' "$session_log" >/dev/null
+grep '"focused_title_bar_ok":true' "$session_log" >/dev/null
+grep '"workspace_indicator_ok":true' "$session_log" >/dev/null
 grep '"compositor_ready":true' "$session_log" >/dev/null
 grep '"shell_ready":true' "$session_log" >/dev/null
 grep '"notification_ready":true' "$session_log" >/dev/null
@@ -94,6 +99,11 @@ cat > "$out_dir/manifest.json" <<EOF
   },
   "checks": {
     "session_verified": true,
+    "policy_windows": 3,
+    "visible_windows": 3,
+    "focused_window_visible": true,
+    "focused_title_bar": true,
+    "workspace_indicator": true,
     "session_services": true,
     "notification_service": true,
     "settings_service": true,
