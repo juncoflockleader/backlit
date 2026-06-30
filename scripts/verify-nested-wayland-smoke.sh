@@ -27,6 +27,11 @@ else
   exit 2
 fi
 
+if ! command -v foot >/dev/null 2>&1; then
+  echo "nested Wayland smoke requires foot for terminal launch verification" >&2
+  exit 2
+fi
+
 if [ -z "${XDG_RUNTIME_DIR:-}" ] || [ ! -d "$XDG_RUNTIME_DIR" ] || [ ! -w "$XDG_RUNTIME_DIR" ]; then
   XDG_RUNTIME_DIR="$repo_root/$out_dir/runtime"
   export XDG_RUNTIME_DIR
@@ -67,6 +72,15 @@ WAYLAND_DISPLAY="$socket_name" cargo run -p backlit-launcher -- \
   --spawn-smoke \
   --spawn-program="$info_tool" \
   --wayland-display="$socket_name" > "$out_dir/launcher-spawn.jsonl"
+WAYLAND_DISPLAY="$socket_name" cargo run -p backlit-launcher -- \
+  --verify \
+  --target=terminal \
+  --spawn-smoke \
+  --spawn-arg=-- \
+  --spawn-arg=sh \
+  --spawn-arg=-lc \
+  --spawn-arg=true \
+  --wayland-display="$socket_name" > "$out_dir/terminal-launch.jsonl"
 cargo build \
   -p backlit-session \
   -p backlit-compositor \
@@ -94,6 +108,13 @@ grep '"event":"launcher.spawn"' "$out_dir/launcher-spawn.jsonl" >/dev/null
 grep '"spawned":true' "$out_dir/launcher-spawn.jsonl" >/dev/null
 grep '"exit_success":true' "$out_dir/launcher-spawn.jsonl" >/dev/null
 grep '"wayland_display_set":true' "$out_dir/launcher-spawn.jsonl" >/dev/null
+grep '"event":"launcher.spawn"' "$out_dir/terminal-launch.jsonl" >/dev/null
+grep '"target":"terminal"' "$out_dir/terminal-launch.jsonl" >/dev/null
+grep '"program":"foot"' "$out_dir/terminal-launch.jsonl" >/dev/null
+grep '"arg_count":4' "$out_dir/terminal-launch.jsonl" >/dev/null
+grep '"spawned":true' "$out_dir/terminal-launch.jsonl" >/dev/null
+grep '"exit_success":true' "$out_dir/terminal-launch.jsonl" >/dev/null
+grep '"wayland_display_set":true' "$out_dir/terminal-launch.jsonl" >/dev/null
 grep '"event":"session.services_verified"' "$out_dir/session.jsonl" >/dev/null
 grep '"event":"session.launch_spawn"' "$out_dir/session.jsonl" >/dev/null
 grep '"event":"session.clean_exit"' "$out_dir/session.jsonl" >/dev/null
@@ -130,6 +151,7 @@ cat > "$out_dir/manifest.json" <<EOF
     "backend_preflight_log": "$out_dir/backend-preflight.jsonl",
     "compositor_log": "$out_dir/compositor.jsonl",
     "launcher_spawn_log": "$out_dir/launcher-spawn.jsonl",
+    "terminal_launch_log": "$out_dir/terminal-launch.jsonl",
     "session_log": "$out_dir/session.jsonl",
     "session_screenshot": "$out_dir/session.ppm",
     "session_services_dir": "$out_dir/session-services"
@@ -139,6 +161,7 @@ cat > "$out_dir/manifest.json" <<EOF
     "wayland_preflight_ready": true,
     "compositor_wayland_smoke": true,
     "launcher_wayland_client_spawn": true,
+    "launcher_terminal_wayland_spawn": true,
     "session_wayland_client_spawn": true,
     "session_wayland_services": true,
     "session_notification_service": true,

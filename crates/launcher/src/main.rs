@@ -73,6 +73,7 @@ fn run() -> Result<(), String> {
                     ("target", FieldValue::Str(target.as_str())),
                     ("dry_run", FieldValue::Bool(false)),
                     ("program", FieldValue::Str(report.program.as_str())),
+                    ("arg_count", FieldValue::U64(report.arg_count as u64)),
                     ("spawned", FieldValue::Bool(report.spawned)),
                     ("exit_success", FieldValue::Bool(report.exit_success)),
                     ("status_code", FieldValue::U64(report.status_code)),
@@ -272,6 +273,7 @@ fn parse_target(value: &str) -> Result<LaunchTarget, String> {
 #[derive(Debug, Clone, PartialEq, Eq)]
 struct SpawnReport {
     program: String,
+    arg_count: usize,
     spawned: bool,
     exit_success: bool,
     status_code: u64,
@@ -285,15 +287,7 @@ impl SpawnReport {
 }
 
 fn run_spawn_smoke(command: &LaunchCommand, config: &Config) -> Result<SpawnReport, String> {
-    let program = config
-        .spawn_program
-        .clone()
-        .unwrap_or_else(|| command.program.to_string());
-    let args: Vec<String> = if config.spawn_program.is_some() {
-        config.spawn_args.clone()
-    } else {
-        command.args.iter().map(|arg| (*arg).to_string()).collect()
-    };
+    let (program, args) = spawn_invocation(command, config);
     let wayland_display = config
         .wayland_display
         .clone()
@@ -311,11 +305,31 @@ fn run_spawn_smoke(command: &LaunchCommand, config: &Config) -> Result<SpawnRepo
 
     Ok(SpawnReport {
         program,
+        arg_count: args.len(),
         spawned: true,
         exit_success: status.success(),
         status_code: status.code().unwrap_or(255) as u64,
         wayland_display_set: wayland_display.is_some(),
     })
+}
+
+fn spawn_invocation(command: &LaunchCommand, config: &Config) -> (String, Vec<String>) {
+    let program = config
+        .spawn_program
+        .clone()
+        .unwrap_or_else(|| command.program.to_string());
+    let args = if config.spawn_program.is_some() {
+        config.spawn_args.clone()
+    } else {
+        command
+            .args
+            .iter()
+            .map(|arg| (*arg).to_string())
+            .chain(config.spawn_args.iter().cloned())
+            .collect()
+    };
+
+    (program, args)
 }
 
 fn print_help() {
@@ -335,7 +349,7 @@ Flags:
   --require-desktop-entries  Fail verification if no visible .desktop entries are discovered.
   --spawn-smoke  Spawn the selected launch target or override program and verify it exits successfully.
   --spawn-program  Program override for deterministic spawn verification.
-  --spawn-arg  Argument for the spawn program override. May be passed more than once.
+  --spawn-arg  Argument appended to the selected target, or to the spawn override when --spawn-program is set. May repeat.
   --wayland-display  WAYLAND_DISPLAY value to pass to the spawned process.
 "
     );
@@ -343,7 +357,8 @@ Flags:
 
 #[cfg(test)]
 mod tests {
-    use super::Config;
+    use super::{spawn_invocation, Config};
+    use backlit_launcher::{LaunchTarget, REQUIRED_TARGETS};
 
     #[test]
     fn parses_spawn_smoke_flags() {
@@ -369,5 +384,48 @@ mod tests {
         assert!(config.require_desktop_entries);
         assert_eq!(config.spawn_args, ["--help"]);
         assert_eq!(config.wayland_display.as_deref(), Some("wayland-1"));
+    }
+
+    #[test]
+    fn appends_spawn_args_to_selected_target_command() {
+        let config = Config::parse([
+            "--target",
+            "terminal",
+            "--spawn-smoke",
+            "--spawn-arg",
+            "--",
+            "--spawn-arg",
+            "sh",
+            "--spawn-arg",
+            "-lc",
+            "--spawn-arg",
+            "true",
+        ])
+        .expect("config should parse");
+        let command = LaunchTarget::Terminal.default_command();
+        let (program, args) = spawn_invocation(&command, &config);
+
+        assert_eq!(program, "foot");
+        assert_eq!(args, ["--", "sh", "-lc", "true"]);
+    }
+
+    #[test]
+    fn override_program_uses_only_override_args() {
+        let config = Config::parse([
+            "--target",
+            "terminal",
+            "--spawn-smoke",
+            "--spawn-program",
+            "true",
+            "--spawn-arg",
+            "--version",
+        ])
+        .expect("config should parse");
+        let command = LaunchTarget::Browser.default_command();
+        let (program, args) = spawn_invocation(&command, &config);
+
+        assert_eq!(program, "true");
+        assert_eq!(args, ["--version"]);
+        assert_eq!(REQUIRED_TARGETS.len(), 3);
     }
 }

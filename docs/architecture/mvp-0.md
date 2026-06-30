@@ -10,7 +10,7 @@ MVP 0 is the development harness:
 - MVP shell chrome smoke for wallpaper, panel status indicators, panel power menu, NetworkManager/PipeWire status and control plans, workspace indicator, launcher targets, app switcher entries, and lock-screen readiness.
 - Dry-run launcher catalog for terminal, browser, and settings.
 - Deterministic `.desktop` app discovery smoke for launcher.
-- Launcher process-spawn smoke with Wayland display environment propagation.
+- Launcher process-spawn smoke with Wayland display environment propagation, including real `foot` terminal launch under nested Weston.
 - Keyboard shortcut routing for launcher, app switcher, and core launch targets.
 - Input event routing smoke for keyboard shortcuts, pointer focus, window move, and resize.
 - xdg-shell-style toplevel and popup lifecycle smoke for configure/ack/map, focus, maximize, fullscreen, and close.
