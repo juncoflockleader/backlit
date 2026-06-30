@@ -1,4 +1,5 @@
 use std::fmt;
+use std::fs;
 use std::str::FromStr;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -30,6 +31,78 @@ pub struct BackendPreflightReport {
     pub detail: String,
 }
 
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct BackendPreflightEnvironment {
+    pub wayland_display: Option<String>,
+    pub xdg_runtime_dir: Option<String>,
+    pub target_os: String,
+    pub drm_card_nodes: u64,
+    pub drm_render_nodes: u64,
+    pub input_event_nodes: u64,
+    pub session_id: Option<String>,
+    pub seat: Option<String>,
+    pub session_type: Option<String>,
+}
+
+impl BackendPreflightEnvironment {
+    pub fn for_target(target_os: impl Into<String>) -> Self {
+        Self {
+            wayland_display: None,
+            xdg_runtime_dir: None,
+            target_os: target_os.into(),
+            drm_card_nodes: 0,
+            drm_render_nodes: 0,
+            input_event_nodes: 0,
+            session_id: None,
+            seat: None,
+            session_type: None,
+        }
+    }
+
+    pub fn from_host() -> Self {
+        let mut environment = Self::for_target(std::env::consts::OS);
+        environment.wayland_display = std::env::var("WAYLAND_DISPLAY").ok();
+        environment.xdg_runtime_dir = std::env::var("XDG_RUNTIME_DIR").ok();
+        environment.session_id = std::env::var("XDG_SESSION_ID").ok();
+        environment.seat = std::env::var("XDG_SEAT").ok();
+        environment.session_type = std::env::var("XDG_SESSION_TYPE").ok();
+        environment.drm_card_nodes = count_entries_with_prefix("/dev/dri", "card");
+        environment.drm_render_nodes = count_entries_with_prefix("/dev/dri", "renderD");
+        environment.input_event_nodes = count_entries_with_prefix("/dev/input", "event");
+        environment
+    }
+
+    pub fn with_wayland_display(mut self, value: impl Into<String>) -> Self {
+        self.wayland_display = Some(value.into());
+        self
+    }
+
+    pub fn with_xdg_runtime_dir(mut self, value: impl Into<String>) -> Self {
+        self.xdg_runtime_dir = Some(value.into());
+        self
+    }
+
+    pub fn with_drm_nodes(mut self, card_nodes: u64, render_nodes: u64) -> Self {
+        self.drm_card_nodes = card_nodes;
+        self.drm_render_nodes = render_nodes;
+        self
+    }
+
+    pub fn with_input_event_nodes(mut self, event_nodes: u64) -> Self {
+        self.input_event_nodes = event_nodes;
+        self
+    }
+
+    pub fn with_session_id(mut self, value: impl Into<String>) -> Self {
+        self.session_id = Some(value.into());
+        self
+    }
+
+    pub fn drm_node_count(&self) -> u64 {
+        self.drm_card_nodes + self.drm_render_nodes
+    }
+}
+
 impl BackendPreflightReport {
     pub fn ready(backend: BackendKind, code: &'static str, detail: impl Into<String>) -> Self {
         Self {
@@ -56,14 +129,28 @@ pub fn preflight_backend(
     xdg_runtime_dir: Option<&str>,
     target_os: &str,
 ) -> BackendPreflightReport {
+    let mut environment = BackendPreflightEnvironment::for_target(target_os);
+    environment.wayland_display = wayland_display.map(str::to_string);
+    environment.xdg_runtime_dir = xdg_runtime_dir.map(str::to_string);
+
+    preflight_backend_with_environment(backend, &environment)
+}
+
+pub fn preflight_backend_with_environment(
+    backend: BackendKind,
+    environment: &BackendPreflightEnvironment,
+) -> BackendPreflightReport {
     match backend {
         BackendKind::Headless => BackendPreflightReport::ready(
             backend,
             "ready",
             "headless backend does not require host display state",
         ),
-        BackendKind::Wayland => preflight_wayland(wayland_display, xdg_runtime_dir),
-        BackendKind::Drm => preflight_drm(xdg_runtime_dir, target_os),
+        BackendKind::Wayland => preflight_wayland(
+            environment.wayland_display.as_deref(),
+            environment.xdg_runtime_dir.as_deref(),
+        ),
+        BackendKind::Drm => preflight_drm(environment),
     }
 }
 
@@ -94,8 +181,8 @@ fn preflight_wayland(
     )
 }
 
-fn preflight_drm(xdg_runtime_dir: Option<&str>, target_os: &str) -> BackendPreflightReport {
-    if target_os != "linux" {
+fn preflight_drm(environment: &BackendPreflightEnvironment) -> BackendPreflightReport {
+    if environment.target_os != "linux" {
         return BackendPreflightReport::blocked(
             BackendKind::Drm,
             "requires-linux",
@@ -103,7 +190,7 @@ fn preflight_drm(xdg_runtime_dir: Option<&str>, target_os: &str) -> BackendPrefl
         );
     }
 
-    if missing(xdg_runtime_dir) {
+    if missing(environment.xdg_runtime_dir.as_deref()) {
         return BackendPreflightReport::blocked(
             BackendKind::Drm,
             "missing-xdg-runtime-dir",
@@ -111,11 +198,58 @@ fn preflight_drm(xdg_runtime_dir: Option<&str>, target_os: &str) -> BackendPrefl
         );
     }
 
+    if environment.drm_node_count() == 0 {
+        return BackendPreflightReport::blocked(
+            BackendKind::Drm,
+            "missing-drm-device",
+            "DRM/KMS backend requires at least one /dev/dri card or render node",
+        );
+    }
+
+    if environment.input_event_nodes == 0 {
+        return BackendPreflightReport::blocked(
+            BackendKind::Drm,
+            "missing-input-devices",
+            "libinput backend requires /dev/input/event* devices",
+        );
+    }
+
+    if missing(environment.session_id.as_deref()) {
+        return BackendPreflightReport::blocked(
+            BackendKind::Drm,
+            "missing-logind-session",
+            "DRM/KMS backend expects an XDG_SESSION_ID so logind/libseat can authorize devices",
+        );
+    }
+
     BackendPreflightReport::ready(
         BackendKind::Drm,
         "ready-preliminary",
-        "Linux session environment is present; device, seat, and GPU checks run in the real backend",
+        format!(
+            "Linux launch environment has XDG_RUNTIME_DIR, {} DRM card nodes, {} DRM render nodes, {} input event nodes, and session {}",
+            environment.drm_card_nodes,
+            environment.drm_render_nodes,
+            environment.input_event_nodes,
+            environment.session_id.as_deref().unwrap_or("unknown")
+        ),
     )
+}
+
+fn count_entries_with_prefix(dir: &str, prefix: &str) -> u64 {
+    let Ok(entries) = fs::read_dir(dir) else {
+        return 0;
+    };
+
+    entries
+        .filter_map(Result::ok)
+        .filter(|entry| {
+            entry
+                .file_name()
+                .to_str()
+                .map(|name| name.starts_with(prefix))
+                .unwrap_or(false)
+        })
+        .count() as u64
 }
 
 fn missing(value: Option<&str>) -> bool {
@@ -360,7 +494,10 @@ impl fmt::Display for HeadlessError {
 
 #[cfg(test)]
 mod tests {
-    use super::{parse_args, BackendKind, ClientId, HeadlessCompositor, RunConfig};
+    use super::{
+        parse_args, BackendKind, BackendPreflightEnvironment, ClientId, HeadlessCompositor,
+        RunConfig,
+    };
 
     #[test]
     fn defaults_to_headless() {
@@ -459,5 +596,71 @@ mod tests {
 
         assert!(!report.ready);
         assert_eq!(report.code, "requires-linux");
+    }
+
+    #[test]
+    fn drm_preflight_requires_runtime_dir() {
+        let environment = BackendPreflightEnvironment::for_target("linux")
+            .with_drm_nodes(1, 1)
+            .with_input_event_nodes(2)
+            .with_session_id("1");
+
+        let report = super::preflight_backend_with_environment(BackendKind::Drm, &environment);
+
+        assert!(!report.ready);
+        assert_eq!(report.code, "missing-xdg-runtime-dir");
+    }
+
+    #[test]
+    fn drm_preflight_requires_drm_device_nodes() {
+        let environment = BackendPreflightEnvironment::for_target("linux")
+            .with_xdg_runtime_dir("/run/user/1000")
+            .with_input_event_nodes(2)
+            .with_session_id("1");
+
+        let report = super::preflight_backend_with_environment(BackendKind::Drm, &environment);
+
+        assert!(!report.ready);
+        assert_eq!(report.code, "missing-drm-device");
+    }
+
+    #[test]
+    fn drm_preflight_requires_input_event_nodes() {
+        let environment = BackendPreflightEnvironment::for_target("linux")
+            .with_xdg_runtime_dir("/run/user/1000")
+            .with_drm_nodes(1, 1)
+            .with_session_id("1");
+
+        let report = super::preflight_backend_with_environment(BackendKind::Drm, &environment);
+
+        assert!(!report.ready);
+        assert_eq!(report.code, "missing-input-devices");
+    }
+
+    #[test]
+    fn drm_preflight_requires_logind_session_identity() {
+        let environment = BackendPreflightEnvironment::for_target("linux")
+            .with_xdg_runtime_dir("/run/user/1000")
+            .with_drm_nodes(1, 1)
+            .with_input_event_nodes(2);
+
+        let report = super::preflight_backend_with_environment(BackendKind::Drm, &environment);
+
+        assert!(!report.ready);
+        assert_eq!(report.code, "missing-logind-session");
+    }
+
+    #[test]
+    fn drm_preflight_is_ready_with_runtime_devices_and_session() {
+        let environment = BackendPreflightEnvironment::for_target("linux")
+            .with_xdg_runtime_dir("/run/user/1000")
+            .with_drm_nodes(1, 1)
+            .with_input_event_nodes(2)
+            .with_session_id("1");
+
+        let report = super::preflight_backend_with_environment(BackendKind::Drm, &environment);
+
+        assert!(report.ready, "{report:?}");
+        assert_eq!(report.code, "ready-preliminary");
     }
 }

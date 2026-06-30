@@ -2,7 +2,9 @@ use std::env;
 use std::process;
 
 use backlit_common::metrics::{event_json, FieldValue};
-use backlit_compositor_backend::{preflight_backend, BackendKind};
+use backlit_compositor_backend::{
+    preflight_backend_with_environment, BackendKind, BackendPreflightEnvironment,
+};
 
 fn main() {
     if let Err(error) = run() {
@@ -19,14 +21,13 @@ fn run() -> Result<(), String> {
         return Ok(());
     }
 
-    let wayland_display = env::var("WAYLAND_DISPLAY").ok();
-    let xdg_runtime_dir = env::var("XDG_RUNTIME_DIR").ok();
-    let report = preflight_backend(
-        config.backend,
-        wayland_display.as_deref(),
-        xdg_runtime_dir.as_deref(),
-        env::consts::OS,
-    );
+    let environment = BackendPreflightEnvironment::from_host();
+    let report = preflight_backend_with_environment(config.backend, &environment);
+    let wayland_display = environment.wayland_display.as_deref().unwrap_or("");
+    let xdg_runtime_dir = environment.xdg_runtime_dir.as_deref().unwrap_or("");
+    let session_id = environment.session_id.as_deref().unwrap_or("");
+    let seat = environment.seat.as_deref().unwrap_or("");
+    let session_type = environment.session_type.as_deref().unwrap_or("");
 
     println!(
         "{}",
@@ -37,6 +38,24 @@ fn run() -> Result<(), String> {
                 ("ready", FieldValue::Bool(report.ready)),
                 ("code", FieldValue::Str(report.code)),
                 ("detail", FieldValue::Str(report.detail.as_str())),
+                ("target_os", FieldValue::Str(environment.target_os.as_str())),
+                ("wayland_display", FieldValue::Str(wayland_display)),
+                ("xdg_runtime_dir", FieldValue::Str(xdg_runtime_dir)),
+                (
+                    "drm_card_nodes",
+                    FieldValue::U64(environment.drm_card_nodes)
+                ),
+                (
+                    "drm_render_nodes",
+                    FieldValue::U64(environment.drm_render_nodes),
+                ),
+                (
+                    "input_event_nodes",
+                    FieldValue::U64(environment.input_event_nodes),
+                ),
+                ("session_id", FieldValue::Str(session_id)),
+                ("seat", FieldValue::Str(seat)),
+                ("session_type", FieldValue::Str(session_type)),
             ],
         )
     );
@@ -116,6 +135,9 @@ Usage:
 Flags:
   --backend  Backend to preflight. Defaults to headless.
   --verify   Exit non-zero when the requested backend is not ready.
+
+The JSON event includes runtime, DRM, input, and session hints used by
+launch-readiness verification.
 "
     );
 }

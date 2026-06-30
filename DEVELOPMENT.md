@@ -126,7 +126,7 @@ The Linux-side verifier can also be run directly inside any Ubuntu checkout:
 ./scripts/verify-linux-e2e.sh
 ```
 
-It runs `cargo fmt`, workspace tests, `cargo clippy`, the deterministic GUI smoke verifier, the preview renderer, CI contract verifier, packaging contract verifier, staged session install verifier, nested Wayland smoke verifier, and MVP 0 contract verifier, then writes `target/linux-e2e/manifest.json`.
+It runs `cargo fmt`, workspace tests, `cargo clippy`, the deterministic GUI smoke verifier, the preview renderer, CI contract verifier, packaging contract verifier, staged session install verifier, launch-readiness verifier, nested Wayland smoke verifier, and MVP 0 contract verifier, then writes `target/linux-e2e/manifest.json`.
 
 ## GUI Linux VM Workflow
 
@@ -190,6 +190,7 @@ cargo run -p backlit-session -- --backend=headless --screenshot target/backlit-s
 ./scripts/render-gui-preview.sh
 ./scripts/render-parallels-gui-preview.sh
 ./scripts/verify-gui-smoke.sh
+./scripts/verify-launch-readiness.sh
 ./scripts/verify-mvp0-contract.sh
 ./scripts/verify-ci-contract.sh
 ./scripts/verify-packaging-contract.sh
@@ -285,7 +286,15 @@ cargo run -p backlit-compositor-backend -- --backend=wayland --verify
 cargo run -p backlit-compositor-backend -- --backend=drm --verify
 ```
 
-The Wayland preflight expects `WAYLAND_DISPLAY` and `XDG_RUNTIME_DIR`; the DRM preflight only becomes meaningful inside a real Linux session.
+The Wayland preflight expects `WAYLAND_DISPLAY` and `XDG_RUNTIME_DIR`; the DRM preflight expects Linux, `XDG_RUNTIME_DIR`, `/dev/dri` nodes, `/dev/input/event*` devices, and `XDG_SESSION_ID` so the real backend can later ask logind/libseat for device access.
+
+To capture the current host's launch readiness:
+
+```bash
+./scripts/verify-launch-readiness.sh
+```
+
+This writes `target/launch-readiness/manifest.json`. On macOS or headless CI it can pass with `drm_blocked_expected: true`; inside the Parallels Ubuntu GUI VM it should report `drm_expected_ready: true` and `drm_ready: true`.
 
 ## Packaging Contract Verification
 
