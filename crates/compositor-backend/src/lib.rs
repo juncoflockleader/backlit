@@ -107,9 +107,157 @@ fn parse_backend(value: &str) -> Result<BackendKind, ArgError> {
         .map_err(|_| ArgError::InvalidBackend(value.to_string()))
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub struct ClientId(pub u64);
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub struct SurfaceId(pub u64);
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct HeadlessSurface {
+    pub id: SurfaceId,
+    pub client: ClientId,
+    pub title: String,
+    pub width: u32,
+    pub height: u32,
+    pub damaged: bool,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct HeadlessClient {
+    pub id: ClientId,
+    pub name: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct FrameReport {
+    pub frame: u64,
+    pub client_count: u64,
+    pub surface_count: u64,
+    pub damaged_surfaces: u64,
+    pub total_pixels: u64,
+}
+
+#[derive(Debug, Clone)]
+pub struct HeadlessCompositor {
+    clients: Vec<HeadlessClient>,
+    surfaces: Vec<HeadlessSurface>,
+    next_client_id: u64,
+    next_surface_id: u64,
+    frame: u64,
+}
+
+impl Default for HeadlessCompositor {
+    fn default() -> Self {
+        Self {
+            clients: Vec::new(),
+            surfaces: Vec::new(),
+            next_client_id: 1,
+            next_surface_id: 1,
+            frame: 0,
+        }
+    }
+}
+
+impl HeadlessCompositor {
+    pub fn connect_client(&mut self, name: impl Into<String>) -> ClientId {
+        let id = ClientId(self.next_client_id);
+        self.next_client_id += 1;
+        self.clients.push(HeadlessClient {
+            id,
+            name: name.into(),
+        });
+        id
+    }
+
+    pub fn submit_surface(
+        &mut self,
+        client: ClientId,
+        title: impl Into<String>,
+        width: u32,
+        height: u32,
+    ) -> Result<SurfaceId, HeadlessError> {
+        if !self.clients.iter().any(|known| known.id == client) {
+            return Err(HeadlessError::UnknownClient(client));
+        }
+
+        let id = SurfaceId(self.next_surface_id);
+        self.next_surface_id += 1;
+        self.surfaces.push(HeadlessSurface {
+            id,
+            client,
+            title: title.into(),
+            width,
+            height,
+            damaged: true,
+        });
+        Ok(id)
+    }
+
+    pub fn mark_damaged(&mut self, surface: SurfaceId) -> Result<(), HeadlessError> {
+        match self.surfaces.iter_mut().find(|known| known.id == surface) {
+            Some(surface) => {
+                surface.damaged = true;
+                Ok(())
+            }
+            None => Err(HeadlessError::UnknownSurface(surface)),
+        }
+    }
+
+    pub fn present(&mut self) -> FrameReport {
+        self.frame += 1;
+
+        let damaged_surfaces = self
+            .surfaces
+            .iter()
+            .filter(|surface| surface.damaged)
+            .count() as u64;
+        let total_pixels = self
+            .surfaces
+            .iter()
+            .map(|surface| surface.width as u64 * surface.height as u64)
+            .sum();
+
+        for surface in &mut self.surfaces {
+            surface.damaged = false;
+        }
+
+        FrameReport {
+            frame: self.frame,
+            client_count: self.clients.len() as u64,
+            surface_count: self.surfaces.len() as u64,
+            damaged_surfaces,
+            total_pixels,
+        }
+    }
+
+    pub fn clients(&self) -> &[HeadlessClient] {
+        &self.clients
+    }
+
+    pub fn surfaces(&self) -> &[HeadlessSurface] {
+        &self.surfaces
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum HeadlessError {
+    UnknownClient(ClientId),
+    UnknownSurface(SurfaceId),
+}
+
+impl fmt::Display for HeadlessError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::UnknownClient(id) => write!(f, "unknown headless client {}", id.0),
+            Self::UnknownSurface(id) => write!(f, "unknown headless surface {}", id.0),
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
-    use super::{parse_args, BackendKind, RunConfig};
+    use super::{parse_args, BackendKind, ClientId, HeadlessCompositor, RunConfig};
 
     #[test]
     fn defaults_to_headless() {
@@ -139,5 +287,36 @@ mod tests {
         let config = parse_args(["--backend", "nested"]).unwrap();
 
         assert_eq!(config.backend, BackendKind::Wayland);
+    }
+
+    #[test]
+    fn headless_backend_accepts_clients_and_surfaces() {
+        let mut compositor = HeadlessCompositor::default();
+        let client = compositor.connect_client("demo-client");
+        let surface = compositor
+            .submit_surface(client, "demo-window", 640, 480)
+            .unwrap();
+
+        assert_eq!(compositor.clients().len(), 1);
+        assert_eq!(compositor.surfaces()[0].id, surface);
+
+        let first_frame = compositor.present();
+        assert_eq!(first_frame.client_count, 1);
+        assert_eq!(first_frame.surface_count, 1);
+        assert_eq!(first_frame.damaged_surfaces, 1);
+        assert_eq!(first_frame.total_pixels, 640 * 480);
+
+        let second_frame = compositor.present();
+        assert_eq!(second_frame.damaged_surfaces, 0);
+    }
+
+    #[test]
+    fn headless_backend_rejects_unknown_clients() {
+        let mut compositor = HeadlessCompositor::default();
+        let error = compositor
+            .submit_surface(ClientId(99), "ghost", 10, 10)
+            .unwrap_err();
+
+        assert_eq!(error.to_string(), "unknown headless client 99");
     }
 }

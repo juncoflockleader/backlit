@@ -3,7 +3,7 @@ use std::process;
 use std::time::Instant;
 
 use backlit_common::metrics::{event_json, FieldValue};
-use backlit_compositor_backend::{parse_args, BackendKind, RunConfig};
+use backlit_compositor_backend::{parse_args, BackendKind, HeadlessCompositor, RunConfig};
 use backlit_window_policy::WindowPolicy;
 
 fn main() {
@@ -63,11 +63,25 @@ fn run_smoke_test(config: &RunConfig) {
     policy.focus(first);
     policy.cycle_focus_forward();
 
+    let mut backend = HeadlessCompositor::default();
+    let client = backend.connect_client("backlit-demo-client");
+    let _terminal = backend
+        .submit_surface(client, "demo-terminal", 800, 600)
+        .expect("smoke client should be registered");
+    let _browser = backend
+        .submit_surface(client, "demo-browser", 1200, 800)
+        .expect("smoke client should be registered");
+    let frame = backend.present();
+
     emit(
         "compositor.smoke_test",
         config,
         &[
             ("windows", FieldValue::U64(policy.windows().len() as u64)),
+            ("clients", FieldValue::U64(frame.client_count)),
+            ("surfaces", FieldValue::U64(frame.surface_count)),
+            ("damaged_surfaces", FieldValue::U64(frame.damaged_surfaces)),
+            ("total_surface_pixels", FieldValue::U64(frame.total_pixels)),
             ("first_window", FieldValue::U64(first.0)),
             ("focused_window", FieldValue::U64(second.0)),
         ],

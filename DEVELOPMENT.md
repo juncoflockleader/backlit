@@ -166,6 +166,7 @@ Artifacts are written to `target/gui-smoke/`:
 - Keep compositor policy small, measurable, and hard to crash.
 - Keep shell clients separate from compositor state where practical.
 - Put focus, placement, workspace, and snapping behavior in `backlit-window-policy` so it can be tested without a GPU.
+- Keep the headless backend path testable without Wayland so CI can prove client/surface/damage behavior before DRM/KMS work lands.
 - Emit structured JSON metrics for startup, backend selection, smoke tests, and future frame timing.
 - No feature that touches startup, input, rendering, app launch, or session services should merge without a benchmark or regression check.
 - Avoid animations and plugin systems until frame pacing is excellent.
