@@ -133,7 +133,7 @@ require_contains scripts/verify-drm-session-smoke.sh '"session_local"'
 require_contains scripts/verify-drm-session-smoke.sh '"drm_card_access_ready"'
 require_contains scripts/verify-drm-session-smoke.sh '"input_broker_ready"'
 
-require_contains packaging/sessions/backlit.desktop 'Exec=backlit-session'
+require_contains packaging/sessions/backlit.desktop 'Exec=backlit-session --backend=drm'
 require_contains packaging/applications/org.backlit.Settings.desktop 'Exec=backlit-settings'
 require_contains packaging/systemd/backlit-session.target 'Wants=backlit-compositor.service backlit-shell.service backlit-notification-daemon.service backlit-settings-daemon.service'
 require_contains packaging/systemd/backlit-compositor.service 'ExecStart=/usr/bin/backlit-compositor'
