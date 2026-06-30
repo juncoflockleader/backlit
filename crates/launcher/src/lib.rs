@@ -1,3 +1,6 @@
+use std::fs;
+use std::io;
+use std::path::Path;
 use std::str::FromStr;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -125,9 +128,136 @@ pub fn verify_catalog(commands: &[LaunchCommand]) -> LauncherVerification {
     }
 }
 
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct DesktopEntry {
+    pub id: String,
+    pub name: String,
+    pub exec: String,
+    pub terminal: bool,
+}
+
+impl DesktopEntry {
+    pub fn command_program(&self) -> &str {
+        self.exec
+            .split_whitespace()
+            .next()
+            .unwrap_or(self.exec.as_str())
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum DesktopEntryError {
+    MissingName,
+    MissingExec,
+    NotApplication,
+    Hidden,
+}
+
+pub fn parse_desktop_entry(
+    id: impl Into<String>,
+    contents: &str,
+) -> Result<DesktopEntry, DesktopEntryError> {
+    let mut in_desktop_entry = false;
+    let mut entry_type = None;
+    let mut name = None;
+    let mut exec = None;
+    let mut terminal = false;
+    let mut hidden = false;
+    let mut no_display = false;
+
+    for line in contents.lines().map(str::trim) {
+        if line.is_empty() || line.starts_with('#') {
+            continue;
+        }
+
+        if line.starts_with('[') && line.ends_with(']') {
+            in_desktop_entry = line == "[Desktop Entry]";
+            continue;
+        }
+
+        if !in_desktop_entry {
+            continue;
+        }
+
+        let Some((key, value)) = line.split_once('=') else {
+            continue;
+        };
+
+        match key {
+            "Type" => entry_type = Some(value.to_string()),
+            "Name" => name = Some(value.to_string()),
+            "Exec" => exec = Some(strip_exec_field_codes(value)),
+            "Terminal" => terminal = value.eq_ignore_ascii_case("true"),
+            "Hidden" => hidden = value.eq_ignore_ascii_case("true"),
+            "NoDisplay" => no_display = value.eq_ignore_ascii_case("true"),
+            _ => {}
+        }
+    }
+
+    if entry_type.as_deref() != Some("Application") {
+        return Err(DesktopEntryError::NotApplication);
+    }
+
+    if hidden || no_display {
+        return Err(DesktopEntryError::Hidden);
+    }
+
+    Ok(DesktopEntry {
+        id: id.into(),
+        name: name
+            .filter(|name| !name.trim().is_empty())
+            .ok_or(DesktopEntryError::MissingName)?,
+        exec: exec
+            .filter(|exec| !exec.trim().is_empty())
+            .ok_or(DesktopEntryError::MissingExec)?,
+        terminal,
+    })
+}
+
+pub fn discover_desktop_entries(dir: impl AsRef<Path>) -> io::Result<Vec<DesktopEntry>> {
+    let mut paths = Vec::new();
+
+    for entry in fs::read_dir(dir)? {
+        let entry = entry?;
+        let path = entry.path();
+        if path.extension().and_then(|extension| extension.to_str()) == Some("desktop") {
+            paths.push(path);
+        }
+    }
+
+    paths.sort();
+
+    let mut entries = Vec::new();
+    for path in paths {
+        let contents = fs::read_to_string(&path)?;
+        let id = path
+            .file_name()
+            .and_then(|name| name.to_str())
+            .unwrap_or("unknown.desktop")
+            .to_string();
+
+        if let Ok(entry) = parse_desktop_entry(id, &contents) {
+            entries.push(entry);
+        }
+    }
+
+    Ok(entries)
+}
+
+fn strip_exec_field_codes(value: &str) -> String {
+    value
+        .split_whitespace()
+        .filter(|word| !matches!(*word, "%f" | "%F" | "%u" | "%U" | "%i" | "%c" | "%k"))
+        .collect::<Vec<_>>()
+        .join(" ")
+}
+
 #[cfg(test)]
 mod tests {
-    use super::{default_catalog, verify_catalog, LaunchTarget, REQUIRED_TARGETS};
+    use super::{
+        default_catalog, parse_desktop_entry, verify_catalog, DesktopEntryError, LaunchTarget,
+        REQUIRED_TARGETS,
+    };
 
     #[test]
     fn default_catalog_covers_required_targets() {
@@ -153,5 +283,41 @@ mod tests {
 
         assert!(!report.passed());
         assert_eq!(report.missing_targets, vec![LaunchTarget::Browser]);
+    }
+
+    #[test]
+    fn parses_visible_desktop_entries() {
+        let entry = parse_desktop_entry(
+            "org.backlit.Terminal.desktop",
+            "\
+[Desktop Entry]
+Type=Application
+Name=Terminal
+Exec=foot %F
+Terminal=false
+",
+        )
+        .unwrap();
+
+        assert_eq!(entry.name, "Terminal");
+        assert_eq!(entry.exec, "foot");
+        assert_eq!(entry.command_program(), "foot");
+    }
+
+    #[test]
+    fn rejects_hidden_desktop_entries() {
+        let error = parse_desktop_entry(
+            "hidden.desktop",
+            "\
+[Desktop Entry]
+Type=Application
+Name=Hidden
+Exec=hidden-app
+NoDisplay=true
+",
+        )
+        .unwrap_err();
+
+        assert_eq!(error, DesktopEntryError::Hidden);
     }
 }

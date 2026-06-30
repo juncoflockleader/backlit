@@ -9,6 +9,7 @@ MVP 0 is the development harness:
 - Pure window-policy logic.
 - MVP shell role smoke checks.
 - Dry-run launcher catalog for terminal, browser, and settings.
+- Deterministic `.desktop` app discovery smoke for launcher.
 - Keyboard shortcut routing for launcher, app switcher, and core launch targets.
 - Session interaction smoke for app switching and terminal launch resolution.
 - Session move/resize smoke through pure window policy.

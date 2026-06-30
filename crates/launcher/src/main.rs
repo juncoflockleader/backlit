@@ -2,7 +2,7 @@ use std::env;
 use std::process;
 
 use backlit_common::metrics::{event_json, FieldValue};
-use backlit_launcher::{default_catalog, verify_catalog, LaunchTarget};
+use backlit_launcher::{default_catalog, discover_desktop_entries, verify_catalog, LaunchTarget};
 
 fn main() {
     if let Err(error) = run() {
@@ -58,6 +58,31 @@ fn run() -> Result<(), String> {
         );
     }
 
+    let desktop_entries = if let Some(desktop_dir) = config.desktop_dir.as_deref() {
+        let entries = discover_desktop_entries(desktop_dir).map_err(|error| {
+            format!("failed to discover desktop entries in {desktop_dir}: {error}")
+        })?;
+
+        for entry in &entries {
+            println!(
+                "{}",
+                event_json(
+                    "launcher.desktop_entry",
+                    &[
+                        ("id", FieldValue::Str(entry.id.as_str())),
+                        ("name", FieldValue::Str(entry.name.as_str())),
+                        ("program", FieldValue::Str(entry.command_program())),
+                        ("terminal", FieldValue::Bool(entry.terminal)),
+                    ],
+                )
+            );
+        }
+
+        entries.len()
+    } else {
+        0
+    };
+
     let report = verify_catalog(&catalog);
     println!(
         "{}",
@@ -81,20 +106,22 @@ fn run() -> Result<(), String> {
                     "empty_programs",
                     FieldValue::U64(report.empty_programs.len() as u64),
                 ),
+                ("desktop_entries", FieldValue::U64(desktop_entries as u64)),
             ],
         )
     );
 
-    if config.verify && !report.passed() {
+    if config.verify && (!report.passed() || config.desktop_dir.is_some() && desktop_entries == 0) {
         return Err(String::from("launcher catalog verification failed"));
     }
 
     Ok(())
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+#[derive(Debug, Clone, PartialEq, Eq, Default)]
 struct Config {
     target: Option<LaunchTarget>,
+    desktop_dir: Option<String>,
     list: bool,
     verify: bool,
     help: bool,
@@ -123,6 +150,13 @@ impl Config {
                     .next()
                     .ok_or_else(|| String::from("missing value for --target"))?;
                 config.target = Some(parse_target(&value)?);
+            } else if let Some(value) = arg.strip_prefix("--desktop-dir=") {
+                config.desktop_dir = Some(value.to_string());
+            } else if arg == "--desktop-dir" {
+                config.desktop_dir = Some(
+                    args.next()
+                        .ok_or_else(|| String::from("missing value for --desktop-dir"))?,
+                );
             } else {
                 return Err(format!("unknown flag: {arg}"));
             }
@@ -142,12 +176,13 @@ fn print_help() {
 backlit-launcher
 
 Usage:
-  backlit-launcher [--verify] [--list] [--target=terminal|browser|settings]
+  backlit-launcher [--verify] [--list] [--target=terminal|browser|settings] [--desktop-dir=DIR]
 
 Flags:
   --verify  Fail if the required launch catalog is incomplete.
   --list    Emit the required launch catalog as JSON.
   --target  Resolve a single target in dry-run mode.
+  --desktop-dir  Discover visible .desktop application entries from DIR.
 "
     );
 }

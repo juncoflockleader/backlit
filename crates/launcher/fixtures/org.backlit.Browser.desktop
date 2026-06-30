@@ -1,0 +1,6 @@
+[Desktop Entry]
+Type=Application
+Name=Browser
+Exec=xdg-open https://start.backlit.local
+Terminal=false
+

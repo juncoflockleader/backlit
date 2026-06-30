@@ -14,7 +14,7 @@ cargo run -p backlit-compositor-backend -- --backend=headless --verify > "$out_d
 cargo run -p backlit-protocols -- --verify --list > "$out_dir/protocols.jsonl"
 cargo run -p backlit-perf -- --verify > "$out_dir/perf.jsonl"
 cargo run -p backlit-shell -- --component=all --socket=backlit-0 --verify > "$out_dir/shell.jsonl"
-cargo run -p backlit-launcher -- --verify --list --target=terminal > "$out_dir/launcher.jsonl"
+cargo run -p backlit-launcher -- --verify --list --target=terminal --desktop-dir=crates/launcher/fixtures > "$out_dir/launcher.jsonl"
 cargo run -p backlit-shortcuts -- --verify --list --resolve=Super+Enter > "$out_dir/shortcuts.jsonl"
 cargo run -p backlit-session-supervisor -- --verify > "$out_dir/supervisor.jsonl"
 cargo run -p backlit-session -- \
@@ -51,6 +51,7 @@ grep '"event":"shell.verified"' "$out_dir/shell.jsonl" >/dev/null
 grep '"required_components":4' "$out_dir/shell.jsonl" >/dev/null
 grep '"event":"launcher.verified"' "$out_dir/launcher.jsonl" >/dev/null
 grep '"required_targets":3' "$out_dir/launcher.jsonl" >/dev/null
+grep '"desktop_entries":3' "$out_dir/launcher.jsonl" >/dev/null
 grep '"target":"terminal"' "$out_dir/launcher.jsonl" >/dev/null
 grep '"event":"shortcut.verified"' "$out_dir/shortcuts.jsonl" >/dev/null
 grep '"required_bindings":6' "$out_dir/shortcuts.jsonl" >/dev/null
@@ -97,6 +98,7 @@ cat > "$out_dir/manifest.json" <<EOF
     "protocol_required_count": 7,
     "shell_required_components": 4,
     "launcher_required_targets": 3,
+    "desktop_entries": 3,
     "shortcut_required_bindings": 6,
     "shell_crash_isolated": true,
     "session_windows_after_launch": 4,
