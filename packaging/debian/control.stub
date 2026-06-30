@@ -1,0 +1,26 @@
+Source: backlit
+Section: x11
+Priority: optional
+Maintainer: Backlit contributors <devnull@example.invalid>
+Standards-Version: 4.7.0
+Build-Depends: debhelper-compat (= 13), cargo, rustc, pkg-config
+Homepage: https://github.com/juncoflockleader/backlit
+
+Package: fastgui-compositor
+Architecture: any
+Depends: ${shlibs:Depends}, ${misc:Depends}
+Description: Backlit Wayland compositor
+ Fast, small Wayland compositor for the Backlit desktop session.
+
+Package: fastgui-shell
+Architecture: any
+Depends: ${shlibs:Depends}, ${misc:Depends}, fastgui-compositor
+Description: Backlit shell clients
+ Panel, launcher, wallpaper, and shell support processes for Backlit.
+
+Package: fastgui-desktop
+Architecture: any
+Depends: ${misc:Depends}, fastgui-compositor, fastgui-shell
+Description: Backlit desktop environment meta-package
+ Installs the Backlit desktop session on Ubuntu Server/headless Ubuntu.
+

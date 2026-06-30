@@ -1,0 +1,7 @@
+[Desktop Entry]
+Name=Backlit
+Comment=Fast Wayland desktop session
+Exec=backlit-session
+Type=Application
+DesktopNames=Backlit
+

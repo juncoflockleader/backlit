@@ -1,0 +1,21 @@
+[workspace]
+resolver = "2"
+members = [
+  "crates/common",
+  "crates/compositor-backend",
+  "crates/compositor",
+  "crates/portal-backend",
+  "crates/settings-daemon",
+  "crates/shell",
+  "crates/shell-protocol",
+  "crates/window-policy",
+]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2021"
+rust-version = "1.76"
+license = "MIT OR Apache-2.0"
+repository = "https://github.com/juncoflockleader/backlit"
+authors = ["Backlit contributors"]
+

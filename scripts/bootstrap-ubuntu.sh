@@ -1,0 +1,31 @@
+#!/usr/bin/env sh
+set -eu
+
+sudo apt-get update
+sudo apt-get install -y \
+  build-essential \
+  git \
+  pkg-config \
+  clang \
+  lld \
+  cmake \
+  meson \
+  ninja-build \
+  rustc \
+  cargo \
+  libwayland-dev \
+  wayland-protocols \
+  libxkbcommon-dev \
+  libinput-dev \
+  libudev-dev \
+  libsystemd-dev \
+  libseat-dev \
+  libgbm-dev \
+  libegl1-mesa-dev \
+  libgles2-mesa-dev \
+  libdrm-dev \
+  mesa-utils \
+  weston \
+  xwayland \
+  foot
+
