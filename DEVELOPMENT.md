@@ -128,7 +128,7 @@ The Linux-side verifier can also be run directly inside any Ubuntu checkout:
 ./scripts/verify-linux-e2e.sh
 ```
 
-It runs `cargo fmt`, workspace tests, `cargo clippy`, the deterministic GUI smoke verifier, the preview renderer, launch-performance verifier, resource-budget verifier, CI contract verifier, packaging contract verifier, staged session install verifier, launch-readiness verifier, session launch verifier, session clean-exit verifier, nested Wayland smoke verifier, and MVP 0 contract verifier, then writes `target/linux-e2e/manifest.json`.
+It runs `cargo fmt`, workspace tests, `cargo clippy`, the deterministic GUI smoke verifier, the preview renderer, launch-performance verifier, resource-budget verifier, portal-security verifier, CI contract verifier, packaging contract verifier, staged session install verifier, launch-readiness verifier, session launch verifier, session clean-exit verifier, nested Wayland smoke verifier, and MVP 0 contract verifier, then writes `target/linux-e2e/manifest.json`.
 
 ## GUI Linux VM Workflow
 
@@ -190,12 +190,14 @@ cargo run -p backlit-input -- --verify
 cargo run -p backlit-surface -- --verify
 cargo run -p backlit-session-supervisor -- --verify
 cargo run -p backlit-clipboard -- --verify
+cargo run -p backlit-portal-backend -- --verify
 cargo run -p backlit-session -- --backend=headless --screenshot target/backlit-session.ppm --verify --verify-services --verify-clean-exit
 ./scripts/render-gui-preview.sh
 ./scripts/render-parallels-gui-preview.sh
 ./scripts/verify-gui-smoke.sh
 ./scripts/verify-launch-performance.sh
 ./scripts/verify-resource-budget.sh
+./scripts/verify-portal-security.sh
 ./scripts/verify-launch-readiness.sh
 ./scripts/verify-session-launch.sh
 ./scripts/verify-session-clean-exit.sh
@@ -267,6 +269,8 @@ The compositor smoke path also checks the headless direct-scanout policy: an opa
 The launch-performance verifier runs the built `backlit-session`, `backlit-compositor`, and `backlit-shell` binaries directly, then writes `target/launch-performance/manifest.json`. It enforces the current MVP budgets for session GUI readiness under 500 ms, shell-ready service probes under 2 seconds, and terminal hotkey spawn under 300 ms.
 
 The resource-budget verifier runs bounded idle probes for `backlit-compositor` and `backlit-shell`, samples Linux `/proc`, then writes `target/resource-budget/manifest.json`. On Linux it enforces compositor idle CPU under 0.5% and combined compositor+shell RSS under 250 MB; on non-Linux hosts it records an expected skip so Parallels remains the authoritative resource-budget proof.
+
+Portal security is covered by `backlit-portal-backend --verify`, which denies direct screenshot, screencast, and remote-desktop capture while allowing consented portal-mediated screenshot, screencast, and file-chooser requests.
 
 The default GUI render is guarded by checksum `5635038614353063225`; update it only when an intentional visual change is made.
 

@@ -20,6 +20,7 @@ Current launch-readiness checks:
 - `backlit-surface --verify` verifies the policy-level xdg-shell toplevel contract: create, configure, ack, map into window policy, focus, maximize, fullscreen, close request, and clean removal.
 - `backlit-perf --verify` verifies a deterministic 60-frame drag pacing smoke with zero dropped frames and pointer-to-frame p99 under 16 ms.
 - `backlit-compositor -- --smoke-test` verifies direct-scanout eligibility policy for opaque fullscreen dmabuf surfaces, including overlay and SHM blockers.
+- `backlit-portal-backend --verify` verifies that direct screenshot, screencast, and remote-desktop capture are denied and only consented portal-mediated flows are allowed.
 - `scripts/verify-launch-performance.sh` verifies MVP launch budgets from built binaries: GUI ready under 500 ms, terminal hotkey spawn under 300 ms, and shell-ready service probes under 2 seconds.
 - `scripts/verify-resource-budget.sh` verifies Linux idle resource budgets from bounded compositor and shell probes: compositor idle CPU under 0.5% and combined compositor+shell RSS under 250 MB.
 - `scripts/verify-drm-session-smoke.sh` runs the full DRM session path with GUI verification, launch spawn, compositor/shell service probes, and clean shutdown on launch-ready Linux hosts.

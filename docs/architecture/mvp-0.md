@@ -23,6 +23,7 @@ MVP 0 is the development harness:
 - Output work-area policy for panel-aware maximize and fullscreen geometry.
 - Session supervisor crash isolation smoke.
 - Clipboard state smoke for text owner, replacement, and clearing.
+- Portal security smoke for denied direct capture and consented portal-mediated flows.
 - Deterministic demo GUI renderer.
 - Headless session launch verification.
 - Viewable GUI preview renderer with verified session services.

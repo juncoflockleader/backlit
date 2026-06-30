@@ -34,6 +34,7 @@ require_executable scripts/verify-gui-smoke.sh
 require_executable scripts/render-gui-preview.sh
 require_executable scripts/verify-launch-performance.sh
 require_executable scripts/verify-resource-budget.sh
+require_executable scripts/verify-portal-security.sh
 require_executable scripts/verify-linux-e2e.sh
 require_executable scripts/verify-ci-contract.sh
 require_executable scripts/verify-packaging-contract.sh
@@ -50,6 +51,7 @@ require_contains Cargo.toml '"crates/perf"'
 require_contains Cargo.toml '"crates/session"'
 require_contains Cargo.toml '"crates/shell"'
 require_contains Cargo.toml '"crates/launcher"'
+require_contains Cargo.toml '"crates/portal-backend"'
 require_contains Cargo.toml '"crates/surface"'
 require_contains Cargo.toml '"crates/window-policy"'
 
@@ -60,12 +62,14 @@ require_contains scripts/verify-gui-smoke.sh 'cargo run -p backlit-perf -- --ver
 require_contains scripts/verify-gui-smoke.sh 'cargo run -p backlit-input -- --verify'
 require_contains scripts/verify-gui-smoke.sh 'cargo run -p backlit-surface -- --verify'
 require_contains scripts/verify-gui-smoke.sh 'cargo run -p backlit-demo-client --'
+require_contains scripts/verify-gui-smoke.sh 'cargo run -p backlit-portal-backend -- --verify'
 require_contains scripts/verify-gui-smoke.sh '"golden_checksum": true'
 require_contains scripts/verify-launch-performance.sh '"name": "backlit-launch-performance"'
 require_contains scripts/verify-linux-e2e.sh './scripts/verify-nested-wayland-smoke.sh'
 require_contains scripts/verify-linux-e2e.sh './scripts/render-gui-preview.sh'
 require_contains scripts/verify-linux-e2e.sh './scripts/verify-launch-performance.sh'
 require_contains scripts/verify-linux-e2e.sh './scripts/verify-resource-budget.sh'
+require_contains scripts/verify-linux-e2e.sh './scripts/verify-portal-security.sh'
 require_contains scripts/verify-linux-e2e.sh './scripts/verify-ci-contract.sh'
 require_contains scripts/verify-linux-e2e.sh './scripts/verify-packaging-contract.sh'
 require_contains scripts/verify-linux-e2e.sh './scripts/verify-staged-session-install.sh'
@@ -85,6 +89,7 @@ if [ -n "$artifact_root" ] && [ -d "$artifact_root" ]; then
   require_file "$artifact_root/gui-preview/manifest.json"
   require_file "$artifact_root/launch-performance/manifest.json"
   require_file "$artifact_root/resource-budget/manifest.json"
+  require_file "$artifact_root/portal-security/manifest.json"
   require_file "$artifact_root/ci-contract/manifest.json"
   require_file "$artifact_root/packaging-contract/manifest.json"
   require_file "$artifact_root/staged-session-install/manifest.json"
@@ -103,6 +108,7 @@ if [ -n "$artifact_root" ] && [ -d "$artifact_root" ]; then
   require_contains "$artifact_root/gui-smoke/manifest.json" '"targeted_damage": true'
   require_contains "$artifact_root/gui-smoke/manifest.json" '"direct_scanout": true'
   require_contains "$artifact_root/gui-smoke/manifest.json" '"drag_frame_pacing": true'
+  require_contains "$artifact_root/gui-smoke/manifest.json" '"portal_security": true'
   require_contains "$artifact_root/gui-smoke/manifest.json" '"session_services": true'
   require_contains "$artifact_root/gui-smoke/manifest.json" '"session_launch_spawn": true'
   require_contains "$artifact_root/gui-smoke/manifest.json" '"session_move_resize": true'
@@ -119,6 +125,9 @@ if [ -n "$artifact_root" ] && [ -d "$artifact_root" ]; then
   else
     require_contains "$artifact_root/resource-budget/manifest.json" '"resource_budget_blocked_expected": true'
   fi
+  require_contains "$artifact_root/portal-security/manifest.json" '"direct_screenshot_denied": true'
+  require_contains "$artifact_root/portal-security/manifest.json" '"direct_screencast_denied": true'
+  require_contains "$artifact_root/portal-security/manifest.json" '"consented_screenshot_allowed": true'
   require_contains "$artifact_root/ci-contract/manifest.json" '"linux_e2e_gate": true'
   require_contains "$artifact_root/packaging-contract/manifest.json" '"desktop_entry": true'
   require_contains "$artifact_root/packaging-contract/manifest.json" '"package_split": true'
@@ -165,6 +174,7 @@ cat > "$out_dir/manifest.json" <<EOF
     "performance_smoke": true,
     "launch_performance": true,
     "resource_budget": true,
+    "portal_security": true,
     "input_smoke": true,
     "surface_lifecycle": true,
     "frame_damage": true,

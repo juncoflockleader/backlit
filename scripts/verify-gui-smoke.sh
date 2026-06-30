@@ -26,6 +26,7 @@ cargo run -p backlit-input -- --verify > "$out_dir/input.jsonl"
 cargo run -p backlit-surface -- --verify > "$out_dir/surface.jsonl"
 cargo run -p backlit-session-supervisor -- --verify > "$out_dir/supervisor.jsonl"
 cargo run -p backlit-clipboard -- --verify > "$out_dir/clipboard.jsonl"
+cargo run -p backlit-portal-backend -- --verify > "$out_dir/portal.jsonl"
 cargo run -p backlit-session -- \
   --backend=headless \
   --socket=backlit-0 \
@@ -137,6 +138,14 @@ grep '"shell_crash_isolated":true' "$out_dir/supervisor.jsonl" >/dev/null
 grep '"compositor_crash_ends_session":true' "$out_dir/supervisor.jsonl" >/dev/null
 grep '"event":"clipboard.smoke"' "$out_dir/clipboard.jsonl" >/dev/null
 grep '"generation":3' "$out_dir/clipboard.jsonl" >/dev/null
+grep '"event":"portal_backend.security_smoke"' "$out_dir/portal.jsonl" >/dev/null
+grep '"direct_screenshot_denied":true' "$out_dir/portal.jsonl" >/dev/null
+grep '"direct_screencast_denied":true' "$out_dir/portal.jsonl" >/dev/null
+grep '"direct_remote_desktop_denied":true' "$out_dir/portal.jsonl" >/dev/null
+grep '"unconsented_portal_denied":true' "$out_dir/portal.jsonl" >/dev/null
+grep '"consented_screenshot_allowed":true' "$out_dir/portal.jsonl" >/dev/null
+grep '"consented_screencast_allowed":true' "$out_dir/portal.jsonl" >/dev/null
+grep '"file_chooser_allowed":true' "$out_dir/portal.jsonl" >/dev/null
 grep '"event":"demo_client.verified"' "$out_dir/demo-client.jsonl" >/dev/null
 grep '"passed":true' "$out_dir/demo-client.jsonl" >/dev/null
 grep '"golden_ok":true' "$out_dir/demo-client.jsonl" >/dev/null
@@ -171,6 +180,7 @@ cat > "$out_dir/manifest.json" <<EOF
     "surface_log": "$out_dir/surface.jsonl",
     "supervisor_log": "$out_dir/supervisor.jsonl",
     "clipboard_log": "$out_dir/clipboard.jsonl",
+    "portal_log": "$out_dir/portal.jsonl",
     "session_log": "$out_dir/session.jsonl",
     "session_services_dir": "$out_dir/session-services",
     "demo_client_log": "$out_dir/demo-client.jsonl",
@@ -193,6 +203,7 @@ cat > "$out_dir/manifest.json" <<EOF
     "drag_frame_pacing": true,
     "shell_crash_isolated": true,
     "clipboard_generation": 3,
+    "portal_security": true,
     "session_windows_after_launch": 4,
     "session_launch_spawn": true,
     "session_services": true,
