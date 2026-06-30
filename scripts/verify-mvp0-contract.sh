@@ -47,6 +47,7 @@ require_executable scripts/verify-ci-contract.sh
 require_executable scripts/verify-packaging-contract.sh
 require_executable scripts/verify-package-manifests.sh
 require_executable scripts/verify-debian-package-build.sh
+require_executable scripts/verify-debian-package-install.sh
 require_executable scripts/verify-staged-session-install.sh
 require_executable scripts/verify-nested-wayland-smoke.sh
 require_executable scripts/verify-session-clean-exit.sh
@@ -114,6 +115,7 @@ require_contains scripts/verify-linux-e2e.sh './scripts/verify-ci-contract.sh'
 require_contains scripts/verify-linux-e2e.sh './scripts/verify-packaging-contract.sh'
 require_contains scripts/verify-linux-e2e.sh './scripts/verify-package-manifests.sh'
 require_contains scripts/verify-linux-e2e.sh './scripts/verify-debian-package-build.sh'
+require_contains scripts/verify-linux-e2e.sh './scripts/verify-debian-package-install.sh'
 require_contains scripts/verify-linux-e2e.sh './scripts/verify-staged-session-install.sh'
 require_contains scripts/verify-linux-e2e.sh './scripts/verify-systemd-activation.sh'
 require_contains scripts/verify-linux-e2e.sh './scripts/verify-drm-session-smoke.sh'
@@ -176,6 +178,7 @@ if [ -n "$artifact_root" ] && [ -d "$artifact_root" ]; then
   require_file "$artifact_root/packaging-contract/manifest.json"
   require_file "$artifact_root/package-manifests/manifest.json"
   require_file "$artifact_root/debian-package-build/manifest.json"
+  require_file "$artifact_root/debian-package-install/manifest.json"
   require_file "$artifact_root/staged-session-install/manifest.json"
   require_file "$artifact_root/launch-readiness/manifest.json"
   require_file "$artifact_root/session-clean-exit/manifest.json"
@@ -311,6 +314,18 @@ if [ -n "$artifact_root" ] && [ -d "$artifact_root" ]; then
   else
     require_contains "$artifact_root/debian-package-build/manifest.json" '"build_blocked_expected": true'
   fi
+  require_contains "$artifact_root/debian-package-install/manifest.json" '"package_install_checked": true'
+  if grep '"debs_extracted": true' "$artifact_root/debian-package-install/manifest.json" >/dev/null; then
+    require_contains "$artifact_root/debian-package-install/manifest.json" '"fastgui_core_closure": true'
+    require_contains "$artifact_root/debian-package-install/manifest.json" '"session_exec_from_extracted_debs": true'
+    require_contains "$artifact_root/debian-package-install/manifest.json" '"session_systemd_units_from_extracted_debs": true'
+    require_contains "$artifact_root/debian-package-install/manifest.json" '"session_gui_from_extracted_debs": true'
+    require_contains "$artifact_root/debian-package-install/manifest.json" '"session_services_from_extracted_debs": true'
+    require_contains "$artifact_root/debian-package-install/manifest.json" '"session_clean_exit_from_extracted_debs": true'
+    require_contains "$artifact_root/debian-package-install/manifest.json" '"settings_app_from_extracted_debs": true'
+  else
+    require_contains "$artifact_root/debian-package-install/manifest.json" '"install_blocked_expected": true'
+  fi
   require_contains "$artifact_root/staged-session-install/manifest.json" '"desktop_exec_resolves": true'
   require_contains "$artifact_root/staged-session-install/manifest.json" '"settings_desktop_exec_resolves": true'
   require_contains "$artifact_root/staged-session-install/manifest.json" '"session_systemd_units": true'
@@ -417,6 +432,7 @@ cat > "$out_dir/manifest.json" <<EOF
     "packaging_skeleton": true,
     "package_manifests": true,
     "debian_package_build": true,
+    "debian_package_install": true,
     "staged_session_install": true,
     "drm_session_smoke": true,
     "ci_gate": true

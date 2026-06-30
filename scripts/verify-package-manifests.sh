@@ -85,6 +85,7 @@ require_line packaging/debian/fastgui-dev-tools.install "usr/lib/backlit/dev-too
 require_line packaging/debian/fastgui-dev-tools.install "usr/lib/backlit/dev-tools/verify-compositor-runtime.sh"
 require_line packaging/debian/fastgui-dev-tools.install "usr/lib/backlit/dev-tools/verify-package-manifests.sh"
 require_line packaging/debian/fastgui-dev-tools.install "usr/lib/backlit/dev-tools/verify-debian-package-build.sh"
+require_line packaging/debian/fastgui-dev-tools.install "usr/lib/backlit/dev-tools/verify-debian-package-install.sh"
 require_line packaging/debian/fastgui-dev-tools.install "usr/lib/backlit/dev-tools/verify-launch-performance.sh"
 require_line packaging/debian/fastgui-dev-tools.install "usr/lib/backlit/dev-tools/verify-launch-readiness.sh"
 require_line packaging/debian/fastgui-dev-tools.install "usr/lib/backlit/dev-tools/verify-session-launch.sh"

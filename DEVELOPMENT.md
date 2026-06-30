@@ -131,7 +131,7 @@ The Linux-side verifier can also be run directly inside any Ubuntu checkout:
 ./scripts/verify-linux-e2e.sh
 ```
 
-It runs `cargo fmt`, workspace tests, `cargo clippy`, the deterministic GUI smoke verifier, the preview renderer, compositor-runtime verifier, launch-performance verifier, launcher desktop discovery verifier, resource-budget verifier, notification-daemon verifier, settings-daemon verifier, service-lifecycle verifier, settings-app verifier, portal-security verifier, crash-log verifier, CI contract verifier, packaging contract verifier, package-manifest verifier, Debian package-build verifier, staged session install verifier, systemd activation verifier, launch-readiness verifier, session launch verifier, session clean-exit verifier, nested Wayland smoke verifier, and MVP 0 contract verifier, then writes `target/linux-e2e/manifest.json`.
+It runs `cargo fmt`, workspace tests, `cargo clippy`, the deterministic GUI smoke verifier, the preview renderer, compositor-runtime verifier, launch-performance verifier, launcher desktop discovery verifier, resource-budget verifier, notification-daemon verifier, settings-daemon verifier, service-lifecycle verifier, settings-app verifier, portal-security verifier, crash-log verifier, CI contract verifier, packaging contract verifier, package-manifest verifier, Debian package-build verifier, Debian package-install verifier, staged session install verifier, systemd activation verifier, launch-readiness verifier, session launch verifier, session clean-exit verifier, nested Wayland smoke verifier, and MVP 0 contract verifier, then writes `target/linux-e2e/manifest.json`.
 
 ## GUI Linux VM Workflow
 
@@ -219,6 +219,7 @@ cargo run -p backlit-session -- --backend=headless --screenshot target/backlit-s
 ./scripts/verify-packaging-contract.sh
 ./scripts/verify-package-manifests.sh
 ./scripts/verify-debian-package-build.sh
+./scripts/verify-debian-package-install.sh
 ./scripts/verify-staged-session-install.sh
 ./scripts/verify-systemd-activation.sh
 ./scripts/verify-nested-wayland-smoke.sh
@@ -379,7 +380,7 @@ It writes `target/packaging-contract/manifest.json` by default.
 
 ## Staged Session Install Verification
 
-The Debian package-build verifier assembles the `fastgui-*` package roots from `packaging/debian/*.install`, builds `.deb` artifacts with `dpkg-deb` on Linux, and inspects `fastgui-core`, runtime package contents, and package dependencies. On non-Debian hosts it writes an expected-blocked manifest so the same E2E script remains usable from macOS.
+The Debian package-build verifier assembles the `fastgui-*` package roots from `packaging/debian/*.install`, builds `.deb` artifacts with `dpkg-deb` on Linux, and inspects `fastgui-core`, runtime package contents, and package dependencies. The Debian package-install verifier extracts the `fastgui-core` dependency closure from those `.deb`s, then runs `backlit-session --backend=headless --verify --verify-services --verify-clean-exit` from the extracted `/usr/bin` tree. On non-Debian hosts both write expected-blocked manifests so the same E2E script remains usable from macOS.
 
 The staged install verifier builds the session, compositor, shell, and settings daemon binaries, lays them out under a fake `/usr`, installs the session desktop entry, `backlit-session.target`, and user systemd units, and verifies that all launch commands resolve to staged executables. The systemd activation verifier separately proves the session launcher can execute the target import/start/stop command sequence:
 
