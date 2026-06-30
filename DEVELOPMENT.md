@@ -138,7 +138,7 @@ cargo run -p backlit-protocols -- --verify --list
 cargo run -p backlit-perf -- --verify
 cargo run -p backlit-session -- --backend=headless --screenshot target/backlit-session.ppm --verify
 ./scripts/verify-gui-smoke.sh
-cargo run -p backlit-shell -- --component=panel --socket=backlit-0
+cargo run -p backlit-shell -- --component=all --socket=backlit-0 --verify
 ```
 
 Current compositor flags:

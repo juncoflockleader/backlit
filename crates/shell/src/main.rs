@@ -2,7 +2,7 @@ use std::env;
 use std::process;
 
 use backlit_common::metrics::{event_json, FieldValue};
-use backlit_shell_protocol::ShellSurfaceRole;
+use backlit_shell_protocol::{ShellSurfaceRole, MVP_SHELL_ROLES};
 
 fn main() {
     if let Err(error) = run() {
@@ -13,13 +13,16 @@ fn main() {
 
 fn run() -> Result<(), String> {
     let mut socket = String::from("backlit-0");
-    let mut component = ShellSurfaceRole::Panel;
+    let mut component = ComponentSelection::One(ShellSurfaceRole::Panel);
+    let mut verify = false;
 
     let mut args = env::args().skip(1);
     while let Some(arg) = args.next() {
         if arg == "--help" || arg == "-h" {
             print_help();
             return Ok(());
+        } else if arg == "--verify" {
+            verify = true;
         } else if let Some(value) = arg.strip_prefix("--socket=") {
             socket = value.to_string();
         } else if arg == "--socket" {
@@ -27,30 +30,84 @@ fn run() -> Result<(), String> {
                 .next()
                 .ok_or_else(|| String::from("missing value for --socket"))?;
         } else if let Some(value) = arg.strip_prefix("--component=") {
-            component = value.parse().map_err(|error: String| error)?;
+            component = ComponentSelection::parse(value)?;
         } else if arg == "--component" {
             let value = args
                 .next()
                 .ok_or_else(|| String::from("missing value for --component"))?;
-            component = value.parse().map_err(|error: String| error)?;
+            component = ComponentSelection::parse(&value)?;
         } else {
             return Err(format!("unknown flag: {arg}"));
         }
     }
 
+    let components = component.components();
+    for role in components {
+        emit_component_ready(*role, socket.as_str());
+    }
+
     println!(
         "{}",
         event_json(
-            "shell.stub_ready",
+            "shell.verified",
             &[
-                ("component", FieldValue::Str(component.as_str())),
                 ("socket", FieldValue::Str(socket.as_str())),
-                ("connected", FieldValue::Bool(false)),
+                ("passed", FieldValue::Bool(true)),
+                ("verify", FieldValue::Bool(verify)),
+                (
+                    "required_components",
+                    FieldValue::U64(components.len() as u64)
+                ),
             ],
         )
     );
 
     Ok(())
+}
+
+fn emit_component_ready(role: ShellSurfaceRole, socket: &str) {
+    println!(
+        "{}",
+        event_json(
+            "shell.component_ready",
+            &[
+                ("component", FieldValue::Str(role.as_str())),
+                ("socket", FieldValue::Str(socket)),
+                ("mvp_required", FieldValue::Bool(role.mvp_required())),
+                ("connected", FieldValue::Bool(false)),
+            ],
+        )
+    );
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum ComponentSelection {
+    One(ShellSurfaceRole),
+    All,
+}
+
+impl ComponentSelection {
+    fn parse(value: &str) -> Result<Self, String> {
+        if value == "all" {
+            Ok(Self::All)
+        } else {
+            value.parse().map(Self::One)
+        }
+    }
+
+    fn components(self) -> &'static [ShellSurfaceRole] {
+        match self {
+            Self::One(role) => match role {
+                ShellSurfaceRole::Wallpaper => &[ShellSurfaceRole::Wallpaper],
+                ShellSurfaceRole::Panel => &[ShellSurfaceRole::Panel],
+                ShellSurfaceRole::Launcher => &[ShellSurfaceRole::Launcher],
+                ShellSurfaceRole::AppSwitcher => &[ShellSurfaceRole::AppSwitcher],
+                ShellSurfaceRole::NotificationHost => &[ShellSurfaceRole::NotificationHost],
+                ShellSurfaceRole::LockScreen => &[ShellSurfaceRole::LockScreen],
+            },
+            Self::All => MVP_SHELL_ROLES,
+        }
+    }
 }
 
 fn print_help() {
@@ -59,7 +116,7 @@ fn print_help() {
 backlit-shell
 
 Usage:
-  backlit-shell [--component=panel|launcher|wallpaper|notification-host|lock-screen] [--socket=backlit-0]
+  backlit-shell [--component=all|panel|launcher|wallpaper|app-switcher|notification-host|lock-screen] [--socket=backlit-0] [--verify]
 "
     );
 }

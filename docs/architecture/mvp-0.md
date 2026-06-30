@@ -7,7 +7,7 @@ MVP 0 is the development harness:
 - Backend preflight checks for headless, nested Wayland, and DRM launch paths.
 - Nested Wayland backend flag.
 - Pure window-policy logic.
-- Tiny shell stubs.
+- MVP shell role smoke checks.
 - Deterministic demo GUI renderer.
 - Headless session launch verification.
 - Basic MVP protocol smoke registry.

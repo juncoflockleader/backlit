@@ -17,6 +17,7 @@ cargo run -p backlit-compositor -- --backend=headless --smoke-test
 cargo run -p backlit-compositor-backend -- --backend=headless --verify
 cargo run -p backlit-protocols -- --verify --list
 cargo run -p backlit-perf -- --verify
+cargo run -p backlit-shell -- --component=all --verify
 ./scripts/verify-gui-smoke.sh
 ```
 
