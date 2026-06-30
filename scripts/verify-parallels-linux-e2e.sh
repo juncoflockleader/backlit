@@ -281,7 +281,9 @@ host_session_replay_manifest="$host_out_dir/session-replay-manifest.json"
 host_drm_session_smoke_manifest="$host_out_dir/drm-session-smoke-manifest.json"
 host_debian_package_build_manifest="$host_out_dir/debian-package-build-manifest.json"
 host_debian_package_install_manifest="$host_out_dir/debian-package-install-manifest.json"
+host_debian_package_install_replay_manifest="$host_out_dir/debian-package-install-session-replay-manifest.json"
 host_debian_system_install_manifest="$host_out_dir/debian-system-install-manifest.json"
+host_debian_system_install_replay_manifest="$host_out_dir/debian-system-install-session-replay-manifest.json"
 host_nested_wayland_manifest="$host_out_dir/nested-wayland-manifest.json"
 host_mvp0_contract_manifest="$host_out_dir/mvp0-contract-manifest.json"
 host_ppm="$host_out_dir/gui-preview-backlit-session.ppm"
@@ -297,7 +299,9 @@ rm -f \
   "$host_drm_session_smoke_manifest" \
   "$host_debian_package_build_manifest" \
   "$host_debian_package_install_manifest" \
+  "$host_debian_package_install_replay_manifest" \
   "$host_debian_system_install_manifest" \
+  "$host_debian_system_install_replay_manifest" \
   "$host_nested_wayland_manifest" \
   "$host_mvp0_contract_manifest" \
   "$host_ppm" \
@@ -312,7 +316,9 @@ download_file "$guest_e2e_dir/session-replay/manifest.json" "$host_session_repla
 download_file "$guest_e2e_dir/drm-session-smoke/manifest.json" "$host_drm_session_smoke_manifest"
 download_file "$guest_e2e_dir/debian-package-build/manifest.json" "$host_debian_package_build_manifest"
 download_file "$guest_e2e_dir/debian-package-install/manifest.json" "$host_debian_package_install_manifest"
+download_file "$guest_e2e_dir/debian-package-install/session-replay/manifest.json" "$host_debian_package_install_replay_manifest"
 download_file "$guest_e2e_dir/debian-system-install/manifest.json" "$host_debian_system_install_manifest"
+download_file "$guest_e2e_dir/debian-system-install/session-replay/manifest.json" "$host_debian_system_install_replay_manifest"
 download_file "$guest_e2e_dir/nested-wayland/manifest.json" "$host_nested_wayland_manifest"
 download_file "$guest_e2e_dir/mvp0-contract/manifest.json" "$host_mvp0_contract_manifest"
 download_file "$guest_e2e_dir/gui-preview/backlit-session.ppm" "$host_ppm"
@@ -388,12 +394,18 @@ require_contains "$host_debian_package_install_manifest" '"session_gui_from_extr
 require_contains "$host_debian_package_install_manifest" '"session_services_from_extracted_debs": true'
 require_contains "$host_debian_package_install_manifest" '"session_replay_from_extracted_debs": true'
 require_contains "$host_debian_package_install_manifest" '"session_clean_exit_from_extracted_debs": true'
+require_contains "$host_debian_package_install_replay_manifest" '"frame_count": 9'
+require_contains "$host_debian_package_install_replay_manifest" '"launcher_overlay_frame": true'
+require_contains "$host_debian_package_install_replay_manifest" '"app_switcher_overlay_frame": true'
 require_contains "$host_debian_system_install_manifest" '"system_install_performed": true'
 require_contains "$host_debian_system_install_manifest" '"actual_system_dpkg_install": true'
 require_contains "$host_debian_system_install_manifest" '"usr_bin_session_launch": true'
 require_contains "$host_debian_system_install_manifest" '"session_services_from_system_install": true'
 require_contains "$host_debian_system_install_manifest" '"session_replay_from_system_install": true'
 require_contains "$host_debian_system_install_manifest" '"packages_purged_after_verification": true'
+require_contains "$host_debian_system_install_replay_manifest" '"frame_count": 9'
+require_contains "$host_debian_system_install_replay_manifest" '"launcher_overlay_frame": true'
+require_contains "$host_debian_system_install_replay_manifest" '"app_switcher_overlay_frame": true'
 require_contains "$host_nested_wayland_manifest" '"session_wayland_clean_exit": true'
 require_contains "$host_mvp0_contract_manifest" '"artifact_manifests_checked": true'
 
@@ -414,7 +426,9 @@ cat > "$host_out_dir/manifest.json" <<EOF
     "drm_session_smoke_manifest": "$host_drm_session_smoke_manifest",
     "debian_package_build_manifest": "$host_debian_package_build_manifest",
     "debian_package_install_manifest": "$host_debian_package_install_manifest",
+    "debian_package_install_replay_manifest": "$host_debian_package_install_replay_manifest",
     "debian_system_install_manifest": "$host_debian_system_install_manifest",
+    "debian_system_install_replay_manifest": "$host_debian_system_install_replay_manifest",
     "nested_wayland_manifest": "$host_nested_wayland_manifest",
     "mvp0_contract_manifest": "$host_mvp0_contract_manifest",
     "gui_preview_ppm": "$host_ppm",
@@ -433,8 +447,10 @@ cat > "$host_out_dir/manifest.json" <<EOF
     "drm_session_clean_exit": true,
     "debian_package_build": true,
     "debian_package_install": true,
+    "debian_package_install_replay": true,
     "dpkg_root_install": true,
     "debian_system_install": true,
+    "debian_system_install_replay": true,
     "actual_system_dpkg_install": true,
     "nested_wayland": true,
     "mvp0_contract": true,

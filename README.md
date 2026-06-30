@@ -67,7 +67,7 @@ When a Parallels Ubuntu VM is available, the full Linux guest verification can b
 ./scripts/render-parallels-gui-preview.sh
 ```
 
-The Parallels E2E wrapper also exports a host-side evidence bundle to `target/linux-e2e-parallels/`, including the guest E2E manifest, DRM readiness/session smoke manifests, Debian package build/install/system-install manifests, nested Wayland manifest, MVP contract manifest, and an E2E GUI preview image.
+The Parallels E2E wrapper also exports a host-side evidence bundle to `target/linux-e2e-parallels/`, including the guest E2E manifest, DRM readiness/session smoke manifests, Debian package build/install/system-install manifests, installed-package replay manifests, nested Wayland manifest, MVP contract manifest, and an E2E GUI preview image.
 
 The session smoke path also verifies input and xdg-shell lifecycle interactions: app switching, terminal launch resolution, pointer-driven focus, move/resize routing, workspace switching, left/right window snapping, xdg toplevel map/configure/maximize/fullscreen/close behavior, popup mapping under a parent, clean session shutdown, deterministic terminal spawn with `WAYLAND_DISPLAY` propagation, scripted visual replay frames, and nested Wayland launch of the real terminal target.
 
