@@ -192,6 +192,7 @@ cargo run -p backlit-session -- --backend=headless --screenshot target/backlit-s
 ./scripts/verify-gui-smoke.sh
 ./scripts/verify-launch-readiness.sh
 ./scripts/verify-session-launch.sh
+./scripts/verify-drm-session-smoke.sh
 ./scripts/verify-mvp0-contract.sh
 ./scripts/verify-ci-contract.sh
 ./scripts/verify-packaging-contract.sh
@@ -294,9 +295,10 @@ To capture the current host's launch readiness:
 ```bash
 ./scripts/verify-launch-readiness.sh
 ./scripts/verify-session-launch.sh
+./scripts/verify-drm-session-smoke.sh
 ```
 
-These write `target/launch-readiness/manifest.json` and `target/session-launch/manifest.json`. On macOS or headless CI they can pass with DRM expected-blocked; inside the Parallels Ubuntu GUI VM they should report DRM expected-ready and ready. The session launch verifier also checks that `packaging/sessions/backlit.desktop` resolves to `backlit-session` and that `backlit-session --preflight-only` exits cleanly for launchable backends.
+These write `target/launch-readiness/manifest.json`, `target/session-launch/manifest.json`, and `target/drm-session-smoke/manifest.json`. On macOS or headless CI they can pass with DRM expected-blocked; inside the Parallels Ubuntu GUI VM they should report DRM expected-ready and ready. The session launch verifier also checks that `packaging/sessions/backlit.desktop` resolves to `backlit-session` and that `backlit-session --preflight-only` exits cleanly for launchable backends. The DRM session smoke verifier runs the full `backlit-session --backend=drm` path with GUI verification, terminal spawn verification, and compositor/shell service probes when the host is launch-ready.
 
 ## Packaging Contract Verification
 

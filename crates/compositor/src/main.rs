@@ -3,7 +3,10 @@ use std::process;
 use std::time::Instant;
 
 use backlit_common::metrics::{event_json, FieldValue};
-use backlit_compositor_backend::{parse_args, BackendKind, HeadlessCompositor, RunConfig};
+use backlit_compositor_backend::{
+    parse_args, preflight_backend_with_environment, BackendPreflightEnvironment,
+    BackendPreflightReport, HeadlessCompositor, RunConfig,
+};
 use backlit_window_policy::WindowPolicy;
 
 fn main() {
@@ -21,18 +24,25 @@ fn run() -> Result<(), String> {
         return Ok(());
     }
 
-    if config.backend == BackendKind::Drm && !cfg!(target_os = "linux") {
-        return Err(String::from(
-            "the drm backend requires Linux with a real graphics/input stack",
-        ));
-    }
-
     let started = Instant::now();
     emit(
         "compositor.start",
         &config,
         &[("smoke_test", FieldValue::Bool(config.smoke_test))],
     );
+
+    let preflight_environment = BackendPreflightEnvironment::from_host();
+    let preflight_report =
+        preflight_backend_with_environment(config.backend, &preflight_environment);
+    emit_backend_preflight(&config, &preflight_report, &preflight_environment);
+
+    if !preflight_report.ready {
+        return Err(format!(
+            "{} compositor backend preflight failed: {}",
+            preflight_report.backend.as_str(),
+            preflight_report.code,
+        ));
+    }
 
     if config.smoke_test {
         run_smoke_test(&config);
@@ -96,6 +106,46 @@ fn emit(event: &str, config: &RunConfig, fields: &[(&str, FieldValue<'_>)]) {
     println!("{}", event_json(event, &combined));
 }
 
+fn emit_backend_preflight(
+    config: &RunConfig,
+    report: &BackendPreflightReport,
+    environment: &BackendPreflightEnvironment,
+) {
+    let wayland_display = environment.wayland_display.as_deref().unwrap_or("");
+    let xdg_runtime_dir = environment.xdg_runtime_dir.as_deref().unwrap_or("");
+    let session_id = environment.session_id.as_deref().unwrap_or("");
+    let seat = environment.seat.as_deref().unwrap_or("");
+    let session_type = environment.session_type.as_deref().unwrap_or("");
+
+    emit(
+        "compositor.backend_preflight",
+        config,
+        &[
+            ("ready", FieldValue::Bool(report.ready)),
+            ("code", FieldValue::Str(report.code)),
+            ("detail", FieldValue::Str(report.detail.as_str())),
+            ("target_os", FieldValue::Str(environment.target_os.as_str())),
+            ("wayland_display", FieldValue::Str(wayland_display)),
+            ("xdg_runtime_dir", FieldValue::Str(xdg_runtime_dir)),
+            (
+                "drm_card_nodes",
+                FieldValue::U64(environment.drm_card_nodes),
+            ),
+            (
+                "drm_render_nodes",
+                FieldValue::U64(environment.drm_render_nodes),
+            ),
+            (
+                "input_event_nodes",
+                FieldValue::U64(environment.input_event_nodes),
+            ),
+            ("session_id", FieldValue::Str(session_id)),
+            ("seat", FieldValue::Str(seat)),
+            ("session_type", FieldValue::Str(session_type)),
+        ],
+    );
+}
+
 fn print_help() {
     println!(
         "\
@@ -109,6 +159,8 @@ Flags:
   --socket       Wayland socket name to create or target. Defaults to backlit-0.
   --smoke-test   Run the current MVP 0 policy/metrics smoke test and exit.
   --help         Show this help text.
+
+Backend launch preflight runs before smoke or service readiness events.
 "
     );
 }
