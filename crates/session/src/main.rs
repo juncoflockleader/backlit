@@ -13,7 +13,7 @@ use backlit_compositor_backend::{
 use backlit_demo_client::{
     render_demo_gui, verify_demo_gui, DEFAULT_DEMO_HEIGHT, DEFAULT_DEMO_WIDTH,
 };
-use backlit_launcher::{default_catalog, LaunchTarget};
+use backlit_launcher::{default_catalog, resolve_command, LaunchTarget};
 use backlit_shortcuts::{resolve_shortcut, ShortcutAction};
 use backlit_window_policy::{OutputLayout, WindowPolicy, WindowState};
 
@@ -182,6 +182,15 @@ fn run() -> Result<(), String> {
 
         if !report.passed() || !interaction_report.passed() {
             return Err(String::from("headless GUI verification failed"));
+        }
+    }
+
+    if config.verify_launch_spawn {
+        let launch_spawn_report = verify_launch_spawn(&config);
+        emit_launch_spawn(&config, &launch_spawn_report);
+
+        if !launch_spawn_report.passed() {
+            return Err(String::from("session launch spawn verification failed"));
         }
     }
 
@@ -453,6 +462,119 @@ fn emit_launch_ready(config: &Config, passed: bool) {
     );
 }
 
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct LaunchSpawnReport {
+    shortcut_resolved: bool,
+    target_resolved: bool,
+    program: String,
+    spawned: bool,
+    exit_success: bool,
+    status_code: u64,
+    wayland_display_set: bool,
+}
+
+impl LaunchSpawnReport {
+    fn passed(&self) -> bool {
+        self.shortcut_resolved
+            && self.target_resolved
+            && self.spawned
+            && self.exit_success
+            && self.wayland_display_set
+    }
+}
+
+fn verify_launch_spawn(config: &Config) -> LaunchSpawnReport {
+    let shortcut_resolved = matches!(
+        resolve_shortcut("Super+Enter"),
+        Some(ShortcutAction::Launch(LaunchTarget::Terminal))
+    );
+    let catalog = default_catalog();
+    let command = resolve_command(&catalog, LaunchTarget::Terminal);
+    let target_resolved = command.is_some();
+    let program = config
+        .launch_spawn_program
+        .clone()
+        .or_else(|| command.map(|command| command.program.to_string()))
+        .unwrap_or_default();
+    let args: Vec<String> = if config.launch_spawn_program.is_some() {
+        config.launch_spawn_args.clone()
+    } else {
+        command
+            .map(|command| command.args.iter().map(|arg| (*arg).to_string()).collect())
+            .unwrap_or_default()
+    };
+    let wayland_display = config
+        .launch_wayland_display
+        .clone()
+        .or_else(|| env::var("WAYLAND_DISPLAY").ok());
+
+    if !shortcut_resolved || !target_resolved || program.trim().is_empty() {
+        return LaunchSpawnReport {
+            shortcut_resolved,
+            target_resolved,
+            program,
+            spawned: false,
+            exit_success: false,
+            status_code: 255,
+            wayland_display_set: wayland_display.is_some(),
+        };
+    }
+
+    let mut child = Command::new(&program);
+    child.args(args);
+    if let Some(display) = &wayland_display {
+        child.env("WAYLAND_DISPLAY", display);
+    }
+
+    match child.status() {
+        Ok(status) => LaunchSpawnReport {
+            shortcut_resolved,
+            target_resolved,
+            program,
+            spawned: true,
+            exit_success: status.success(),
+            status_code: status.code().unwrap_or(255) as u64,
+            wayland_display_set: wayland_display.is_some(),
+        },
+        Err(_) => LaunchSpawnReport {
+            shortcut_resolved,
+            target_resolved,
+            program,
+            spawned: false,
+            exit_success: false,
+            status_code: 255,
+            wayland_display_set: wayland_display.is_some(),
+        },
+    }
+}
+
+fn emit_launch_spawn(config: &Config, report: &LaunchSpawnReport) {
+    emit(
+        "session.launch_spawn",
+        config,
+        &[
+            ("target", FieldValue::Str(LaunchTarget::Terminal.as_str())),
+            (
+                "shortcut",
+                FieldValue::Str(LaunchTarget::Terminal.shortcut()),
+            ),
+            (
+                "shortcut_resolved",
+                FieldValue::Bool(report.shortcut_resolved),
+            ),
+            ("target_resolved", FieldValue::Bool(report.target_resolved)),
+            ("program", FieldValue::Str(report.program.as_str())),
+            ("spawned", FieldValue::Bool(report.spawned)),
+            ("exit_success", FieldValue::Bool(report.exit_success)),
+            ("status_code", FieldValue::U64(report.status_code)),
+            (
+                "wayland_display_set",
+                FieldValue::Bool(report.wayland_display_set),
+            ),
+        ],
+    );
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 struct InteractionReport {
     initial_focus: u64,
@@ -598,6 +720,10 @@ struct Config {
     verify: bool,
     verify_services: bool,
     preflight_only: bool,
+    verify_launch_spawn: bool,
+    launch_spawn_program: Option<String>,
+    launch_spawn_args: Vec<String>,
+    launch_wayland_display: Option<String>,
     help: bool,
 }
 
@@ -613,6 +739,10 @@ impl Default for Config {
             verify: false,
             verify_services: false,
             preflight_only: false,
+            verify_launch_spawn: false,
+            launch_spawn_program: None,
+            launch_spawn_args: Vec::new(),
+            launch_wayland_display: None,
             help: false,
         }
     }
@@ -636,6 +766,29 @@ impl Config {
                 config.verify_services = true;
             } else if arg == "--preflight-only" {
                 config.preflight_only = true;
+            } else if arg == "--verify-launch-spawn" {
+                config.verify_launch_spawn = true;
+            } else if let Some(value) = arg.strip_prefix("--launch-spawn-program=") {
+                config.launch_spawn_program = Some(value.to_string());
+            } else if arg == "--launch-spawn-program" {
+                config.launch_spawn_program = Some(
+                    args.next()
+                        .ok_or_else(|| String::from("missing value for --launch-spawn-program"))?,
+                );
+            } else if let Some(value) = arg.strip_prefix("--launch-spawn-arg=") {
+                config.launch_spawn_args.push(value.to_string());
+            } else if arg == "--launch-spawn-arg" {
+                config.launch_spawn_args.push(
+                    args.next()
+                        .ok_or_else(|| String::from("missing value for --launch-spawn-arg"))?,
+                );
+            } else if let Some(value) = arg.strip_prefix("--wayland-display=") {
+                config.launch_wayland_display = Some(value.to_string());
+            } else if arg == "--wayland-display" {
+                config.launch_wayland_display = Some(
+                    args.next()
+                        .ok_or_else(|| String::from("missing value for --wayland-display"))?,
+                );
             } else if let Some(value) = arg.strip_prefix("--backend=") {
                 config.backend = parse_backend(value)?;
             } else if arg == "--backend" {
@@ -702,7 +855,7 @@ fn print_help() {
 backlit-session
 
 Usage:
-  backlit-session [--backend=headless|wayland|drm] [--socket=backlit-0] [--screenshot=target/backlit-session.ppm] [--verify] [--verify-services] [--preflight-only]
+  backlit-session [--backend=headless|wayland|drm] [--socket=backlit-0] [--screenshot=target/backlit-session.ppm] [--verify] [--verify-services] [--verify-launch-spawn] [--preflight-only]
 
 Flags:
   --backend      Select compositor backend. Defaults to headless.
@@ -715,6 +868,14 @@ Flags:
   --verify       Fail if expected GUI regions are missing.
   --verify-services
                  Fail if sibling compositor and shell probes cannot launch.
+  --verify-launch-spawn
+                 Spawn the terminal launch target resolved from Super+Enter.
+  --launch-spawn-program
+                 Override terminal program for deterministic spawn verification.
+  --launch-spawn-arg
+                 Argument for the launch spawn program override. May repeat.
+  --wayland-display
+                 WAYLAND_DISPLAY value to pass to the launched terminal target.
   --preflight-only
                  Verify backend launch prerequisites and exit before rendering.
 "
@@ -731,6 +892,13 @@ mod tests {
             "--verify",
             "--verify-services",
             "--preflight-only",
+            "--verify-launch-spawn",
+            "--launch-spawn-program",
+            "true",
+            "--launch-spawn-arg",
+            "--help",
+            "--wayland-display",
+            "wayland-1",
             "--service-log-dir",
             "target/session-services",
         ])
@@ -739,6 +907,10 @@ mod tests {
         assert!(config.verify);
         assert!(config.verify_services);
         assert!(config.preflight_only);
+        assert!(config.verify_launch_spawn);
+        assert_eq!(config.launch_spawn_program.as_deref(), Some("true"));
+        assert_eq!(config.launch_spawn_args, ["--help"]);
+        assert_eq!(config.launch_wayland_display.as_deref(), Some("wayland-1"));
         assert_eq!(
             config.service_log_dir.as_deref(),
             Some("target/session-services")

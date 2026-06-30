@@ -79,6 +79,7 @@ if [ -n "$artifact_root" ] && [ -d "$artifact_root" ]; then
   require_contains "$artifact_root/gui-smoke/manifest.json" '"launcher_required_targets": 3'
   require_contains "$artifact_root/gui-smoke/manifest.json" '"shortcut_required_bindings": 6'
   require_contains "$artifact_root/gui-smoke/manifest.json" '"session_services": true'
+  require_contains "$artifact_root/gui-smoke/manifest.json" '"session_launch_spawn": true'
   require_contains "$artifact_root/gui-smoke/manifest.json" '"session_move_resize": true'
   require_contains "$artifact_root/gui-smoke/manifest.json" '"golden_checksum": true'
   require_contains "$artifact_root/gui-preview/manifest.json" '"session_verified": true'
@@ -95,6 +96,7 @@ if [ -n "$artifact_root" ] && [ -d "$artifact_root" ]; then
     require_contains "$artifact_root/nested-wayland/manifest.json" '"parent_socket_ready": true'
     require_contains "$artifact_root/nested-wayland/manifest.json" '"wayland_preflight_ready": true'
     require_contains "$artifact_root/nested-wayland/manifest.json" '"compositor_wayland_smoke": true'
+    require_contains "$artifact_root/nested-wayland/manifest.json" '"session_wayland_client_spawn": true'
     require_contains "$artifact_root/nested-wayland/manifest.json" '"session_wayland_services": true'
   fi
 fi

@@ -15,6 +15,7 @@ Current launch-readiness checks:
 - `scripts/verify-launch-readiness.sh` records whether the host is DRM launch-ready or expected-blocked.
 - `backlit-session --preflight-only` verifies backend launch prerequisites through the actual session entrypoint before rendering starts.
 - `scripts/verify-session-launch.sh` verifies the desktop session entry, headless session launch, and DRM session launch preflight.
+- `backlit-session --verify-launch-spawn` verifies that the `Super+Enter` terminal route can spawn a process with `WAYLAND_DISPLAY` set.
 - The Linux E2E manifest includes the launch-readiness manifest.
 - The Linux E2E manifest includes the session launch manifest.
 - Parallels Ubuntu E2E is expected to report `drm_expected_ready: true`, `drm_ready: true`, `drm_session_expected_ready: true`, and `drm_session_ready: true`.

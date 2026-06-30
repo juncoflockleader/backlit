@@ -83,15 +83,22 @@ require_executable "$(resolve_usr_bin "$shell_command")"
   --socket=backlit-0 \
   --screenshot "$session_screenshot" \
   --verify \
+  --verify-launch-spawn \
+  --launch-spawn-program true \
+  --wayland-display backlit-0 \
   --verify-services \
   --service-log-dir "$out_dir/session-services" > "$session_log"
 
 require_file "$session_screenshot"
 grep -F '"event":"session.interactions"' "$session_log" >/dev/null || fail "missing session interaction event"
+grep -F '"event":"session.launch_spawn"' "$session_log" >/dev/null || fail "missing session launch spawn event"
 grep -F '"event":"session.verified"' "$session_log" >/dev/null || fail "missing session verification event"
 grep -F '"event":"session.services_verified"' "$session_log" >/dev/null || fail "missing session services verification event"
 grep -F '"passed":true' "$session_log" >/dev/null || fail "session verification did not pass"
 grep -F '"golden_ok":true' "$session_log" >/dev/null || fail "session golden verification did not pass"
+grep -F '"spawned":true' "$session_log" >/dev/null || fail "session launch target did not spawn"
+grep -F '"exit_success":true' "$session_log" >/dev/null || fail "session launch target did not exit successfully"
+grep -F '"wayland_display_set":true' "$session_log" >/dev/null || fail "session launch target did not receive WAYLAND_DISPLAY"
 grep -F '"compositor_ready":true' "$session_log" >/dev/null || fail "session compositor service did not become ready"
 grep -F '"shell_ready":true' "$session_log" >/dev/null || fail "session shell service did not become ready"
 grep -F '"children_exited_cleanly":true' "$session_log" >/dev/null || fail "session service probes did not exit cleanly"
@@ -123,6 +130,7 @@ cat > "$out_dir/manifest.json" <<EOF
     "systemd_exec_resolves": true,
     "staged_session_help": true,
     "staged_session_gui": true,
+    "staged_session_launch_spawn": true,
     "staged_session_services": true,
     "staged_compositor_smoke": true,
     "staged_shell_verify": true

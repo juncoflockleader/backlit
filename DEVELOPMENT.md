@@ -263,7 +263,7 @@ Launcher spawn verification proves the selected target can start a process with 
 
 Keyboard shortcut routing is also verified in dry-run mode for launcher, terminal, browser, settings, and app-switcher actions.
 
-The session smoke path consumes those dry-run routes too: `Alt+Tab` cycles focus and `Super+Enter` resolves the terminal launch path, then records the resulting window-policy state in `session.jsonl`.
+The session smoke path consumes those routes too: `Alt+Tab` cycles focus and `Super+Enter` resolves the terminal launch path, spawns the terminal launch target with `WAYLAND_DISPLAY` set when `--verify-launch-spawn` is enabled, then records the resulting window-policy state in `session.jsonl`.
 
 With `--verify-services`, `backlit-session` also resolves sibling `backlit-compositor` and `backlit-shell` binaries, runs their readiness probes, captures their logs, and emits `session.services_verified`.
 

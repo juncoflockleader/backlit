@@ -73,6 +73,9 @@ WAYLAND_DISPLAY="$socket_name" cargo run -p backlit-session -- \
   --socket=backlit-0 \
   --screenshot="$out_dir/session.ppm" \
   --verify \
+  --verify-launch-spawn \
+  --launch-spawn-program="$info_tool" \
+  --wayland-display="$socket_name" \
   --verify-services \
   --service-log-dir="$out_dir/session-services" > "$out_dir/session.jsonl"
 
@@ -86,7 +89,12 @@ grep '"spawned":true' "$out_dir/launcher-spawn.jsonl" >/dev/null
 grep '"exit_success":true' "$out_dir/launcher-spawn.jsonl" >/dev/null
 grep '"wayland_display_set":true' "$out_dir/launcher-spawn.jsonl" >/dev/null
 grep '"event":"session.services_verified"' "$out_dir/session.jsonl" >/dev/null
+grep '"event":"session.launch_spawn"' "$out_dir/session.jsonl" >/dev/null
 grep '"backend":"wayland"' "$out_dir/session.jsonl" >/dev/null
+grep '"shortcut_resolved":true' "$out_dir/session.jsonl" >/dev/null
+grep '"spawned":true' "$out_dir/session.jsonl" >/dev/null
+grep '"exit_success":true' "$out_dir/session.jsonl" >/dev/null
+grep '"wayland_display_set":true' "$out_dir/session.jsonl" >/dev/null
 grep '"compositor_ready":true' "$out_dir/session.jsonl" >/dev/null
 grep '"shell_ready":true' "$out_dir/session.jsonl" >/dev/null
 grep '"children_exited_cleanly":true' "$out_dir/session.jsonl" >/dev/null
@@ -115,6 +123,7 @@ cat > "$out_dir/manifest.json" <<EOF
     "wayland_preflight_ready": true,
     "compositor_wayland_smoke": true,
     "launcher_wayland_client_spawn": true,
+    "session_wayland_client_spawn": true,
     "session_wayland_services": true
   }
 }

@@ -45,6 +45,6 @@ When a Parallels Ubuntu VM is available, the full Linux guest verification can b
 ./scripts/render-parallels-gui-preview.sh
 ```
 
-The session smoke path also verifies dry-run shortcut interactions: app switching and terminal launch resolution.
+The session smoke path also verifies shortcut interactions: app switching, terminal launch resolution, and deterministic terminal spawn with `WAYLAND_DISPLAY` propagation.
 
 See [DEVELOPMENT.md](DEVELOPMENT.md) for environment setup, VM workflow, project layout, and contribution rules.

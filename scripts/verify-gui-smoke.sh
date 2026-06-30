@@ -29,6 +29,9 @@ cargo run -p backlit-session -- \
   --socket=backlit-0 \
   --screenshot="$out_dir/backlit-session.ppm" \
   --verify \
+  --verify-launch-spawn \
+  --launch-spawn-program=true \
+  --wayland-display=backlit-0 \
   --verify-services \
   --service-log-dir="$out_dir/session-services" > "$out_dir/session.jsonl"
 cargo run -p backlit-demo-client -- \
@@ -37,9 +40,15 @@ cargo run -p backlit-demo-client -- \
 
 grep '"event":"session.verified"' "$out_dir/session.jsonl" >/dev/null
 grep '"event":"session.interactions"' "$out_dir/session.jsonl" >/dev/null
+grep '"event":"session.launch_spawn"' "$out_dir/session.jsonl" >/dev/null
 grep '"event":"session.services_verified"' "$out_dir/session.jsonl" >/dev/null
 grep '"windows_after_launch":4' "$out_dir/session.jsonl" >/dev/null
 grep '"terminal_launch_resolved":true' "$out_dir/session.jsonl" >/dev/null
+grep '"shortcut_resolved":true' "$out_dir/session.jsonl" >/dev/null
+grep '"target_resolved":true' "$out_dir/session.jsonl" >/dev/null
+grep '"spawned":true' "$out_dir/session.jsonl" >/dev/null
+grep '"exit_success":true' "$out_dir/session.jsonl" >/dev/null
+grep '"wayland_display_set":true' "$out_dir/session.jsonl" >/dev/null
 grep '"move_resize_ok":true' "$out_dir/session.jsonl" >/dev/null
 grep '"minimize_skips_focus":true' "$out_dir/session.jsonl" >/dev/null
 grep '"resized_width":920' "$out_dir/session.jsonl" >/dev/null
@@ -128,6 +137,7 @@ cat > "$out_dir/manifest.json" <<EOF
     "shell_crash_isolated": true,
     "clipboard_generation": 3,
     "session_windows_after_launch": 4,
+    "session_launch_spawn": true,
     "session_services": true,
     "session_move_resize": true,
     "session_minimize_skips_focus": true,
