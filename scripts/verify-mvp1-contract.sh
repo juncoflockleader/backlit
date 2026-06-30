@@ -134,6 +134,7 @@ if [ -n "$artifact_root" ] && [ -d "$artifact_root" ]; then
   else
     require_contains "$artifact_root/resource-budget/manifest.json" '"resource_budget_blocked_expected": true'
   fi
+  require_contains "$artifact_root/compositor-runtime/manifest.json" '"surface_policy_preview": true'
   require_contains "$artifact_root/compositor-runtime/manifest.json" '"targeted_surface_damage": true'
   require_contains "$artifact_root/compositor-runtime/manifest.json" '"client_disconnect_cleanup": true'
 

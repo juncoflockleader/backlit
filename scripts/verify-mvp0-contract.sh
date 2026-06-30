@@ -269,6 +269,7 @@ if [ -n "$artifact_root" ] && [ -d "$artifact_root" ]; then
   require_contains "$artifact_root/gui-preview/manifest.json" '"settings_service": true'
   require_contains "$artifact_root/compositor-runtime/manifest.json" '"scripted_client_runtime": true'
   require_contains "$artifact_root/compositor-runtime/manifest.json" '"app_surface_map": true'
+  require_contains "$artifact_root/compositor-runtime/manifest.json" '"surface_policy_preview": true'
   require_contains "$artifact_root/compositor-runtime/manifest.json" '"targeted_surface_damage": true'
   require_contains "$artifact_root/compositor-runtime/manifest.json" '"idle_no_redraw": true'
   require_contains "$artifact_root/compositor-runtime/manifest.json" '"surface_close_damage": true'

@@ -297,7 +297,7 @@ It also runs `backlit-perf --verify`, which measures the deterministic GUI rende
 
 The compositor smoke path also checks the headless direct-scanout policy: an opaque fullscreen dmabuf surface covering the output is eligible, while overlays and SHM buffers block scanout.
 
-The compositor-runtime verifier runs `backlit-compositor --scripted-client --serve --serve-for-ms=25`, maps two app-like surfaces, verifies targeted damage and idle no-redraw behavior, closes one surface, disconnects the client, and checks the cleanup frames. It is a bounded headless proof for the app-window lifecycle that the future Smithay runtime must preserve.
+The compositor-runtime verifier runs `backlit-compositor --scripted-client --scripted-client-preview target/compositor-runtime/scripted-client-policy-preview.ppm --serve --serve-for-ms=25`, maps two app-like surfaces, verifies they become managed policy windows, writes and verifies a GUI preview frame from that compositor path, verifies targeted damage and idle no-redraw behavior, closes one surface, disconnects the client, and checks the cleanup frames. It is a bounded headless proof for the app-window lifecycle that the future Smithay runtime must preserve.
 
 The launch-performance verifier runs the built `backlit-session`, `backlit-compositor`, `backlit-shell`, `backlit-notification-daemon`, and `backlit-settings-daemon` binaries directly, then writes `target/launch-performance/manifest.json`. It enforces the current MVP budgets for session GUI readiness under 500 ms, service-ready probes under 2 seconds, and terminal hotkey spawn under 300 ms.
 

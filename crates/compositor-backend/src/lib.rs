@@ -721,6 +721,7 @@ pub struct RunConfig {
     pub socket: String,
     pub smoke_test: bool,
     pub scripted_client: bool,
+    pub scripted_client_preview: Option<String>,
     pub serve: bool,
     pub serve_for_ms: Option<u64>,
     pub idle_probe_ms: Option<u64>,
@@ -734,6 +735,7 @@ impl Default for RunConfig {
             socket: String::from("backlit-0"),
             smoke_test: false,
             scripted_client: false,
+            scripted_client_preview: None,
             serve: false,
             serve_for_ms: None,
             idle_probe_ms: None,
@@ -776,6 +778,15 @@ where
             config.smoke_test = true;
         } else if arg == "--scripted-client" {
             config.scripted_client = true;
+        } else if let Some(value) = arg.strip_prefix("--scripted-client-preview=") {
+            config.scripted_client = true;
+            config.scripted_client_preview = Some(value.to_string());
+        } else if arg == "--scripted-client-preview" {
+            config.scripted_client = true;
+            config.scripted_client_preview = Some(
+                args.next()
+                    .ok_or(ArgError::MissingValue("--scripted-client-preview"))?,
+            );
         } else if arg == "--serve" {
             config.serve = true;
         } else if let Some(value) = arg.strip_prefix("--backend=") {
@@ -1127,6 +1138,8 @@ mod tests {
             "backlit-test",
             "--smoke-test",
             "--scripted-client",
+            "--scripted-client-preview",
+            "target/compositor-runtime/preview.ppm",
             "--idle-probe-ms",
             "250",
             "--serve",
@@ -1138,6 +1151,10 @@ mod tests {
         assert_eq!(config.socket, "backlit-test");
         assert!(config.smoke_test);
         assert!(config.scripted_client);
+        assert_eq!(
+            config.scripted_client_preview.as_deref(),
+            Some("target/compositor-runtime/preview.ppm")
+        );
         assert_eq!(config.idle_probe_ms, Some(250));
         assert!(config.serve);
         assert_eq!(config.serve_for_ms, Some(25));

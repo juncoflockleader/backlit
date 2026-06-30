@@ -1,4 +1,5 @@
 use std::env;
+use std::path::Path;
 use std::process;
 use std::thread;
 use std::time::Duration;
@@ -9,6 +10,7 @@ use backlit_compositor_backend::{
     parse_args, preflight_backend_with_environment, BackendPreflightEnvironment,
     BackendPreflightReport, HeadlessCompositor, RunConfig, SurfaceOptions,
 };
+use backlit_demo_client::{render_policy_gui, verify_policy_gui};
 use backlit_surface::{SurfaceManager, SurfacePhase, SurfaceRole};
 use backlit_window_policy::{OutputLayout, WindowPolicy, WindowState};
 
@@ -51,7 +53,7 @@ fn run() -> Result<(), String> {
     }
 
     if config.scripted_client {
-        let runtime = run_scripted_client_runtime()?;
+        let runtime = run_scripted_client_runtime(config.scripted_client_preview.as_deref())?;
         emit(
             "compositor.scripted_client",
             &config,
@@ -123,6 +125,38 @@ fn run() -> Result<(), String> {
                 (
                     "clean_disconnect",
                     FieldValue::Bool(runtime.clean_disconnect),
+                ),
+                (
+                    "policy_windows_after_map",
+                    FieldValue::U64(runtime.policy_windows_after_map),
+                ),
+                (
+                    "policy_visible_windows_after_map",
+                    FieldValue::U64(runtime.policy_visible_windows_after_map),
+                ),
+                (
+                    "policy_focused_after_map",
+                    FieldValue::Bool(runtime.policy_focused_after_map),
+                ),
+                (
+                    "policy_preview_requested",
+                    FieldValue::Bool(runtime.policy_preview_requested),
+                ),
+                (
+                    "policy_preview_written",
+                    FieldValue::Bool(runtime.policy_preview_written),
+                ),
+                (
+                    "policy_preview_verified",
+                    FieldValue::Bool(runtime.policy_preview_verified),
+                ),
+                (
+                    "policy_preview_non_background_pixels",
+                    FieldValue::U64(runtime.policy_preview_non_background_pixels),
+                ),
+                (
+                    "policy_preview_checksum",
+                    FieldValue::U64(runtime.policy_preview_checksum),
                 ),
             ],
         );
@@ -249,6 +283,14 @@ struct ScriptedClientRuntime {
     close_damage_ok: bool,
     disconnect_damage_ok: bool,
     clean_disconnect: bool,
+    policy_windows_after_map: u64,
+    policy_visible_windows_after_map: u64,
+    policy_focused_after_map: bool,
+    policy_preview_requested: bool,
+    policy_preview_written: bool,
+    policy_preview_verified: bool,
+    policy_preview_non_background_pixels: u64,
+    policy_preview_checksum: u64,
 }
 
 impl ScriptedClientRuntime {
@@ -272,20 +314,57 @@ impl ScriptedClientRuntime {
             && self.close_damage_ok
             && self.disconnect_damage_ok
             && self.clean_disconnect
+            && self.policy_windows_after_map == 2
+            && self.policy_visible_windows_after_map == 2
+            && self.policy_focused_after_map
+            && (!self.policy_preview_requested || self.policy_preview_written)
+            && self.policy_preview_verified
+            && self.policy_preview_non_background_pixels > 10_000
     }
 }
 
-fn run_scripted_client_runtime() -> Result<ScriptedClientRuntime, String> {
+fn run_scripted_client_runtime(
+    policy_preview_path: Option<&str>,
+) -> Result<ScriptedClientRuntime, String> {
     let mut backend = HeadlessCompositor::default();
+    let layout = OutputLayout::new(1400, 900, 42);
+    let mut manager = SurfaceManager::new(layout);
     let client = backend.connect_client("scripted-terminal-client");
     let terminal = backend
         .submit_surface(client, "scripted-terminal", 800, 600)
         .map_err(|error| error.to_string())?;
+    let terminal_policy_surface =
+        map_scripted_toplevel(&mut manager, "scripted-terminal", 800, 600)?;
     let browser = backend
         .submit_surface(client, "scripted-browser", 1024, 768)
         .map_err(|error| error.to_string())?;
+    let browser_policy_surface =
+        map_scripted_toplevel(&mut manager, "scripted-browser", 1024, 768)?;
     let first_frame = backend.present();
     let idle_frame = backend.present();
+    let browser_window = manager
+        .surface(browser_policy_surface)
+        .and_then(|surface| surface.window_id);
+    let policy_windows_after_map = manager.policy().windows().len() as u64;
+    let policy_visible_windows_after_map = manager.policy().visible_windows().count() as u64;
+    let policy_focused_after_map =
+        browser_window.is_some() && manager.policy().focused() == browser_window;
+    let policy_preview = render_policy_gui(1400, 900, manager.policy(), layout);
+    let policy_preview_report = verify_policy_gui(&policy_preview, manager.policy(), layout);
+    let policy_preview_requested = policy_preview_path.is_some();
+    let policy_preview_written = if let Some(path) = policy_preview_path {
+        policy_preview
+            .write_ppm(path)
+            .map_err(|error| format!("failed to write scripted-client preview {path}: {error}"))?;
+        Path::new(path).is_file()
+    } else {
+        true
+    };
+    let policy_preview_verified = policy_preview_report.passed()
+        && manager
+            .surface(terminal_policy_surface)
+            .and_then(|surface| surface.window_id)
+            .is_some();
 
     backend
         .mark_damaged(terminal)
@@ -333,7 +412,40 @@ fn run_scripted_client_runtime() -> Result<ScriptedClientRuntime, String> {
         close_damage_ok,
         disconnect_damage_ok,
         clean_disconnect,
+        policy_windows_after_map,
+        policy_visible_windows_after_map,
+        policy_focused_after_map,
+        policy_preview_requested,
+        policy_preview_written,
+        policy_preview_verified,
+        policy_preview_non_background_pixels: policy_preview_report.non_background_pixels,
+        policy_preview_checksum: policy_preview_report.checksum,
     })
+}
+
+fn map_scripted_toplevel(
+    manager: &mut SurfaceManager,
+    title: &str,
+    width: i32,
+    height: i32,
+) -> Result<backlit_surface::SurfaceId, String> {
+    let surface = manager.create_toplevel(title, (width, height));
+    let configure = manager
+        .send_initial_configure(surface)
+        .ok_or_else(|| format!("failed to configure scripted surface {title}"))?;
+    if configure.width != width || configure.height != height {
+        return Err(format!(
+            "scripted surface {title} configured as {}x{} instead of {width}x{height}",
+            configure.width, configure.height
+        ));
+    }
+    if !manager.ack_configure(surface, configure.serial) {
+        return Err(format!("failed to ack scripted surface {title}"));
+    }
+    if !manager.commit(surface) {
+        return Err(format!("failed to map scripted surface {title}"));
+    }
+    Ok(surface)
 }
 
 fn run_smoke_test(config: &RunConfig) {
@@ -917,7 +1029,7 @@ fn print_help() {
 backlit-compositor
 
 Usage:
-  backlit-compositor [--backend=headless|wayland|drm] [--socket=backlit-0] [--smoke-test] [--scripted-client] [--serve] [--serve-for-ms=1000] [--idle-probe-ms=1000]
+  backlit-compositor [--backend=headless|wayland|drm] [--socket=backlit-0] [--smoke-test] [--scripted-client] [--scripted-client-preview=path] [--serve] [--serve-for-ms=1000] [--idle-probe-ms=1000]
 
 Flags:
   --backend      Select compositor backend. Defaults to headless.
@@ -925,6 +1037,8 @@ Flags:
   --smoke-test   Run the current MVP 0 policy/metrics smoke test and exit.
   --scripted-client
                  Run a deterministic app-client lifecycle through the compositor runtime.
+  --scripted-client-preview
+                 Write the scripted client policy preview frame to a PPM file.
   --serve        Stay alive after readiness for systemd session service mode.
   --serve-for-ms Stay alive for a bounded service-lifecycle probe duration.
   --idle-probe-ms
@@ -963,11 +1077,13 @@ mod tests {
 
     #[test]
     fn scripted_client_runtime_maps_damages_and_disconnects() {
-        let report = run_scripted_client_runtime().unwrap();
+        let report = run_scripted_client_runtime(None).unwrap();
 
         assert!(report.passed(), "{report:?}");
         assert_eq!(report.surfaces_after_map, 2);
         assert_eq!(report.surfaces_after_disconnect, 0);
         assert_eq!(report.clients_after_disconnect, 0);
+        assert_eq!(report.policy_windows_after_map, 2);
+        assert!(report.policy_preview_verified);
     }
 }

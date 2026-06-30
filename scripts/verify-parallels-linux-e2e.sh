@@ -285,6 +285,7 @@ guest_e2e_dir="$repo_dir/$e2e_out_dir"
 host_guest_manifest="$host_out_dir/guest-manifest.json"
 host_gui_smoke_manifest="$host_out_dir/gui-smoke-manifest.json"
 host_gui_preview_manifest="$host_out_dir/gui-preview-manifest.json"
+host_compositor_runtime_manifest="$host_out_dir/compositor-runtime-manifest.json"
 host_launch_readiness_manifest="$host_out_dir/launch-readiness-manifest.json"
 host_session_replay_manifest="$host_out_dir/session-replay-manifest.json"
 host_drm_session_smoke_manifest="$host_out_dir/drm-session-smoke-manifest.json"
@@ -298,12 +299,15 @@ host_mvp0_contract_manifest="$host_out_dir/mvp0-contract-manifest.json"
 host_mvp1_contract_manifest="$host_out_dir/mvp1-contract-manifest.json"
 host_ppm="$host_out_dir/gui-preview-backlit-session.ppm"
 host_png="$host_out_dir/gui-preview-backlit-session.png"
+host_compositor_preview_ppm="$host_out_dir/compositor-runtime-scripted-client-policy-preview.ppm"
+host_compositor_preview_png="$host_out_dir/compositor-runtime-scripted-client-policy-preview.png"
 
 mkdir -p "$host_out_dir"
 rm -f \
   "$host_guest_manifest" \
   "$host_gui_smoke_manifest" \
   "$host_gui_preview_manifest" \
+  "$host_compositor_runtime_manifest" \
   "$host_launch_readiness_manifest" \
   "$host_session_replay_manifest" \
   "$host_drm_session_smoke_manifest" \
@@ -317,11 +321,14 @@ rm -f \
   "$host_mvp1_contract_manifest" \
   "$host_ppm" \
   "$host_png" \
+  "$host_compositor_preview_ppm" \
+  "$host_compositor_preview_png" \
   "$host_out_dir/manifest.json"
 
 download_file "$guest_e2e_dir/manifest.json" "$host_guest_manifest"
 download_file "$guest_e2e_dir/gui-smoke/manifest.json" "$host_gui_smoke_manifest"
 download_file "$guest_e2e_dir/gui-preview/manifest.json" "$host_gui_preview_manifest"
+download_file "$guest_e2e_dir/compositor-runtime/manifest.json" "$host_compositor_runtime_manifest"
 download_file "$guest_e2e_dir/launch-readiness/manifest.json" "$host_launch_readiness_manifest"
 download_file "$guest_e2e_dir/session-replay/manifest.json" "$host_session_replay_manifest"
 download_file "$guest_e2e_dir/drm-session-smoke/manifest.json" "$host_drm_session_smoke_manifest"
@@ -334,6 +341,7 @@ download_file "$guest_e2e_dir/nested-wayland/manifest.json" "$host_nested_waylan
 download_file "$guest_e2e_dir/mvp0-contract/manifest.json" "$host_mvp0_contract_manifest"
 download_file "$guest_e2e_dir/mvp1-contract/manifest.json" "$host_mvp1_contract_manifest"
 download_file "$guest_e2e_dir/gui-preview/backlit-session.ppm" "$host_ppm"
+download_file "$guest_e2e_dir/compositor-runtime/scripted-client-policy-preview.ppm" "$host_compositor_preview_ppm"
 
 preview_image="$host_ppm"
 preview_format="ppm"
@@ -373,6 +381,44 @@ fi
 ppm_bytes="$(wc -c < "$host_ppm" | tr -d ' ')"
 test "$ppm_bytes" = "1248015"
 
+compositor_preview_image="$host_compositor_preview_ppm"
+compositor_preview_format="ppm"
+compositor_png_written=false
+compositor_converter="none"
+
+if command -v sips >/dev/null 2>&1; then
+  if sips -s format png "$host_compositor_preview_ppm" --out "$host_compositor_preview_png" >/dev/null 2>&1; then
+    compositor_preview_image="$host_compositor_preview_png"
+    compositor_preview_format="png"
+    compositor_png_written=true
+    compositor_converter="sips"
+  fi
+elif command -v magick >/dev/null 2>&1; then
+  if magick "$host_compositor_preview_ppm" "$host_compositor_preview_png" >/dev/null 2>&1; then
+    compositor_preview_image="$host_compositor_preview_png"
+    compositor_preview_format="png"
+    compositor_png_written=true
+    compositor_converter="magick"
+  fi
+elif command -v convert >/dev/null 2>&1; then
+  if convert "$host_compositor_preview_ppm" "$host_compositor_preview_png" >/dev/null 2>&1; then
+    compositor_preview_image="$host_compositor_preview_png"
+    compositor_preview_format="png"
+    compositor_png_written=true
+    compositor_converter="convert"
+  fi
+elif command -v pnmtopng >/dev/null 2>&1; then
+  if pnmtopng "$host_compositor_preview_ppm" > "$host_compositor_preview_png"; then
+    compositor_preview_image="$host_compositor_preview_png"
+    compositor_preview_format="png"
+    compositor_png_written=true
+    compositor_converter="pnmtopng"
+  fi
+fi
+
+compositor_preview_ppm_bytes="$(wc -c < "$host_compositor_preview_ppm" | tr -d ' ')"
+test "$compositor_preview_ppm_bytes" -gt 10000
+
 require_contains "$host_guest_manifest" '"passed": true'
 require_contains "$host_guest_manifest" "\"commit\": \"$guest_commit\""
 require_contains "$host_guest_manifest" '"debian_package_build": true'
@@ -384,6 +430,11 @@ require_contains "$host_guest_manifest" '"mvp1_contract": true'
 require_contains "$host_gui_smoke_manifest" '"golden_checksum": true'
 require_contains "$host_gui_preview_manifest" '"session_verified": true'
 require_contains "$host_gui_preview_manifest" '"session_services": true'
+require_contains "$host_compositor_runtime_manifest" '"scripted_client_runtime": true'
+require_contains "$host_compositor_runtime_manifest" '"surface_policy_preview": true'
+require_contains "$host_compositor_runtime_manifest" '"policy_preview_ppm_bytes":'
+require_contains "$host_compositor_runtime_manifest" '"targeted_surface_damage": true'
+require_contains "$host_compositor_runtime_manifest" '"client_disconnect_cleanup": true'
 require_contains "$host_session_replay_manifest" '"session_replay_event": true'
 require_contains "$host_session_replay_manifest" '"frame_count": 9'
 require_contains "$host_session_replay_manifest" '"launcher_overlay_frame": true'
@@ -439,6 +490,7 @@ cat > "$host_out_dir/manifest.json" <<EOF
     "guest_manifest": "$host_guest_manifest",
     "gui_smoke_manifest": "$host_gui_smoke_manifest",
     "gui_preview_manifest": "$host_gui_preview_manifest",
+    "compositor_runtime_manifest": "$host_compositor_runtime_manifest",
     "launch_readiness_manifest": "$host_launch_readiness_manifest",
     "session_replay_manifest": "$host_session_replay_manifest",
     "drm_session_smoke_manifest": "$host_drm_session_smoke_manifest",
@@ -451,7 +503,9 @@ cat > "$host_out_dir/manifest.json" <<EOF
     "mvp0_contract_manifest": "$host_mvp0_contract_manifest",
     "mvp1_contract_manifest": "$host_mvp1_contract_manifest",
     "gui_preview_ppm": "$host_ppm",
-    "gui_preview_image": "$preview_image"
+    "gui_preview_image": "$preview_image",
+    "compositor_runtime_preview_ppm": "$host_compositor_preview_ppm",
+    "compositor_runtime_preview_image": "$compositor_preview_image"
   },
   "checks": {
     "guest_e2e_passed": true,
@@ -459,6 +513,8 @@ cat > "$host_out_dir/manifest.json" <<EOF
     "guest_artifacts_exported": true,
     "gui_smoke": true,
     "gui_preview": true,
+    "compositor_runtime": true,
+    "compositor_runtime_policy_preview": true,
     "launch_readiness": true,
     "session_replay": true,
     "parallels_drm_launch_ready": true,
@@ -477,7 +533,11 @@ cat > "$host_out_dir/manifest.json" <<EOF
     "ppm_bytes": $ppm_bytes,
     "png_written": $png_written,
     "preview_format": "$preview_format",
-    "converter": "$converter"
+    "converter": "$converter",
+    "compositor_preview_ppm_bytes": $compositor_preview_ppm_bytes,
+    "compositor_png_written": $compositor_png_written,
+    "compositor_preview_format": "$compositor_preview_format",
+    "compositor_converter": "$compositor_converter"
   }
 }
 EOF
@@ -488,4 +548,7 @@ if [ "$preview_format" = "png" ]; then
   printf 'To view E2E preview on macOS: open %s\n' "$preview_image"
 else
   printf 'No PNG converter found; view the PPM directly or install ImageMagick/netpbm.\n'
+fi
+if [ "$compositor_preview_format" = "png" ]; then
+  printf 'To view compositor-runtime preview on macOS: open %s\n' "$compositor_preview_image"
 fi

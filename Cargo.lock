@@ -19,6 +19,7 @@ version = "0.1.0"
 dependencies = [
  "backlit-common",
  "backlit-compositor-backend",
+ "backlit-demo-client",
  "backlit-protocols",
  "backlit-surface",
  "backlit-window-policy",
