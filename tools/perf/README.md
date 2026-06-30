@@ -13,3 +13,10 @@ Initial metrics to collect:
 - terminal launch latency;
 - fullscreen direct scanout success.
 
+Current MVP 0 smoke command:
+
+```bash
+cargo run -p backlit-perf -- --verify
+```
+
+This is intentionally narrow: it checks deterministic GUI render time and headless backend present time so regressions are visible before real frame pacing instrumentation exists.

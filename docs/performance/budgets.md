@@ -14,3 +14,12 @@ Initial MVP targets:
 
 Any change to compositor startup, input, rendering, app launch, shell startup, or session services should carry a benchmark or regression check.
 
+## MVP 0 Smoke Check
+
+The current automated regression check is:
+
+```bash
+cargo run -p backlit-perf -- --verify
+```
+
+It measures the deterministic headless GUI render path and the in-memory headless backend present path. This does not prove real compositor latency, but it catches early regressions while nested Wayland and DRM/KMS backends are still being built.

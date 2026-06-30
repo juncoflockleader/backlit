@@ -134,6 +134,7 @@ cargo clippy --workspace --all-targets -- -D warnings
 cargo test --workspace --all-targets
 cargo run -p backlit-compositor -- --backend=headless --smoke-test
 cargo run -p backlit-protocols -- --verify --list
+cargo run -p backlit-perf -- --verify
 cargo run -p backlit-session -- --backend=headless --screenshot target/backlit-session.ppm --verify
 ./scripts/verify-gui-smoke.sh
 cargo run -p backlit-shell -- --component=panel --socket=backlit-0
@@ -163,6 +164,8 @@ Artifacts are written to `target/gui-smoke/`:
 - `*.jsonl`: structured launch and verification events.
 
 The verifier also runs `backlit-protocols --verify --list` so MVP protocol coverage stays explicit while the real Smithay compositor is being brought up.
+
+It also runs `backlit-perf --verify`, which measures the deterministic GUI render path and headless backend present path against generous MVP 0 smoke budgets.
 
 ## Engineering Rules
 

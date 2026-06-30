@@ -1,0 +1,18 @@
+[package]
+name = "backlit-perf"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+publish = false
+
+[dependencies]
+backlit-common = { path = "../common" }
+backlit-compositor-backend = { path = "../compositor-backend" }
+backlit-demo-client = { path = "../demo-client" }
+backlit-protocols = { path = "../protocols" }
+
+[lib]
+path = "src/lib.rs"
+

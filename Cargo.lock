@@ -27,6 +27,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "backlit-perf"
+version = "0.1.0"
+dependencies = [
+ "backlit-common",
+ "backlit-compositor-backend",
+ "backlit-demo-client",
+ "backlit-protocols",
+]
+
+[[package]]
 name = "backlit-portal-backend"
 version = "0.1.0"
 dependencies = [

@@ -10,6 +10,7 @@ MVP 0 is the development harness:
 - Deterministic demo GUI renderer.
 - Headless session launch verification.
 - Basic MVP protocol smoke registry.
+- Headless performance smoke checks.
 - JSON metrics.
 - CI.
 - Packaging skeleton.
