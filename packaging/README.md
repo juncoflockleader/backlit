@@ -8,7 +8,7 @@ Initial package split from the design:
 - `fastgui-shell` for panel, launcher, wallpaper, notifications, and shell support processes.
 - `fastgui-session`
 - `fastgui-portal`
-- `fastgui-settings`
+- `fastgui-settings` for the settings daemon and Backlit Settings app entry.
 - `fastgui-desktop`
 - `fastgui-dev-tools`
 

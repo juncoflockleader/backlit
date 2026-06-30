@@ -28,6 +28,7 @@ cargo run -p backlit-session-supervisor -- --verify > "$out_dir/supervisor.jsonl
 cargo run -p backlit-clipboard -- --verify > "$out_dir/clipboard.jsonl"
 cargo run -p backlit-notification-daemon -- --verify > "$out_dir/notification-daemon.jsonl"
 cargo run -p backlit-settings-daemon -- --verify > "$out_dir/settings-daemon.jsonl"
+cargo run -p backlit-settings -- --verify > "$out_dir/settings-app.jsonl"
 cargo run -p backlit-portal-backend -- --verify > "$out_dir/portal.jsonl"
 cargo run -p backlit-session -- \
   --backend=headless \
@@ -218,6 +219,23 @@ grep '"suspend_action_ready":true' "$out_dir/settings-daemon.jsonl" >/dev/null
 grep '"reboot_action_ready":true' "$out_dir/settings-daemon.jsonl" >/dev/null
 grep '"shutdown_action_ready":true' "$out_dir/settings-daemon.jsonl" >/dev/null
 grep '"logout_command":"loginctl terminate-session $XDG_SESSION_ID"' "$out_dir/settings-daemon.jsonl" >/dev/null
+grep '"event":"settings_app.verified"' "$out_dir/settings-app.jsonl" >/dev/null
+grep '"passed":true' "$out_dir/settings-app.jsonl" >/dev/null
+grep '"application_id":"org.backlit.Settings"' "$out_dir/settings-app.jsonl" >/dev/null
+grep '"launcher_target_ready":true' "$out_dir/settings-app.jsonl" >/dev/null
+grep '"required_panels":3' "$out_dir/settings-app.jsonl" >/dev/null
+grep '"display_panel_ready":true' "$out_dir/settings-app.jsonl" >/dev/null
+grep '"display_modes":3' "$out_dir/settings-app.jsonl" >/dev/null
+grep '"display_scale_options":4' "$out_dir/settings-app.jsonl" >/dev/null
+grep '"display_apply_validated":true' "$out_dir/settings-app.jsonl" >/dev/null
+grep '"input_panel_ready":true' "$out_dir/settings-app.jsonl" >/dev/null
+grep '"keyboard_repeat_visible":true' "$out_dir/settings-app.jsonl" >/dev/null
+grep '"pointer_accel_visible":true' "$out_dir/settings-app.jsonl" >/dev/null
+grep '"touchpad_toggle_visible":true' "$out_dir/settings-app.jsonl" >/dev/null
+grep '"power_panel_ready":true' "$out_dir/settings-app.jsonl" >/dev/null
+grep '"power_menu_actions":4' "$out_dir/settings-app.jsonl" >/dev/null
+grep '"power_command_plans_available":true' "$out_dir/settings-app.jsonl" >/dev/null
+grep '"daemon_generation":3' "$out_dir/settings-app.jsonl" >/dev/null
 grep '"event":"portal_backend.security_smoke"' "$out_dir/portal.jsonl" >/dev/null
 grep '"direct_screenshot_denied":true' "$out_dir/portal.jsonl" >/dev/null
 grep '"direct_screencast_denied":true' "$out_dir/portal.jsonl" >/dev/null
@@ -262,6 +280,7 @@ cat > "$out_dir/manifest.json" <<EOF
     "clipboard_log": "$out_dir/clipboard.jsonl",
     "notification_daemon_log": "$out_dir/notification-daemon.jsonl",
     "settings_daemon_log": "$out_dir/settings-daemon.jsonl",
+    "settings_app_log": "$out_dir/settings-app.jsonl",
     "portal_log": "$out_dir/portal.jsonl",
     "session_log": "$out_dir/session.jsonl",
     "session_services_dir": "$out_dir/session-services",
@@ -301,6 +320,10 @@ cat > "$out_dir/manifest.json" <<EOF
     "settings_power_actions": true,
     "settings_power_actions_dry_run": true,
     "settings_suspend_action": true,
+    "settings_app": true,
+    "settings_app_display_panel": true,
+    "settings_app_input_panel": true,
+    "settings_app_power_panel": true,
     "portal_security": true,
     "session_windows_after_launch": 4,
     "session_launch_spawn": true,

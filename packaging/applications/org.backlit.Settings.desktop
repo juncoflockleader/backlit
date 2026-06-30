@@ -1,0 +1,7 @@
+[Desktop Entry]
+Name=Backlit Settings
+Comment=Configure Backlit display, input, and power
+Exec=backlit-settings
+Type=Application
+Categories=Settings;DesktopSettings;
+OnlyShowIn=Backlit;

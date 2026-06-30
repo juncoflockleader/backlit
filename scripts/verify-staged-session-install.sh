@@ -8,8 +8,10 @@ out_dir="${1:-target/staged-session-install}"
 stage_dir="$out_dir/root"
 bin_dir="$stage_dir/usr/bin"
 session_dir="$stage_dir/usr/share/wayland-sessions"
+app_dir="$stage_dir/usr/share/applications"
 systemd_dir="$stage_dir/usr/lib/systemd/user"
 session_desktop="$session_dir/backlit.desktop"
+settings_desktop="$app_dir/org.backlit.Settings.desktop"
 compositor_service="$systemd_dir/backlit-compositor.service"
 shell_service="$systemd_dir/backlit-shell.service"
 notification_service="$systemd_dir/backlit-notification-daemon.service"
@@ -20,6 +22,7 @@ compositor_log="$out_dir/compositor.jsonl"
 shell_log="$out_dir/shell.jsonl"
 notification_log="$out_dir/notification-daemon.jsonl"
 settings_log="$out_dir/settings-daemon.jsonl"
+settings_app_log="$out_dir/settings-app.jsonl"
 systemd_units_log="$out_dir/systemd-units.jsonl"
 
 fail() {
@@ -49,27 +52,31 @@ resolve_usr_bin() {
   esac
 }
 
-mkdir -p "$bin_dir" "$session_dir" "$systemd_dir" "$out_dir"
+mkdir -p "$bin_dir" "$session_dir" "$app_dir" "$systemd_dir" "$out_dir"
 
 cargo build \
   -p backlit-session \
   -p backlit-compositor \
   -p backlit-shell \
   -p backlit-notification-daemon \
+  -p backlit-settings \
   -p backlit-settings-daemon
 
 install -m 0755 target/debug/backlit-session "$bin_dir/backlit-session"
 install -m 0755 target/debug/backlit-compositor "$bin_dir/backlit-compositor"
 install -m 0755 target/debug/backlit-shell "$bin_dir/backlit-shell"
 install -m 0755 target/debug/backlit-notification-daemon "$bin_dir/backlit-notification-daemon"
+install -m 0755 target/debug/backlit-settings "$bin_dir/backlit-settings"
 install -m 0755 target/debug/backlit-settings-daemon "$bin_dir/backlit-settings-daemon"
 install -m 0644 packaging/sessions/backlit.desktop "$session_desktop"
+install -m 0644 packaging/applications/org.backlit.Settings.desktop "$settings_desktop"
 install -m 0644 packaging/systemd/backlit-compositor.service "$compositor_service"
 install -m 0644 packaging/systemd/backlit-shell.service "$shell_service"
 install -m 0644 packaging/systemd/backlit-notification-daemon.service "$notification_service"
 install -m 0644 packaging/systemd/backlit-settings-daemon.service "$settings_service"
 
 require_file "$session_desktop"
+require_file "$settings_desktop"
 require_file "$compositor_service"
 require_file "$shell_service"
 require_file "$notification_service"
@@ -79,6 +86,11 @@ require_line "$session_desktop" "Exec=backlit-session"
 desktop_exec="$(sed -n 's/^Exec=//p' "$session_desktop")"
 test "$desktop_exec" = "backlit-session" || fail "unexpected session desktop Exec=$desktop_exec"
 require_executable "$bin_dir/$desktop_exec"
+
+require_line "$settings_desktop" "Exec=backlit-settings"
+settings_desktop_exec="$(sed -n 's/^Exec=//p' "$settings_desktop")"
+test "$settings_desktop_exec" = "backlit-settings" || fail "unexpected settings desktop Exec=$settings_desktop_exec"
+require_executable "$bin_dir/$settings_desktop_exec"
 
 require_line "$compositor_service" "ExecStart=/usr/bin/backlit-compositor --backend=drm --socket=backlit-0"
 require_line "$compositor_service" "Environment=RUST_BACKTRACE=1"
@@ -118,6 +130,7 @@ require_executable "$(resolve_usr_bin "$settings_command")"
 "$bin_dir/backlit-compositor" --help > "$out_dir/backlit-compositor.help"
 "$bin_dir/backlit-shell" --help > "$out_dir/backlit-shell.help"
 "$bin_dir/backlit-notification-daemon" --help > "$out_dir/backlit-notification-daemon.help"
+"$bin_dir/backlit-settings" --help > "$out_dir/backlit-settings.help"
 "$bin_dir/backlit-settings-daemon" --help > "$out_dir/backlit-settings-daemon.help"
 
 "$bin_dir/backlit-session" \
@@ -182,6 +195,14 @@ grep -F '"display_validated":true' "$settings_log" >/dev/null || fail "settings 
 grep -F '"input_validated":true' "$settings_log" >/dev/null || fail "settings input policy did not verify"
 grep -F '"power_validated":true' "$settings_log" >/dev/null || fail "settings power policy did not verify"
 
+"$bin_dir/backlit-settings" --verify > "$settings_app_log"
+grep -F '"event":"settings_app.verified"' "$settings_app_log" >/dev/null || fail "missing settings app verification event"
+grep -F '"passed":true' "$settings_app_log" >/dev/null || fail "settings app verification did not pass"
+grep -F '"launcher_target_ready":true' "$settings_app_log" >/dev/null || fail "settings launcher target did not verify"
+grep -F '"display_panel_ready":true' "$settings_app_log" >/dev/null || fail "settings display panel did not verify"
+grep -F '"input_panel_ready":true' "$settings_app_log" >/dev/null || fail "settings input panel did not verify"
+grep -F '"power_panel_ready":true' "$settings_app_log" >/dev/null || fail "settings power panel did not verify"
+
 cat > "$out_dir/manifest.json" <<EOF
 {
   "name": "backlit-staged-session-install",
@@ -189,6 +210,7 @@ cat > "$out_dir/manifest.json" <<EOF
   "stage_root": "$stage_dir",
   "artifacts": {
     "session_desktop": "$session_desktop",
+    "settings_desktop": "$settings_desktop",
     "compositor_service": "$compositor_service",
     "shell_service": "$shell_service",
     "notification_daemon_service": "$notification_service",
@@ -200,10 +222,12 @@ cat > "$out_dir/manifest.json" <<EOF
     "compositor_log": "$compositor_log",
     "shell_log": "$shell_log",
     "notification_daemon_log": "$notification_log",
-    "settings_daemon_log": "$settings_log"
+    "settings_daemon_log": "$settings_log",
+    "settings_app_log": "$settings_app_log"
   },
   "checks": {
     "desktop_exec_resolves": true,
+    "settings_desktop_exec_resolves": true,
     "systemd_exec_resolves": true,
     "session_systemd_units": true,
     "systemd_journal_output": true,
@@ -215,7 +239,8 @@ cat > "$out_dir/manifest.json" <<EOF
     "staged_compositor_smoke": true,
     "staged_shell_verify": true,
     "staged_notification_daemon_verify": true,
-    "staged_settings_daemon_verify": true
+    "staged_settings_daemon_verify": true,
+    "staged_settings_app_verify": true
   }
 }
 EOF

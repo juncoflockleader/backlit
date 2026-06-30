@@ -26,10 +26,11 @@ crates/
   shell-protocol/      Private shell/compositor protocol model.
   shell/               Shell chrome state and host smoke checks.
   notification-daemon/ D-Bus notification behavior smoke checks.
+  settings/            Minimal settings app surface smoke checks.
   settings-daemon/     Display, input, and power policy daemon smoke checks.
   portal-backend/      Future xdg-desktop-portal backend.
 apps/
-  settings/            Future settings UI.
+  settings/            Future richer settings UI assets.
   launcher/            Future launcher UI.
   terminal-wrapper/    Future terminal launch wrapper.
 packaging/
@@ -130,7 +131,7 @@ The Linux-side verifier can also be run directly inside any Ubuntu checkout:
 ./scripts/verify-linux-e2e.sh
 ```
 
-It runs `cargo fmt`, workspace tests, `cargo clippy`, the deterministic GUI smoke verifier, the preview renderer, launch-performance verifier, launcher desktop discovery verifier, resource-budget verifier, notification-daemon verifier, settings-daemon verifier, portal-security verifier, crash-log verifier, CI contract verifier, packaging contract verifier, staged session install verifier, launch-readiness verifier, session launch verifier, session clean-exit verifier, nested Wayland smoke verifier, and MVP 0 contract verifier, then writes `target/linux-e2e/manifest.json`.
+It runs `cargo fmt`, workspace tests, `cargo clippy`, the deterministic GUI smoke verifier, the preview renderer, launch-performance verifier, launcher desktop discovery verifier, resource-budget verifier, notification-daemon verifier, settings-daemon verifier, settings-app verifier, portal-security verifier, crash-log verifier, CI contract verifier, packaging contract verifier, staged session install verifier, launch-readiness verifier, session launch verifier, session clean-exit verifier, nested Wayland smoke verifier, and MVP 0 contract verifier, then writes `target/linux-e2e/manifest.json`.
 
 ## GUI Linux VM Workflow
 
@@ -194,6 +195,7 @@ cargo run -p backlit-session-supervisor -- --verify
 cargo run -p backlit-clipboard -- --verify
 cargo run -p backlit-notification-daemon -- --verify
 cargo run -p backlit-settings-daemon -- --verify
+cargo run -p backlit-settings -- --verify
 cargo run -p backlit-portal-backend -- --verify
 cargo run -p backlit-session -- --backend=headless --screenshot target/backlit-session.ppm --verify --verify-services --verify-clean-exit
 ./scripts/render-gui-preview.sh
@@ -203,6 +205,7 @@ cargo run -p backlit-session -- --backend=headless --screenshot target/backlit-s
 ./scripts/verify-resource-budget.sh
 ./scripts/verify-notification-daemon.sh
 ./scripts/verify-settings-daemon.sh
+./scripts/verify-settings-app.sh
 ./scripts/verify-portal-security.sh
 ./scripts/verify-crash-logs.sh
 ./scripts/verify-launch-readiness.sh
@@ -290,6 +293,8 @@ The launch-performance verifier runs the built `backlit-session`, `backlit-compo
 The resource-budget verifier runs bounded idle probes for `backlit-compositor` and `backlit-shell`, samples Linux `/proc`, then writes `target/resource-budget/manifest.json`. On Linux it enforces compositor idle CPU under 0.5% and combined compositor+shell RSS under 250 MB; on non-Linux hosts it records an expected skip so Parallels remains the authoritative resource-budget proof.
 
 Settings daemon state is covered by `backlit-settings-daemon --verify`, which validates display mode/scale/refresh settings, keyboard and pointer policy, power idle policy, the lock/logout/reboot/shutdown power menu, and dry-run command plans for lock, logout, suspend, reboot, and shutdown through logind/systemd.
+
+Settings app surface state is covered by `backlit-settings --verify`, which checks that the launcher `settings` target resolves to an installed `backlit-settings` binary and that display, input, and power panels can apply valid settings through the settings daemon policy.
 
 Notification daemon state is covered by `backlit-notification-daemon --verify`, which verifies D-Bus-style notification fields, replace-id behavior, action invocation, critical notification persistence, and expired/dismissed/replaced close reasons.
 

@@ -34,6 +34,7 @@ require_package() {
 }
 
 require_file packaging/sessions/backlit.desktop
+require_file packaging/applications/org.backlit.Settings.desktop
 require_file packaging/systemd/backlit-compositor.service
 require_file packaging/systemd/backlit-shell.service
 require_file packaging/systemd/backlit-notification-daemon.service
@@ -45,6 +46,13 @@ require_line packaging/sessions/backlit.desktop "Name=Backlit"
 require_line packaging/sessions/backlit.desktop "Exec=backlit-session"
 require_line packaging/sessions/backlit.desktop "Type=Application"
 require_line packaging/sessions/backlit.desktop "DesktopNames=Backlit"
+
+require_line packaging/applications/org.backlit.Settings.desktop "[Desktop Entry]"
+require_line packaging/applications/org.backlit.Settings.desktop "Name=Backlit Settings"
+require_line packaging/applications/org.backlit.Settings.desktop "Exec=backlit-settings"
+require_line packaging/applications/org.backlit.Settings.desktop "Type=Application"
+require_line packaging/applications/org.backlit.Settings.desktop "Categories=Settings;DesktopSettings;"
+require_line packaging/applications/org.backlit.Settings.desktop "OnlyShowIn=Backlit;"
 
 require_line packaging/systemd/backlit-compositor.service "PartOf=graphical-session.target"
 require_line packaging/systemd/backlit-compositor.service "Type=simple"
@@ -106,6 +114,7 @@ require_contains Cargo.toml "\"crates/compositor\""
 require_contains Cargo.toml "\"crates/notification-daemon\""
 require_contains Cargo.toml "\"crates/session\""
 require_contains Cargo.toml "\"crates/shell\""
+require_contains Cargo.toml "\"crates/settings\""
 require_contains Cargo.toml "\"crates/settings-daemon\""
 
 package_count="$(grep -c '^Package: ' packaging/debian/control.stub)"
@@ -117,6 +126,7 @@ cat > "$out_dir/manifest.json" <<EOF
   "package_count": $package_count,
   "artifacts": {
     "session_desktop": "packaging/sessions/backlit.desktop",
+    "settings_desktop": "packaging/applications/org.backlit.Settings.desktop",
     "compositor_service": "packaging/systemd/backlit-compositor.service",
     "shell_service": "packaging/systemd/backlit-shell.service",
     "notification_daemon_service": "packaging/systemd/backlit-notification-daemon.service",
@@ -125,6 +135,7 @@ cat > "$out_dir/manifest.json" <<EOF
   },
   "checks": {
     "desktop_entry": true,
+    "settings_desktop_entry": true,
     "systemd_services": true,
     "journal_logging": true,
     "package_split": true,

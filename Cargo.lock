@@ -107,6 +107,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "backlit-settings"
+version = "0.1.0"
+dependencies = [
+ "backlit-common",
+ "backlit-launcher",
+ "backlit-settings-daemon",
+]
+
+[[package]]
 name = "backlit-settings-daemon"
 version = "0.1.0"
 dependencies = [
