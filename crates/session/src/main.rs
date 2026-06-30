@@ -645,10 +645,8 @@ impl SystemdLaunchPlan {
         self.dry_run
             && self.target == "backlit-session.target"
             && self.service_units == service_unit_names()
-            && self.import_environment.command_line()
-                == "systemctl --user import-environment WAYLAND_DISPLAY XDG_CURRENT_DESKTOP DESKTOP_SESSION"
-            && self.start_target.command_line()
-                == "systemctl --user start backlit-session.target"
+            && self.import_environment.args == systemd_import_environment_args()
+            && self.start_target.command_line() == "systemctl --user start backlit-session.target"
             && self.stop_target.command_line() == "systemctl --user stop backlit-session.target"
     }
 
@@ -835,6 +833,20 @@ fn service_unit_names() -> &'static [&'static str] {
     ]
 }
 
+fn systemd_import_environment_args() -> &'static [&'static str] {
+    &[
+        "--user",
+        "import-environment",
+        "XDG_RUNTIME_DIR",
+        "XDG_SESSION_ID",
+        "XDG_SEAT",
+        "XDG_SESSION_TYPE",
+        "WAYLAND_DISPLAY",
+        "XDG_CURRENT_DESKTOP",
+        "DESKTOP_SESSION",
+    ]
+}
+
 fn systemd_launch_plan() -> SystemdLaunchPlan {
     SystemdLaunchPlan {
         dry_run: true,
@@ -842,13 +854,7 @@ fn systemd_launch_plan() -> SystemdLaunchPlan {
         service_units: service_unit_names(),
         import_environment: SystemdCommandPlan {
             program: "systemctl",
-            args: &[
-                "--user",
-                "import-environment",
-                "WAYLAND_DISPLAY",
-                "XDG_CURRENT_DESKTOP",
-                "DESKTOP_SESSION",
-            ],
+            args: systemd_import_environment_args(),
         },
         start_target: SystemdCommandPlan {
             program: "systemctl",
@@ -1851,7 +1857,7 @@ mod tests {
         assert_eq!(plan.service_count(), 4);
         assert_eq!(
             plan.import_environment.command_line(),
-            "systemctl --user import-environment WAYLAND_DISPLAY XDG_CURRENT_DESKTOP DESKTOP_SESSION"
+            "systemctl --user import-environment XDG_RUNTIME_DIR XDG_SESSION_ID XDG_SEAT XDG_SESSION_TYPE WAYLAND_DISPLAY XDG_CURRENT_DESKTOP DESKTOP_SESSION"
         );
         assert_eq!(
             plan.start_target.command_line(),

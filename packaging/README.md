@@ -14,4 +14,4 @@ Initial package split from the design:
 
 The package names can keep the design vocabulary while the source repository and crate names use Backlit branding.
 
-The session package installs `packaging/sessions/backlit.desktop`, `packaging/systemd/backlit-session.target`, and the user services for compositor, shell, notification daemon, and settings daemon. The session launcher verifies a dry-run `systemctl --user import-environment`, `start backlit-session.target`, and `stop backlit-session.target` plan before real service activation is wired in.
+The session package installs `packaging/sessions/backlit.desktop`, `packaging/systemd/backlit-session.target`, and the user services for compositor, shell, notification daemon, and settings daemon. The session launcher verifies a dry-run `systemctl --user import-environment`, `start backlit-session.target`, and `stop backlit-session.target` plan before real service activation is wired in. The import plan carries the runtime and logind context required by the DRM service path: `XDG_RUNTIME_DIR`, `XDG_SESSION_ID`, `XDG_SEAT`, `XDG_SESSION_TYPE`, `WAYLAND_DISPLAY`, `XDG_CURRENT_DESKTOP`, and `DESKTOP_SESSION`.

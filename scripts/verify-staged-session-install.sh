@@ -157,7 +157,7 @@ grep -F '"session_target_wants_services":true' "$systemd_units_log" >/dev/null |
 grep -F '"launch_plan_ready":true' "$systemd_units_log" >/dev/null || fail "session systemd launch plan did not verify"
 grep -F '"target":"backlit-session.target"' "$systemd_units_log" >/dev/null || fail "session systemd target was not planned"
 grep -F '"service_units":4' "$systemd_units_log" >/dev/null || fail "session systemd launch plan did not include all services"
-grep -F '"import_environment_command":"systemctl --user import-environment WAYLAND_DISPLAY XDG_CURRENT_DESKTOP DESKTOP_SESSION"' "$systemd_units_log" >/dev/null || fail "session systemd environment import was not planned"
+grep -F '"import_environment_command":"systemctl --user import-environment XDG_RUNTIME_DIR XDG_SESSION_ID XDG_SEAT XDG_SESSION_TYPE WAYLAND_DISPLAY XDG_CURRENT_DESKTOP DESKTOP_SESSION"' "$systemd_units_log" >/dev/null || fail "session systemd environment import was not planned"
 grep -F '"start_target_command":"systemctl --user start backlit-session.target"' "$systemd_units_log" >/dev/null || fail "session systemd target start was not planned"
 grep -F '"stop_target_command":"systemctl --user stop backlit-session.target"' "$systemd_units_log" >/dev/null || fail "session systemd target stop was not planned"
 grep -F '"units_present":true' "$systemd_units_log" >/dev/null || fail "session systemd units were not all present"

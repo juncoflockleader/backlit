@@ -64,7 +64,7 @@ grep '"session_target_wants_services":true' "$systemd_units_log" >/dev/null
 grep '"launch_plan_ready":true' "$systemd_units_log" >/dev/null
 grep '"target":"backlit-session.target"' "$systemd_units_log" >/dev/null
 grep '"service_units":4' "$systemd_units_log" >/dev/null
-grep '"import_environment_command":"systemctl --user import-environment WAYLAND_DISPLAY XDG_CURRENT_DESKTOP DESKTOP_SESSION"' "$systemd_units_log" >/dev/null
+grep '"import_environment_command":"systemctl --user import-environment XDG_RUNTIME_DIR XDG_SESSION_ID XDG_SEAT XDG_SESSION_TYPE WAYLAND_DISPLAY XDG_CURRENT_DESKTOP DESKTOP_SESSION"' "$systemd_units_log" >/dev/null
 grep '"start_target_command":"systemctl --user start backlit-session.target"' "$systemd_units_log" >/dev/null
 grep '"stop_target_command":"systemctl --user stop backlit-session.target"' "$systemd_units_log" >/dev/null
 grep '"units_present":true' "$systemd_units_log" >/dev/null
