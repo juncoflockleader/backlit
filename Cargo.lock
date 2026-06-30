@@ -30,6 +30,13 @@ dependencies = [
 ]
 
 [[package]]
+name = "backlit-launcher"
+version = "0.1.0"
+dependencies = [
+ "backlit-common",
+]
+
+[[package]]
 name = "backlit-perf"
 version = "0.1.0"
 dependencies = [

@@ -136,6 +136,7 @@ cargo run -p backlit-compositor -- --backend=headless --smoke-test
 cargo run -p backlit-compositor-backend -- --backend=headless --verify
 cargo run -p backlit-protocols -- --verify --list
 cargo run -p backlit-perf -- --verify
+cargo run -p backlit-launcher -- --verify --list --target=terminal
 cargo run -p backlit-session -- --backend=headless --screenshot target/backlit-session.ppm --verify
 ./scripts/verify-gui-smoke.sh
 cargo run -p backlit-shell -- --component=all --socket=backlit-0 --verify
@@ -170,6 +171,8 @@ The verifier also runs `backlit-protocols --verify --list` so MVP protocol cover
 It also runs `backlit-perf --verify`, which measures the deterministic GUI render path and headless backend present path against generous MVP 0 smoke budgets.
 
 The default GUI render is guarded by checksum `5635038614353063225`; update it only when an intentional visual change is made.
+
+The launcher catalog is verified in dry-run mode for the first required targets: terminal, browser, and settings.
 
 Backend preflight can be run directly:
 

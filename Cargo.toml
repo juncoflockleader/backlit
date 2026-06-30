@@ -4,6 +4,7 @@ members = [
   "crates/common",
   "crates/compositor-backend",
   "crates/compositor",
+  "crates/launcher",
   "crates/portal-backend",
   "crates/perf",
   "crates/protocols",
