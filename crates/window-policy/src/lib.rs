@@ -104,10 +104,15 @@ impl WindowPolicy {
         let removed = self.windows.remove(index);
 
         if self.focused == Some(id) {
-            self.focused = self.windows.last().map(|window| window.id);
+            self.focused = self.last_focusable_window();
         }
 
         Some(removed)
+    }
+
+    pub fn close_focused_window(&mut self) -> Option<Window> {
+        let id = self.focused?;
+        self.remove_window(id)
     }
 
     pub fn focus(&mut self, id: WindowId) -> bool {
@@ -257,6 +262,14 @@ impl WindowPolicy {
     fn window_mut(&mut self, id: WindowId) -> Option<&mut Window> {
         self.windows.iter_mut().find(|window| window.id == id)
     }
+
+    fn last_focusable_window(&self) -> Option<WindowId> {
+        self.windows
+            .iter()
+            .rev()
+            .find(|window| window.state != WindowState::Minimized)
+            .map(|window| window.id)
+    }
 }
 
 #[cfg(test)]
@@ -280,6 +293,19 @@ mod tests {
         let second = policy.add_window("browser", (1200, 800));
 
         assert_eq!(policy.remove_window(second).unwrap().title, "browser");
+        assert_eq!(policy.focused(), Some(first));
+    }
+
+    #[test]
+    fn close_focused_window_skips_minimized_fallbacks() {
+        let mut policy = WindowPolicy::default();
+        let first = policy.add_window("terminal", (800, 600));
+        let second = policy.add_window("settings", (720, 560));
+        let third = policy.add_window("browser", (1200, 800));
+
+        assert!(policy.minimize_window(third));
+        assert!(policy.focus(second));
+        assert_eq!(policy.close_focused_window().unwrap().id, second);
         assert_eq!(policy.focused(), Some(first));
     }
 

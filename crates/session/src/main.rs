@@ -10,7 +10,7 @@ use backlit_demo_client::{
 };
 use backlit_launcher::{default_catalog, LaunchTarget};
 use backlit_shortcuts::{resolve_shortcut, ShortcutAction};
-use backlit_window_policy::{OutputLayout, WindowPolicy};
+use backlit_window_policy::{OutputLayout, WindowPolicy, WindowState};
 
 fn main() {
     if let Err(error) = run() {
@@ -122,6 +122,14 @@ fn run() -> Result<(), String> {
                     "fullscreen_uses_output",
                     FieldValue::Bool(interaction_report.fullscreen_uses_output),
                 ),
+                (
+                    "close_fallback_focus_ok",
+                    FieldValue::Bool(interaction_report.close_fallback_focus_ok),
+                ),
+                (
+                    "windows_after_close",
+                    FieldValue::U64(interaction_report.windows_after_close),
+                ),
             ],
         );
 
@@ -173,6 +181,8 @@ struct InteractionReport {
     resized_width: u64,
     maximize_uses_work_area: bool,
     fullscreen_uses_output: bool,
+    close_fallback_focus_ok: bool,
+    windows_after_close: u64,
 }
 
 impl InteractionReport {
@@ -186,6 +196,8 @@ impl InteractionReport {
             && self.minimize_skips_focus
             && self.maximize_uses_work_area
             && self.fullscreen_uses_output
+            && self.close_fallback_focus_ok
+            && self.windows_after_close == 3
     }
 }
 
@@ -209,6 +221,7 @@ fn verify_session_interactions(policy: &WindowPolicy, layout: OutputLayout) -> I
     if terminal_launch_resolved {
         policy.add_window("terminal-2", (800, 600));
     }
+    let windows_after_launch = policy.windows().len() as u64;
 
     let minimized_window = policy.focused();
     let focus_after_minimize = minimized_window
@@ -255,10 +268,19 @@ fn verify_session_interactions(policy: &WindowPolicy, layout: OutputLayout) -> I
         })
         .unwrap_or(false);
 
+    let close_fallback_focus_ok = policy.close_focused_window().is_some()
+        && policy.focused().is_some()
+        && policy
+            .focused()
+            .and_then(|id| policy.window(id))
+            .map(|window| window.state != WindowState::Minimized)
+            .unwrap_or(false);
+    let windows_after_close = policy.windows().len() as u64;
+
     InteractionReport {
         initial_focus,
         focus_after_switcher,
-        windows_after_launch: policy.windows().len() as u64,
+        windows_after_launch,
         terminal_launch_resolved,
         move_resize_ok,
         minimize_skips_focus,
@@ -267,6 +289,8 @@ fn verify_session_interactions(policy: &WindowPolicy, layout: OutputLayout) -> I
         resized_width,
         maximize_uses_work_area,
         fullscreen_uses_output,
+        close_fallback_focus_ok,
+        windows_after_close,
     }
 }
 

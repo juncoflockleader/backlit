@@ -35,6 +35,8 @@ grep '"minimize_skips_focus":true' "$out_dir/session.jsonl" >/dev/null
 grep '"resized_width":920' "$out_dir/session.jsonl" >/dev/null
 grep '"maximize_uses_work_area":true' "$out_dir/session.jsonl" >/dev/null
 grep '"fullscreen_uses_output":true' "$out_dir/session.jsonl" >/dev/null
+grep '"close_fallback_focus_ok":true' "$out_dir/session.jsonl" >/dev/null
+grep '"windows_after_close":3' "$out_dir/session.jsonl" >/dev/null
 grep '"passed":true' "$out_dir/session.jsonl" >/dev/null
 grep '"golden_ok":true' "$out_dir/session.jsonl" >/dev/null
 grep "\"checksum\":$expected_checksum" "$out_dir/session.jsonl" >/dev/null
@@ -100,6 +102,7 @@ cat > "$out_dir/manifest.json" <<EOF
     "session_windows_after_launch": 4,
     "session_move_resize": true,
     "session_minimize_skips_focus": true,
+    "session_close_fallback_focus": true,
     "work_area_y": 42,
     "session_ppm_bytes": $session_ppm_bytes,
     "demo_ppm_bytes": $demo_ppm_bytes,

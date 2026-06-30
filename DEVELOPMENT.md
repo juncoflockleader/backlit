@@ -186,6 +186,8 @@ Move and resize behavior is also verified through the session smoke path before 
 
 Minimized windows are kept in policy state but skipped by focus cycling; this is verified in the session smoke path.
 
+Closing the focused window is verified too, including fallback focus that skips minimized windows.
+
 Crash isolation is covered by `backlit-session-supervisor --verify`: shell crashes restart without killing the compositor, while compositor crashes end the session.
 
 Backend preflight can be run directly:
