@@ -95,9 +95,11 @@ require_contains scripts/verify-linux-e2e.sh './scripts/verify-session-clean-exi
 require_contains scripts/verify-launch-readiness.sh '"xdg_runtime_dir_owned_by_user"'
 require_contains scripts/verify-launch-readiness.sh '"session_local"'
 require_contains scripts/verify-launch-readiness.sh '"drm_card_access_ready"'
+require_contains scripts/verify-launch-readiness.sh '"input_broker_ready"'
 require_contains scripts/verify-drm-session-smoke.sh '"xdg_runtime_dir_owned_by_user"'
 require_contains scripts/verify-drm-session-smoke.sh '"session_local"'
 require_contains scripts/verify-drm-session-smoke.sh '"drm_card_access_ready"'
+require_contains scripts/verify-drm-session-smoke.sh '"input_broker_ready"'
 
 require_contains packaging/sessions/backlit.desktop 'Exec=backlit-session'
 require_contains packaging/systemd/backlit-compositor.service 'ExecStart=/usr/bin/backlit-compositor'
@@ -201,6 +203,7 @@ if [ -n "$artifact_root" ] && [ -d "$artifact_root" ]; then
   require_contains "$artifact_root/launch-readiness/manifest.json" '"xdg_runtime_dir_owned_by_user":'
   require_contains "$artifact_root/launch-readiness/manifest.json" '"session_local":'
   require_contains "$artifact_root/launch-readiness/manifest.json" '"drm_card_access_ready":'
+  require_contains "$artifact_root/launch-readiness/manifest.json" '"input_broker_ready":'
   require_contains "$artifact_root/session-clean-exit/manifest.json" '"clean_exit_event": true'
   require_contains "$artifact_root/session-clean-exit/manifest.json" '"windows_after_shutdown": 0'
   require_contains "$artifact_root/session-clean-exit/manifest.json" '"focus_cleared": true'
@@ -208,6 +211,7 @@ if [ -n "$artifact_root" ] && [ -d "$artifact_root" ]; then
   require_contains "$artifact_root/drm-session-smoke/manifest.json" '"xdg_runtime_dir_owned_by_user":'
   require_contains "$artifact_root/drm-session-smoke/manifest.json" '"session_local":'
   require_contains "$artifact_root/drm-session-smoke/manifest.json" '"drm_card_access_ready":'
+  require_contains "$artifact_root/drm-session-smoke/manifest.json" '"input_broker_ready":'
   if grep '"drm_session_smoke_ready": true' "$artifact_root/drm-session-smoke/manifest.json" >/dev/null; then
     require_contains "$artifact_root/drm-session-smoke/manifest.json" '"drm_session_clean_exit": true'
     require_contains "$artifact_root/drm-session-smoke/manifest.json" '"notification_service": true'

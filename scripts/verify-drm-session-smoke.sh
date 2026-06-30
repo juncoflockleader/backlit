@@ -71,7 +71,22 @@ session_remote=false
 session_state=""
 session_seat="${XDG_SEAT:-}"
 session_type="${XDG_SESSION_TYPE:-}"
-if [ "$session_present" = true ] && command -v loginctl >/dev/null 2>&1; then
+logind_available=false
+if command -v loginctl >/dev/null 2>&1; then
+  logind_available=true
+fi
+
+libseat_available=false
+if command -v pkg-config >/dev/null 2>&1 && pkg-config --exists libseat 2>/dev/null; then
+  libseat_available=true
+fi
+
+libinput_available=false
+if command -v pkg-config >/dev/null 2>&1 && pkg-config --exists libinput 2>/dev/null; then
+  libinput_available=true
+fi
+
+if [ "$session_present" = true ] && [ "$logind_available" = true ]; then
   session_active_value="$(loginctl show-session "$XDG_SESSION_ID" -p Active --value 2>/dev/null || true)"
   session_remote_value="$(loginctl show-session "$XDG_SESSION_ID" -p Remote --value 2>/dev/null || true)"
   session_state="$(loginctl show-session "$XDG_SESSION_ID" -p State --value 2>/dev/null || true)"
@@ -131,6 +146,20 @@ if [ "$input_event_nodes" -gt 0 ] && [ "$input_event_readable" -eq 0 ]; then
   input_requires_logind_broker=true
 fi
 
+input_broker_ready=false
+input_broker_mode="missing"
+if [ "$input_event_nodes" -gt 0 ] && [ "$input_event_readable" -gt 0 ]; then
+  input_broker_ready=true
+  input_broker_mode="direct"
+elif [ "$input_requires_logind_broker" = true ] \
+  && [ "$logind_available" = true ] \
+  && [ "$session_local" = true ] \
+  && [ "$libseat_available" = true ] \
+  && [ "$libinput_available" = true ]; then
+  input_broker_ready=true
+  input_broker_mode="logind-libseat"
+fi
+
 drm_expected_ready=false
 if [ "$(uname -s)" = "Linux" ] \
   && [ "$runtime_present" = true ] \
@@ -138,7 +167,7 @@ if [ "$(uname -s)" = "Linux" ] \
   && [ "$session_present" = true ] \
   && [ "$session_local" = true ] \
   && [ "$drm_card_access_ready" = true ] \
-  && [ "$input_event_nodes" -gt 0 ]; then
+  && [ "$input_broker_ready" = true ]; then
   drm_expected_ready=true
 fi
 
@@ -173,6 +202,8 @@ if [ "$drm_expected_ready" = true ]; then
   grep '"session_active":true' "$session_log" >/dev/null
   grep '"session_remote":false' "$session_log" >/dev/null
   grep '"drm_card_access_ready":true' "$session_log" >/dev/null
+  grep '"input_broker_ready":true' "$session_log" >/dev/null
+  grep '"input_broker_mode":"' "$session_log" >/dev/null
   grep '"event":"session.gui_ready"' "$session_log" >/dev/null
   grep '"event":"session.verified"' "$session_log" >/dev/null
   grep '"event":"session.launch_spawn"' "$session_log" >/dev/null
@@ -250,6 +281,9 @@ cat > "$out_dir/manifest.json" <<EOF
     "session_state": "$session_state",
     "seat": "$session_seat",
     "session_type": "$session_type",
+    "logind_available": $logind_available,
+    "libseat_available": $libseat_available,
+    "libinput_available": $libinput_available,
     "drm_card_nodes": $drm_card_nodes,
     "drm_render_nodes": $drm_render_nodes,
     "input_event_nodes": $input_event_nodes,
@@ -260,6 +294,8 @@ cat > "$out_dir/manifest.json" <<EOF
     "input_event_readable": $input_event_readable,
     "drm_card_access_ready": $drm_card_access_ready,
     "input_requires_logind_broker": $input_requires_logind_broker,
+    "input_broker_ready": $input_broker_ready,
+    "input_broker_mode": "$input_broker_mode",
     "session_ppm_bytes": $session_ppm_bytes
   }
 }

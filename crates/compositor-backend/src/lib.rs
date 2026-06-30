@@ -57,6 +57,9 @@ pub struct BackendPreflightEnvironment {
     pub logind_session_verified: bool,
     pub session_active: bool,
     pub session_remote: bool,
+    pub logind_available: bool,
+    pub libseat_available: bool,
+    pub libinput_available: bool,
 }
 
 impl BackendPreflightEnvironment {
@@ -82,6 +85,9 @@ impl BackendPreflightEnvironment {
             logind_session_verified: false,
             session_active: false,
             session_remote: false,
+            logind_available: false,
+            libseat_available: false,
+            libinput_available: false,
         }
     }
 
@@ -98,6 +104,11 @@ impl BackendPreflightEnvironment {
         environment.session_id = std::env::var("XDG_SESSION_ID").ok();
         environment.seat = std::env::var("XDG_SEAT").ok();
         environment.session_type = std::env::var("XDG_SESSION_TYPE").ok();
+        environment.logind_available = command_available("loginctl", &environment.target_os);
+        environment.libseat_available =
+            pkg_config_package_available("libseat", &environment.target_os);
+        environment.libinput_available =
+            pkg_config_package_available("libinput", &environment.target_os);
         environment.refresh_logind_session_status();
         environment.drm_card_nodes = count_entries_with_prefix("/dev/dri", "card");
         environment.drm_render_nodes = count_entries_with_prefix("/dev/dri", "renderD");
@@ -155,6 +166,18 @@ impl BackendPreflightEnvironment {
         self
     }
 
+    pub fn with_seat_broker_tools(
+        mut self,
+        logind_available: bool,
+        libseat_available: bool,
+        libinput_available: bool,
+    ) -> Self {
+        self.logind_available = logind_available;
+        self.libseat_available = libseat_available;
+        self.libinput_available = libinput_available;
+        self
+    }
+
     pub fn with_session_id(mut self, value: impl Into<String>) -> Self {
         self.session_id = Some(value.into());
         self
@@ -186,6 +209,37 @@ impl BackendPreflightEnvironment {
 
     pub fn input_requires_logind_broker(&self) -> bool {
         self.input_event_nodes > 0 && self.input_event_readable == 0
+    }
+
+    pub fn input_broker_ready(&self) -> bool {
+        if self.input_event_nodes == 0 {
+            return false;
+        }
+
+        if self.input_event_readable > 0 {
+            return true;
+        }
+
+        self.input_requires_logind_broker()
+            && self.logind_available
+            && self.logind_session_verified
+            && self.session_active
+            && !self.session_remote
+            && !missing(self.seat.as_deref())
+            && !missing(self.session_type.as_deref())
+            && self.session_type.as_deref() != Some("unspecified")
+            && self.libseat_available
+            && self.libinput_available
+    }
+
+    pub fn input_broker_mode(&self) -> &'static str {
+        if self.input_event_nodes > 0 && self.input_event_readable > 0 {
+            "direct"
+        } else if self.input_broker_ready() {
+            "logind-libseat"
+        } else {
+            "missing"
+        }
     }
 
     fn refresh_logind_session_status(&mut self) {
@@ -389,14 +443,23 @@ fn preflight_drm(environment: &BackendPreflightEnvironment) -> BackendPreflightR
         );
     }
 
+    if !environment.input_broker_ready() {
+        return BackendPreflightReport::blocked(
+            BackendKind::Drm,
+            "missing-input-broker",
+            "DRM/KMS backend requires direct input event access or logind/libseat/libinput brokering",
+        );
+    }
+
     BackendPreflightReport::ready(
         BackendKind::Drm,
-        "ready-active-local-session",
+        "ready-active-local-session-input-broker",
         format!(
-            "Linux launch environment has XDG_RUNTIME_DIR, {} DRM card nodes, {} DRM render nodes, {} input event nodes, and active local {} session {} on {}",
+            "Linux launch environment has XDG_RUNTIME_DIR, {} DRM card nodes, {} DRM render nodes, {} input event nodes, {} input broker, and active local {} session {} on {}",
             environment.drm_card_nodes,
             environment.drm_render_nodes,
             environment.input_event_nodes,
+            environment.input_broker_mode(),
             environment.session_type.as_deref().unwrap_or("unknown"),
             environment.session_id.as_deref().unwrap_or("unknown"),
             environment.seat.as_deref().unwrap_or("unknown")
@@ -457,6 +520,44 @@ fn open_device_node(path: &std::path::Path, mode: AccessMode) -> bool {
     }
 
     options.open(path).is_ok()
+}
+
+#[cfg(target_os = "linux")]
+fn command_available(command: &str, target_os: &str) -> bool {
+    if target_os != "linux" {
+        return false;
+    }
+
+    let script = format!("command -v {command} >/dev/null 2>&1");
+    Command::new("sh")
+        .arg("-c")
+        .arg(script)
+        .status()
+        .map(|status| status.success())
+        .unwrap_or(false)
+}
+
+#[cfg(not(target_os = "linux"))]
+fn command_available(_command: &str, _target_os: &str) -> bool {
+    false
+}
+
+#[cfg(target_os = "linux")]
+fn pkg_config_package_available(package: &str, target_os: &str) -> bool {
+    if target_os != "linux" {
+        return false;
+    }
+
+    Command::new("pkg-config")
+        .args(["--exists", package])
+        .status()
+        .map(|status| status.success())
+        .unwrap_or(false)
+}
+
+#[cfg(not(target_os = "linux"))]
+fn pkg_config_package_available(_package: &str, _target_os: &str) -> bool {
+    false
 }
 
 fn missing(value: Option<&str>) -> bool {
@@ -1289,7 +1390,7 @@ mod tests {
     }
 
     #[test]
-    fn drm_preflight_is_ready_with_runtime_devices_and_session() {
+    fn drm_preflight_requires_input_broker_when_direct_input_unavailable() {
         let environment = BackendPreflightEnvironment::for_target("linux")
             .with_xdg_runtime_dir("/run/user/1000")
             .with_drm_nodes(1, 1)
@@ -1299,7 +1400,41 @@ mod tests {
 
         let report = super::preflight_backend_with_environment(BackendKind::Drm, &environment);
 
+        assert!(!report.ready);
+        assert_eq!(report.code, "missing-input-broker");
+    }
+
+    #[test]
+    fn drm_preflight_allows_direct_input_without_broker_tools() {
+        let environment = BackendPreflightEnvironment::for_target("linux")
+            .with_xdg_runtime_dir("/run/user/1000")
+            .with_drm_nodes(1, 1)
+            .with_drm_card_access(1, 1)
+            .with_input_event_nodes(2)
+            .with_input_event_access(1)
+            .with_active_local_session("1", "seat0", "wayland");
+
+        let report = super::preflight_backend_with_environment(BackendKind::Drm, &environment);
+
         assert!(report.ready, "{report:?}");
-        assert_eq!(report.code, "ready-active-local-session");
+        assert_eq!(report.code, "ready-active-local-session-input-broker");
+        assert_eq!(environment.input_broker_mode(), "direct");
+    }
+
+    #[test]
+    fn drm_preflight_is_ready_with_runtime_devices_and_session() {
+        let environment = BackendPreflightEnvironment::for_target("linux")
+            .with_xdg_runtime_dir("/run/user/1000")
+            .with_drm_nodes(1, 1)
+            .with_drm_card_access(1, 1)
+            .with_input_event_nodes(2)
+            .with_active_local_session("1", "seat0", "wayland")
+            .with_seat_broker_tools(true, true, true);
+
+        let report = super::preflight_backend_with_environment(BackendKind::Drm, &environment);
+
+        assert!(report.ready, "{report:?}");
+        assert_eq!(report.code, "ready-active-local-session-input-broker");
+        assert_eq!(environment.input_broker_mode(), "logind-libseat");
     }
 }

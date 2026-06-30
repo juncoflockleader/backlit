@@ -298,6 +298,26 @@ fn emit_backend_preflight(
                 "input_requires_logind_broker",
                 FieldValue::Bool(environment.input_requires_logind_broker()),
             ),
+            (
+                "logind_available",
+                FieldValue::Bool(environment.logind_available),
+            ),
+            (
+                "libseat_available",
+                FieldValue::Bool(environment.libseat_available),
+            ),
+            (
+                "libinput_available",
+                FieldValue::Bool(environment.libinput_available),
+            ),
+            (
+                "input_broker_ready",
+                FieldValue::Bool(environment.input_broker_ready()),
+            ),
+            (
+                "input_broker_mode",
+                FieldValue::Str(environment.input_broker_mode()),
+            ),
             ("session_id", FieldValue::Str(session_id)),
             ("seat", FieldValue::Str(seat)),
             ("session_type", FieldValue::Str(session_type)),
