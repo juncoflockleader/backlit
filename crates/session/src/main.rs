@@ -767,7 +767,7 @@ fn verify_systemd_unit(unit_dir: &Path, contract: SystemdUnitContract) -> System
         return SystemdUnitProbe::missing();
     };
     let lines: Vec<&str> = contents.lines().map(str::trim).collect();
-    let contains_line = |required: &str| lines.iter().any(|line| *line == required);
+    let contains_line = |required: &str| lines.contains(&required);
 
     SystemdUnitProbe {
         present: true,
