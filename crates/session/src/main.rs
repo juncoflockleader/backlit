@@ -3,7 +3,8 @@ use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::{self, Command};
 use std::str::FromStr;
-use std::time::Instant;
+use std::thread;
+use std::time::{Duration, Instant};
 
 use backlit_common::metrics::{event_json, FieldValue};
 use backlit_compositor_backend::{
@@ -49,6 +50,14 @@ fn run() -> Result<(), String> {
                 "verify_systemd_units",
                 FieldValue::Bool(config.verify_systemd_units),
             ),
+            (
+                "verify_systemd_activation",
+                FieldValue::Bool(config.verify_systemd_activation),
+            ),
+            (
+                "activate_systemd",
+                FieldValue::Bool(config.activate_systemd),
+            ),
             ("preflight_only", FieldValue::Bool(config.preflight_only)),
         ],
     );
@@ -67,7 +76,9 @@ fn run() -> Result<(), String> {
         ));
     }
 
-    if config.verify_systemd_units {
+    let needs_systemd_contract =
+        config.verify_systemd_units || config.verify_systemd_activation || config.activate_systemd;
+    if needs_systemd_contract {
         let unit_report = verify_systemd_units(Path::new(&config.systemd_unit_dir));
         emit_systemd_unit_verification(&config, &unit_report);
         let launch_plan = systemd_launch_plan();
@@ -75,6 +86,41 @@ fn run() -> Result<(), String> {
 
         if !unit_report.passed() || !launch_plan.ready() {
             return Err(String::from("session systemd unit verification failed"));
+        }
+
+        if config.verify_systemd_activation || config.activate_systemd {
+            let stop_after_start = config.verify_systemd_activation;
+            let activation_report = run_systemd_activation(&config, &launch_plan, stop_after_start);
+            emit_systemd_activation(&config, &activation_report);
+
+            if !activation_report.passed() {
+                return Err(String::from("session systemd activation failed"));
+            }
+
+            if config.verify_systemd_activation {
+                emit(
+                    "session.exit",
+                    &config,
+                    &[(
+                        "elapsed_ms",
+                        FieldValue::U64(started.elapsed().as_millis() as u64),
+                    )],
+                );
+                return Ok(());
+            }
+
+            emit(
+                "session.running",
+                &config,
+                &[
+                    ("target", FieldValue::Str(launch_plan.target)),
+                    (
+                        "elapsed_ms",
+                        FieldValue::U64(started.elapsed().as_millis() as u64),
+                    ),
+                ],
+            );
+            wait_for_systemd_session();
         }
     }
 
@@ -628,6 +674,14 @@ impl SystemdCommandPlan {
             format!("{} {}", self.program, self.args.join(" "))
         }
     }
+
+    fn command_line_with_program(self, program: &str) -> String {
+        if self.args.is_empty() {
+            program.to_string()
+        } else {
+            format!("{} {}", program, self.args.join(" "))
+        }
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -652,6 +706,45 @@ impl SystemdLaunchPlan {
 
     fn service_count(self) -> u64 {
         self.service_units.len() as u64
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct SystemdCommandRun {
+    command_line: String,
+    ran: bool,
+    exit_success: bool,
+    status_code: u64,
+}
+
+impl SystemdCommandRun {
+    fn skipped(command_line: String) -> Self {
+        Self {
+            command_line,
+            ran: false,
+            exit_success: false,
+            status_code: 255,
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct SystemdActivationReport {
+    systemctl_program: String,
+    target: &'static str,
+    stop_after_start: bool,
+    import_environment: SystemdCommandRun,
+    start_target: SystemdCommandRun,
+    stop_target: SystemdCommandRun,
+}
+
+impl SystemdActivationReport {
+    fn passed(&self) -> bool {
+        self.import_environment.ran
+            && self.import_environment.exit_success
+            && self.start_target.ran
+            && self.start_target.exit_success
+            && (!self.stop_after_start || (self.stop_target.ran && self.stop_target.exit_success))
     }
 }
 
@@ -867,6 +960,60 @@ fn systemd_launch_plan() -> SystemdLaunchPlan {
     }
 }
 
+fn run_systemd_activation(
+    config: &Config,
+    plan: &SystemdLaunchPlan,
+    stop_after_start: bool,
+) -> SystemdActivationReport {
+    let systemctl_program = config.systemctl_program.clone();
+    let import_environment =
+        run_systemd_command(systemctl_program.as_str(), plan.import_environment);
+    let start_target = if import_environment.exit_success {
+        run_systemd_command(systemctl_program.as_str(), plan.start_target)
+    } else {
+        SystemdCommandRun::skipped(
+            plan.start_target
+                .command_line_with_program(&systemctl_program),
+        )
+    };
+    let stop_target = if stop_after_start && start_target.exit_success {
+        run_systemd_command(systemctl_program.as_str(), plan.stop_target)
+    } else {
+        SystemdCommandRun::skipped(
+            plan.stop_target
+                .command_line_with_program(&systemctl_program),
+        )
+    };
+
+    SystemdActivationReport {
+        systemctl_program,
+        target: plan.target,
+        stop_after_start,
+        import_environment,
+        start_target,
+        stop_target,
+    }
+}
+
+fn run_systemd_command(program: &str, command: SystemdCommandPlan) -> SystemdCommandRun {
+    let command_line = command.command_line_with_program(program);
+
+    match Command::new(program).args(command.args).status() {
+        Ok(status) => SystemdCommandRun {
+            command_line,
+            ran: true,
+            exit_success: status.success(),
+            status_code: status.code().unwrap_or(255) as u64,
+        },
+        Err(_) => SystemdCommandRun {
+            command_line,
+            ran: false,
+            exit_success: false,
+            status_code: 255,
+        },
+    }
+}
+
 fn systemd_unit_contracts() -> [SystemdUnitContract; 4] {
     [
         SystemdUnitContract {
@@ -1029,6 +1176,70 @@ fn emit_systemd_launch_plan(
     );
 }
 
+fn emit_systemd_activation(config: &Config, report: &SystemdActivationReport) {
+    emit(
+        "session.systemd_activation",
+        config,
+        &[
+            ("passed", FieldValue::Bool(report.passed())),
+            (
+                "systemctl_program",
+                FieldValue::Str(report.systemctl_program.as_str()),
+            ),
+            ("target", FieldValue::Str(report.target)),
+            (
+                "stop_after_start",
+                FieldValue::Bool(report.stop_after_start),
+            ),
+            (
+                "import_environment_command",
+                FieldValue::Str(report.import_environment.command_line.as_str()),
+            ),
+            (
+                "import_environment_run",
+                FieldValue::Bool(report.import_environment.ran),
+            ),
+            (
+                "import_environment_exit_success",
+                FieldValue::Bool(report.import_environment.exit_success),
+            ),
+            (
+                "import_environment_status_code",
+                FieldValue::U64(report.import_environment.status_code),
+            ),
+            (
+                "start_target_command",
+                FieldValue::Str(report.start_target.command_line.as_str()),
+            ),
+            (
+                "start_target_run",
+                FieldValue::Bool(report.start_target.ran),
+            ),
+            (
+                "start_target_exit_success",
+                FieldValue::Bool(report.start_target.exit_success),
+            ),
+            (
+                "start_target_status_code",
+                FieldValue::U64(report.start_target.status_code),
+            ),
+            (
+                "stop_target_command",
+                FieldValue::Str(report.stop_target.command_line.as_str()),
+            ),
+            ("stop_target_run", FieldValue::Bool(report.stop_target.ran)),
+            (
+                "stop_target_exit_success",
+                FieldValue::Bool(report.stop_target.exit_success),
+            ),
+            (
+                "stop_target_status_code",
+                FieldValue::U64(report.stop_target.status_code),
+            ),
+        ],
+    );
+}
+
 fn emit_backend_preflight(
     config: &Config,
     report: &BackendPreflightReport,
@@ -1148,6 +1359,12 @@ fn emit_launch_ready(config: &Config, passed: bool) {
             ("preflight_only", FieldValue::Bool(config.preflight_only)),
         ],
     );
+}
+
+fn wait_for_systemd_session() -> ! {
+    loop {
+        thread::sleep(Duration::from_secs(3600));
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -1566,7 +1783,10 @@ struct Config {
     verify_services: bool,
     verify_clean_exit: bool,
     verify_systemd_units: bool,
+    verify_systemd_activation: bool,
+    activate_systemd: bool,
     systemd_unit_dir: String,
+    systemctl_program: String,
     preflight_only: bool,
     verify_launch_spawn: bool,
     launch_spawn_program: Option<String>,
@@ -1588,7 +1808,10 @@ impl Default for Config {
             verify_services: false,
             verify_clean_exit: false,
             verify_systemd_units: false,
+            verify_systemd_activation: false,
+            activate_systemd: false,
             systemd_unit_dir: String::from("/usr/lib/systemd/user"),
+            systemctl_program: String::from("systemctl"),
             preflight_only: false,
             verify_launch_spawn: false,
             launch_spawn_program: None,
@@ -1619,12 +1842,22 @@ impl Config {
                 config.verify_clean_exit = true;
             } else if arg == "--verify-systemd-units" {
                 config.verify_systemd_units = true;
+            } else if arg == "--verify-systemd-activation" {
+                config.verify_systemd_activation = true;
+            } else if arg == "--activate-systemd" {
+                config.activate_systemd = true;
             } else if let Some(value) = arg.strip_prefix("--systemd-unit-dir=") {
                 config.systemd_unit_dir = value.to_string();
             } else if arg == "--systemd-unit-dir" {
                 config.systemd_unit_dir = args
                     .next()
                     .ok_or_else(|| String::from("missing value for --systemd-unit-dir"))?;
+            } else if let Some(value) = arg.strip_prefix("--systemctl-program=") {
+                config.systemctl_program = value.to_string();
+            } else if arg == "--systemctl-program" {
+                config.systemctl_program = args
+                    .next()
+                    .ok_or_else(|| String::from("missing value for --systemctl-program"))?;
             } else if arg == "--preflight-only" {
                 config.preflight_only = true;
             } else if arg == "--verify-launch-spawn" {
@@ -1716,7 +1949,7 @@ fn print_help() {
 backlit-session
 
 Usage:
-  backlit-session [--backend=headless|wayland|drm] [--socket=backlit-0] [--screenshot=target/backlit-session.ppm] [--verify] [--verify-services] [--verify-systemd-units] [--verify-launch-spawn] [--verify-clean-exit] [--preflight-only]
+  backlit-session [--backend=headless|wayland|drm] [--socket=backlit-0] [--screenshot=target/backlit-session.ppm] [--verify] [--verify-services] [--verify-systemd-units] [--verify-systemd-activation] [--activate-systemd] [--verify-launch-spawn] [--verify-clean-exit] [--preflight-only]
 
 Flags:
   --backend      Select compositor backend. Defaults to headless.
@@ -1735,8 +1968,14 @@ Flags:
                  Verify session shutdown closes managed windows and clears focus.
   --verify-systemd-units
                  Verify installed user systemd units for the graphical session.
+  --verify-systemd-activation
+                 Execute the systemd import/start/stop activation path and exit.
+  --activate-systemd
+                 Start the Backlit user systemd target and keep the session process alive.
   --systemd-unit-dir
                  Directory containing Backlit user systemd units. Defaults to /usr/lib/systemd/user.
+  --systemctl-program
+                 systemctl-compatible command used for activation. Defaults to systemctl.
   --launch-spawn-program
                  Override terminal program for deterministic spawn verification.
   --launch-spawn-arg
@@ -1755,7 +1994,9 @@ mod tests {
     use std::path::Path;
     use std::time::{SystemTime, UNIX_EPOCH};
 
-    use super::{binary_name, systemd_launch_plan, verify_systemd_units, Config};
+    use super::{
+        binary_name, run_systemd_activation, systemd_launch_plan, verify_systemd_units, Config,
+    };
 
     #[test]
     fn parses_service_verification_flags() {
@@ -1764,8 +2005,12 @@ mod tests {
             "--verify-services",
             "--verify-clean-exit",
             "--verify-systemd-units",
+            "--verify-systemd-activation",
+            "--activate-systemd",
             "--systemd-unit-dir",
             "packaging/systemd",
+            "--systemctl-program",
+            "true",
             "--preflight-only",
             "--verify-launch-spawn",
             "--launch-spawn-program",
@@ -1783,7 +2028,10 @@ mod tests {
         assert!(config.verify_services);
         assert!(config.verify_clean_exit);
         assert!(config.verify_systemd_units);
+        assert!(config.verify_systemd_activation);
+        assert!(config.activate_systemd);
         assert_eq!(config.systemd_unit_dir, "packaging/systemd");
+        assert_eq!(config.systemctl_program, "true");
         assert!(config.preflight_only);
         assert!(config.verify_launch_spawn);
         assert_eq!(config.launch_spawn_program.as_deref(), Some("true"));
@@ -1866,6 +2114,33 @@ mod tests {
         assert_eq!(
             plan.stop_target.command_line(),
             "systemctl --user stop backlit-session.target"
+        );
+    }
+
+    #[test]
+    fn verifies_systemd_activation_commands_with_successful_runner() {
+        let config = Config {
+            systemctl_program: String::from("true"),
+            ..Config::default()
+        };
+        let plan = systemd_launch_plan();
+        let report = run_systemd_activation(&config, &plan, true);
+
+        assert!(report.passed(), "{report:?}");
+        assert!(report.import_environment.ran);
+        assert!(report.start_target.ran);
+        assert!(report.stop_target.ran);
+        assert_eq!(
+            report.import_environment.command_line,
+            "true --user import-environment XDG_RUNTIME_DIR XDG_SESSION_ID XDG_SEAT XDG_SESSION_TYPE WAYLAND_DISPLAY XDG_CURRENT_DESKTOP DESKTOP_SESSION"
+        );
+        assert_eq!(
+            report.start_target.command_line,
+            "true --user start backlit-session.target"
+        );
+        assert_eq!(
+            report.stop_target.command_line,
+            "true --user stop backlit-session.target"
         );
     }
 

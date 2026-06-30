@@ -35,7 +35,7 @@ count_matching() {
 test -f "$session_desktop" || fail "missing $session_desktop"
 session_exec="$(sed -n 's/^Exec=//p' "$session_desktop")"
 session_exec_program="${session_exec%% *}"
-test "$session_exec" = "backlit-session --backend=drm" || fail "unexpected desktop Exec=$session_exec"
+test "$session_exec" = "backlit-session --backend=drm --activate-systemd" || fail "unexpected desktop Exec=$session_exec"
 test "$session_exec_program" = "backlit-session" || fail "unexpected desktop Exec program=$session_exec_program"
 
 cargo run -p backlit-session -- \

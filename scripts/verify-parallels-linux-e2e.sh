@@ -102,6 +102,7 @@ uploaded_drm_session_smoke_verifier="/tmp/backlit-verify-drm-session-smoke.sh"
 uploaded_mvp0_contract_verifier="/tmp/backlit-verify-mvp0-contract.sh"
 uploaded_packaging_verifier="/tmp/backlit-verify-packaging-contract.sh"
 uploaded_staged_install_verifier="/tmp/backlit-verify-staged-session-install.sh"
+uploaded_systemd_activation_verifier="/tmp/backlit-verify-systemd-activation.sh"
 uploaded_nested_verifier="/tmp/backlit-verify-nested-wayland-smoke.sh"
 
 export DEBIAN_FRONTEND=noninteractive
@@ -193,6 +194,7 @@ install -m 0755 -o "\$guest_user" -g "\$guest_user" "\$uploaded_drm_session_smok
 install -m 0755 -o "\$guest_user" -g "\$guest_user" "\$uploaded_mvp0_contract_verifier" "\$repo_dir/scripts/verify-mvp0-contract.sh"
 install -m 0755 -o "\$guest_user" -g "\$guest_user" "\$uploaded_packaging_verifier" "\$repo_dir/scripts/verify-packaging-contract.sh"
 install -m 0755 -o "\$guest_user" -g "\$guest_user" "\$uploaded_staged_install_verifier" "\$repo_dir/scripts/verify-staged-session-install.sh"
+install -m 0755 -o "\$guest_user" -g "\$guest_user" "\$uploaded_systemd_activation_verifier" "\$repo_dir/scripts/verify-systemd-activation.sh"
 install -m 0755 -o "\$guest_user" -g "\$guest_user" "\$uploaded_nested_verifier" "\$repo_dir/scripts/verify-nested-wayland-smoke.sh"
 
 runuser -u "\$guest_user" -- bash -lc "
@@ -218,6 +220,7 @@ upload_script "$repo_root/scripts/verify-drm-session-smoke.sh" "/tmp/backlit-ver
 upload_script "$repo_root/scripts/verify-mvp0-contract.sh" "/tmp/backlit-verify-mvp0-contract.sh"
 upload_script "$repo_root/scripts/verify-packaging-contract.sh" "/tmp/backlit-verify-packaging-contract.sh"
 upload_script "$repo_root/scripts/verify-staged-session-install.sh" "/tmp/backlit-verify-staged-session-install.sh"
+upload_script "$repo_root/scripts/verify-systemd-activation.sh" "/tmp/backlit-verify-systemd-activation.sh"
 upload_script "$repo_root/scripts/verify-nested-wayland-smoke.sh" "/tmp/backlit-verify-nested-wayland-smoke.sh"
 upload_script "$root_runner" "/tmp/backlit-parallels-root-runner.sh"
 

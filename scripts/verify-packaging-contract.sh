@@ -44,7 +44,7 @@ require_file packaging/debian/control.stub
 
 require_line packaging/sessions/backlit.desktop "[Desktop Entry]"
 require_line packaging/sessions/backlit.desktop "Name=Backlit"
-require_line packaging/sessions/backlit.desktop "Exec=backlit-session --backend=drm"
+require_line packaging/sessions/backlit.desktop "Exec=backlit-session --backend=drm --activate-systemd"
 require_line packaging/sessions/backlit.desktop "Type=Application"
 require_line packaging/sessions/backlit.desktop "DesktopNames=Backlit"
 

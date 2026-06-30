@@ -85,10 +85,10 @@ require_file "$shell_service"
 require_file "$notification_service"
 require_file "$settings_service"
 
-require_line "$session_desktop" "Exec=backlit-session --backend=drm"
+require_line "$session_desktop" "Exec=backlit-session --backend=drm --activate-systemd"
 desktop_exec="$(sed -n 's/^Exec=//p' "$session_desktop")"
 desktop_exec_program="${desktop_exec%% *}"
-test "$desktop_exec" = "backlit-session --backend=drm" || fail "unexpected session desktop Exec=$desktop_exec"
+test "$desktop_exec" = "backlit-session --backend=drm --activate-systemd" || fail "unexpected session desktop Exec=$desktop_exec"
 test "$desktop_exec_program" = "backlit-session" || fail "unexpected session desktop Exec program=$desktop_exec_program"
 require_executable "$bin_dir/$desktop_exec_program"
 
