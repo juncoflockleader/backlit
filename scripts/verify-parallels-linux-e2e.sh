@@ -242,6 +242,12 @@ BACKLIT_ALLOW_SYSTEM_PACKAGE_INSTALL=1 scripts/verify-debian-system-install.sh \
   "\$e2e_out_dir/debian-system-install" \
   "\$e2e_out_dir/debian-package-build"
 chown -R "\$guest_user:\$guest_user" "\$repo_dir/\$e2e_out_dir/debian-system-install"
+runuser -u "\$guest_user" -- bash -lc "
+set -euo pipefail
+source \"\\\$HOME/.cargo/env\"
+cd \"\$repo_dir\"
+scripts/verify-mvp1-contract.sh \"\$e2e_out_dir/mvp1-contract\" \"\$e2e_out_dir\"
+"
 EOF
 chmod 700 "$root_runner"
 
