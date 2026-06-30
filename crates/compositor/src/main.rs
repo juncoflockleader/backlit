@@ -1,5 +1,9 @@
 use std::env;
+use std::fs;
+use std::os::unix::fs::FileTypeExt;
+use std::os::unix::net::UnixListener;
 use std::path::Path;
+use std::path::PathBuf;
 use std::process;
 use std::thread;
 use std::time::Duration;
@@ -221,6 +225,17 @@ fn run() -> Result<(), String> {
     }
 
     if config.serve {
+        let mut session_socket = match bind_session_socket(&config)? {
+            Some(socket) => {
+                emit_socket_bound(&config, &socket);
+                Some(socket)
+            }
+            None => {
+                emit_socket_unavailable(&config);
+                None
+            }
+        };
+
         emit(
             "compositor.service_running",
             &config,
@@ -235,6 +250,11 @@ fn run() -> Result<(), String> {
 
         if let Some(duration_ms) = config.serve_for_ms {
             thread::sleep(Duration::from_millis(duration_ms));
+            if let Some(mut socket) = session_socket.take() {
+                let path = socket.path_string();
+                let removed = socket.cleanup();
+                emit_socket_unbound(&config, path.as_str(), removed);
+            }
             emit(
                 "compositor.service_exit",
                 &config,
@@ -260,6 +280,103 @@ fn run() -> Result<(), String> {
     );
 
     Ok(())
+}
+
+#[derive(Debug)]
+struct BoundSessionSocket {
+    socket_name: String,
+    runtime_dir: String,
+    path: PathBuf,
+    stale_socket_removed: bool,
+    cleaned: bool,
+    _listener: UnixListener,
+}
+
+impl BoundSessionSocket {
+    fn path_string(&self) -> String {
+        self.path.display().to_string()
+    }
+
+    fn cleanup(&mut self) -> bool {
+        if self.cleaned {
+            return false;
+        }
+
+        self.cleaned = true;
+        fs::remove_file(&self.path).is_ok()
+    }
+}
+
+impl Drop for BoundSessionSocket {
+    fn drop(&mut self) {
+        if !self.cleaned {
+            let _ = fs::remove_file(&self.path);
+            self.cleaned = true;
+        }
+    }
+}
+
+fn bind_session_socket(config: &RunConfig) -> Result<Option<BoundSessionSocket>, String> {
+    bind_session_socket_in_runtime(&config.socket, env::var("XDG_RUNTIME_DIR").ok())
+}
+
+fn bind_session_socket_in_runtime(
+    socket_name: &str,
+    runtime_dir: Option<String>,
+) -> Result<Option<BoundSessionSocket>, String> {
+    let Some(runtime_dir) = runtime_dir.filter(|value| !value.trim().is_empty()) else {
+        return Ok(None);
+    };
+    let runtime_path = Path::new(runtime_dir.as_str());
+    if !runtime_path.is_dir() {
+        return Ok(None);
+    }
+
+    let socket_path = if Path::new(socket_name).is_absolute() {
+        PathBuf::from(socket_name)
+    } else {
+        runtime_path.join(socket_name)
+    };
+    let mut stale_socket_removed = false;
+
+    if let Ok(metadata) = fs::symlink_metadata(&socket_path) {
+        if metadata.file_type().is_socket() {
+            fs::remove_file(&socket_path).map_err(|error| {
+                format!(
+                    "failed to remove stale compositor socket {}: {error}",
+                    socket_path.display()
+                )
+            })?;
+            stale_socket_removed = true;
+        } else {
+            return Err(format!(
+                "refusing to replace non-socket compositor path {}",
+                socket_path.display()
+            ));
+        }
+    }
+
+    let listener = UnixListener::bind(&socket_path).map_err(|error| {
+        format!(
+            "failed to bind compositor socket {}: {error}",
+            socket_path.display()
+        )
+    })?;
+    listener.set_nonblocking(true).map_err(|error| {
+        format!(
+            "failed to set compositor socket {} nonblocking: {error}",
+            socket_path.display()
+        )
+    })?;
+
+    Ok(Some(BoundSessionSocket {
+        socket_name: socket_name.to_string(),
+        runtime_dir,
+        path: socket_path,
+        stale_socket_removed,
+        cleaned: false,
+        _listener: listener,
+    }))
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -1023,6 +1140,49 @@ fn emit_backend_preflight(
     );
 }
 
+fn emit_socket_bound(config: &RunConfig, socket: &BoundSessionSocket) {
+    let path = socket.path_string();
+    emit(
+        "compositor.socket_bound",
+        config,
+        &[
+            ("socket_name", FieldValue::Str(socket.socket_name.as_str())),
+            ("runtime_dir", FieldValue::Str(socket.runtime_dir.as_str())),
+            ("socket_path", FieldValue::Str(path.as_str())),
+            (
+                "stale_socket_removed",
+                FieldValue::Bool(socket.stale_socket_removed),
+            ),
+        ],
+    );
+}
+
+fn emit_socket_unavailable(config: &RunConfig) {
+    let runtime_dir = env::var("XDG_RUNTIME_DIR").unwrap_or_default();
+    emit(
+        "compositor.socket_unavailable",
+        config,
+        &[
+            ("runtime_dir", FieldValue::Str(runtime_dir.as_str())),
+            (
+                "runtime_dir_present",
+                FieldValue::Bool(!runtime_dir.trim().is_empty()),
+            ),
+        ],
+    );
+}
+
+fn emit_socket_unbound(config: &RunConfig, path: &str, removed: bool) {
+    emit(
+        "compositor.socket_unbound",
+        config,
+        &[
+            ("socket_path", FieldValue::Str(path)),
+            ("removed", FieldValue::Bool(removed)),
+        ],
+    );
+}
+
 fn print_help() {
     println!(
         "\
@@ -1053,6 +1213,11 @@ Backend launch preflight runs before smoke or service readiness events.
 #[cfg(test)]
 mod tests {
     use super::{run_compositor_surface_smoke, run_scripted_client_runtime};
+    use std::fs;
+    use std::os::unix::fs::FileTypeExt;
+    use std::os::unix::net::UnixStream;
+    use std::path::PathBuf;
+    use std::time::{SystemTime, UNIX_EPOCH};
 
     #[test]
     fn compositor_surface_smoke_maps_xdg_toplevel_into_backend_frame() {
@@ -1085,5 +1250,39 @@ mod tests {
         assert_eq!(report.clients_after_disconnect, 0);
         assert_eq!(report.policy_windows_after_map, 2);
         assert!(report.policy_preview_verified);
+    }
+
+    #[test]
+    fn service_socket_binds_accepts_connections_and_cleans_up() {
+        let unique = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap()
+            .as_nanos();
+        let runtime_dir = PathBuf::from(format!(
+            "/private/tmp/blsock-{}-{unique}",
+            std::process::id()
+        ));
+        fs::create_dir_all(&runtime_dir).unwrap();
+
+        let runtime_dir_string = runtime_dir.display().to_string();
+        let mut socket = match super::bind_session_socket_in_runtime(
+            "backlit-test-socket",
+            Some(runtime_dir_string),
+        ) {
+            Ok(Some(socket)) => socket,
+            Err(error) if error.contains("Operation not permitted") => {
+                let _ = fs::remove_dir(&runtime_dir);
+                return;
+            }
+            other => panic!("unexpected socket bind result: {other:?}"),
+        };
+        let socket_path = socket.path.clone();
+
+        assert!(fs::metadata(&socket_path).unwrap().file_type().is_socket());
+        UnixStream::connect(&socket_path).unwrap();
+        assert!(socket.cleanup());
+        assert!(!socket_path.exists());
+
+        fs::remove_dir(&runtime_dir).unwrap();
     }
 }

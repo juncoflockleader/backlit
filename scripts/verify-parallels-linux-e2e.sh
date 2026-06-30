@@ -112,6 +112,7 @@ uploaded_verifier="/tmp/backlit-verify-linux-e2e.sh"
 uploaded_gui_smoke_verifier="/tmp/backlit-verify-gui-smoke.sh"
 uploaded_gui_preview_renderer="/tmp/backlit-render-gui-preview.sh"
 uploaded_compositor_runtime_verifier="/tmp/backlit-verify-compositor-runtime.sh"
+uploaded_compositor_socket_verifier="/tmp/backlit-verify-compositor-socket.sh"
 uploaded_launch_performance_verifier="/tmp/backlit-verify-launch-performance.sh"
 uploaded_ci_contract_verifier="/tmp/backlit-verify-ci-contract.sh"
 uploaded_launch_readiness_verifier="/tmp/backlit-verify-launch-readiness.sh"
@@ -212,6 +213,7 @@ install -m 0755 -o "\$guest_user" -g "\$guest_user" "\$uploaded_verifier" "\$rep
 install -m 0755 -o "\$guest_user" -g "\$guest_user" "\$uploaded_gui_smoke_verifier" "\$repo_dir/scripts/verify-gui-smoke.sh"
 install -m 0755 -o "\$guest_user" -g "\$guest_user" "\$uploaded_gui_preview_renderer" "\$repo_dir/scripts/render-gui-preview.sh"
 install -m 0755 -o "\$guest_user" -g "\$guest_user" "\$uploaded_compositor_runtime_verifier" "\$repo_dir/scripts/verify-compositor-runtime.sh"
+install -m 0755 -o "\$guest_user" -g "\$guest_user" "\$uploaded_compositor_socket_verifier" "\$repo_dir/scripts/verify-compositor-socket.sh"
 install -m 0755 -o "\$guest_user" -g "\$guest_user" "\$uploaded_launch_performance_verifier" "\$repo_dir/scripts/verify-launch-performance.sh"
 install -m 0755 -o "\$guest_user" -g "\$guest_user" "\$uploaded_ci_contract_verifier" "\$repo_dir/scripts/verify-ci-contract.sh"
 install -m 0755 -o "\$guest_user" -g "\$guest_user" "\$uploaded_launch_readiness_verifier" "\$repo_dir/scripts/verify-launch-readiness.sh"
@@ -258,6 +260,7 @@ upload_script "$repo_root/scripts/verify-linux-e2e.sh" "/tmp/backlit-verify-linu
 upload_script "$repo_root/scripts/verify-gui-smoke.sh" "/tmp/backlit-verify-gui-smoke.sh"
 upload_script "$repo_root/scripts/render-gui-preview.sh" "/tmp/backlit-render-gui-preview.sh"
 upload_script "$repo_root/scripts/verify-compositor-runtime.sh" "/tmp/backlit-verify-compositor-runtime.sh"
+upload_script "$repo_root/scripts/verify-compositor-socket.sh" "/tmp/backlit-verify-compositor-socket.sh"
 upload_script "$repo_root/scripts/verify-launch-performance.sh" "/tmp/backlit-verify-launch-performance.sh"
 upload_script "$repo_root/scripts/verify-ci-contract.sh" "/tmp/backlit-verify-ci-contract.sh"
 upload_script "$repo_root/scripts/verify-launch-readiness.sh" "/tmp/backlit-verify-launch-readiness.sh"
@@ -286,6 +289,7 @@ host_guest_manifest="$host_out_dir/guest-manifest.json"
 host_gui_smoke_manifest="$host_out_dir/gui-smoke-manifest.json"
 host_gui_preview_manifest="$host_out_dir/gui-preview-manifest.json"
 host_compositor_runtime_manifest="$host_out_dir/compositor-runtime-manifest.json"
+host_compositor_socket_manifest="$host_out_dir/compositor-socket-manifest.json"
 host_launch_readiness_manifest="$host_out_dir/launch-readiness-manifest.json"
 host_session_replay_manifest="$host_out_dir/session-replay-manifest.json"
 host_drm_session_smoke_manifest="$host_out_dir/drm-session-smoke-manifest.json"
@@ -308,6 +312,7 @@ rm -f \
   "$host_gui_smoke_manifest" \
   "$host_gui_preview_manifest" \
   "$host_compositor_runtime_manifest" \
+  "$host_compositor_socket_manifest" \
   "$host_launch_readiness_manifest" \
   "$host_session_replay_manifest" \
   "$host_drm_session_smoke_manifest" \
@@ -329,6 +334,7 @@ download_file "$guest_e2e_dir/manifest.json" "$host_guest_manifest"
 download_file "$guest_e2e_dir/gui-smoke/manifest.json" "$host_gui_smoke_manifest"
 download_file "$guest_e2e_dir/gui-preview/manifest.json" "$host_gui_preview_manifest"
 download_file "$guest_e2e_dir/compositor-runtime/manifest.json" "$host_compositor_runtime_manifest"
+download_file "$guest_e2e_dir/compositor-socket/manifest.json" "$host_compositor_socket_manifest"
 download_file "$guest_e2e_dir/launch-readiness/manifest.json" "$host_launch_readiness_manifest"
 download_file "$guest_e2e_dir/session-replay/manifest.json" "$host_session_replay_manifest"
 download_file "$guest_e2e_dir/drm-session-smoke/manifest.json" "$host_drm_session_smoke_manifest"
@@ -435,6 +441,9 @@ require_contains "$host_compositor_runtime_manifest" '"surface_policy_preview": 
 require_contains "$host_compositor_runtime_manifest" '"policy_preview_ppm_bytes":'
 require_contains "$host_compositor_runtime_manifest" '"targeted_surface_damage": true'
 require_contains "$host_compositor_runtime_manifest" '"client_disconnect_cleanup": true'
+require_contains "$host_compositor_socket_manifest" '"session_socket_bound": true'
+require_contains "$host_compositor_socket_manifest" '"socket_accepts_client_connection": true'
+require_contains "$host_compositor_socket_manifest" '"session_socket_cleanup": true'
 require_contains "$host_session_replay_manifest" '"session_replay_event": true'
 require_contains "$host_session_replay_manifest" '"frame_count": 9'
 require_contains "$host_session_replay_manifest" '"launcher_overlay_frame": true'
@@ -491,6 +500,7 @@ cat > "$host_out_dir/manifest.json" <<EOF
     "gui_smoke_manifest": "$host_gui_smoke_manifest",
     "gui_preview_manifest": "$host_gui_preview_manifest",
     "compositor_runtime_manifest": "$host_compositor_runtime_manifest",
+    "compositor_socket_manifest": "$host_compositor_socket_manifest",
     "launch_readiness_manifest": "$host_launch_readiness_manifest",
     "session_replay_manifest": "$host_session_replay_manifest",
     "drm_session_smoke_manifest": "$host_drm_session_smoke_manifest",
@@ -515,6 +525,7 @@ cat > "$host_out_dir/manifest.json" <<EOF
     "gui_preview": true,
     "compositor_runtime": true,
     "compositor_runtime_policy_preview": true,
+    "compositor_socket": true,
     "launch_readiness": true,
     "session_replay": true,
     "parallels_drm_launch_ready": true,

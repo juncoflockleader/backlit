@@ -34,6 +34,7 @@ require_executable scripts/verify-gui-smoke.sh
 require_executable scripts/verify-launcher-desktop-discovery.sh
 require_executable scripts/render-gui-preview.sh
 require_executable scripts/verify-compositor-runtime.sh
+require_executable scripts/verify-compositor-socket.sh
 require_executable scripts/verify-launch-performance.sh
 require_executable scripts/verify-resource-budget.sh
 require_executable scripts/verify-notification-daemon.sh
@@ -110,6 +111,7 @@ require_contains scripts/verify-nested-wayland-smoke.sh '"launcher_terminal_wayl
 require_contains scripts/verify-nested-wayland-smoke.sh '"launcher_terminal_no_seat_expected":'
 require_contains scripts/verify-linux-e2e.sh './scripts/render-gui-preview.sh'
 require_contains scripts/verify-linux-e2e.sh './scripts/verify-compositor-runtime.sh'
+require_contains scripts/verify-linux-e2e.sh './scripts/verify-compositor-socket.sh'
 require_contains scripts/verify-linux-e2e.sh './scripts/verify-launch-performance.sh'
 require_contains scripts/verify-linux-e2e.sh './scripts/verify-launcher-desktop-discovery.sh'
 require_contains scripts/verify-linux-e2e.sh './scripts/verify-resource-budget.sh'
@@ -190,6 +192,7 @@ if [ -n "$artifact_root" ] && [ -d "$artifact_root" ]; then
   require_file "$artifact_root/gui-smoke/manifest.json"
   require_file "$artifact_root/gui-preview/manifest.json"
   require_file "$artifact_root/compositor-runtime/manifest.json"
+  require_file "$artifact_root/compositor-socket/manifest.json"
   require_file "$artifact_root/launch-performance/manifest.json"
   require_file "$artifact_root/launcher-desktop-discovery/manifest.json"
   require_file "$artifact_root/resource-budget/manifest.json"
@@ -275,6 +278,13 @@ if [ -n "$artifact_root" ] && [ -d "$artifact_root" ]; then
   require_contains "$artifact_root/compositor-runtime/manifest.json" '"surface_close_damage": true'
   require_contains "$artifact_root/compositor-runtime/manifest.json" '"client_disconnect_cleanup": true'
   require_contains "$artifact_root/compositor-runtime/manifest.json" '"service_mode_runtime": true'
+  if grep '"session_socket_bound": true' "$artifact_root/compositor-socket/manifest.json" >/dev/null; then
+    require_contains "$artifact_root/compositor-socket/manifest.json" '"socket_accepts_client_connection": true'
+    require_contains "$artifact_root/compositor-socket/manifest.json" '"session_socket_cleanup": true'
+  else
+    require_contains "$artifact_root/compositor-socket/manifest.json" '"socket_blocked_expected": true'
+    require_contains "$artifact_root/compositor-socket/manifest.json" '"socket_permission_denied": true'
+  fi
   require_contains "$artifact_root/launch-performance/manifest.json" '"startup_budget": true'
   require_contains "$artifact_root/launch-performance/manifest.json" '"terminal_launch_budget": true'
   require_contains "$artifact_root/launch-performance/manifest.json" '"shell_ready_budget": true'
@@ -464,6 +474,7 @@ cat > "$out_dir/manifest.json" <<EOF
     "launcher_desktop_discovery": true,
     "resource_budget": true,
     "compositor_runtime": true,
+    "compositor_socket": true,
     "compositor_service_ready": true,
     "notification_daemon": true,
     "settings_daemon": true,

@@ -33,6 +33,7 @@ require_executable scripts/verify-launch-readiness.sh
 require_executable scripts/verify-session-launch.sh
 require_executable scripts/verify-drm-session-smoke.sh
 require_executable scripts/verify-session-replay.sh
+require_executable scripts/verify-compositor-socket.sh
 require_executable scripts/verify-debian-package-install.sh
 require_executable scripts/verify-debian-system-install.sh
 require_executable scripts/verify-launch-performance.sh
@@ -57,6 +58,8 @@ require_contains scripts/verify-drm-session-smoke.sh '"drm_session_smoke_ready"'
 require_contains scripts/verify-drm-session-smoke.sh '"drm_session_clean_exit"'
 require_contains scripts/verify-session-replay.sh '"launcher_overlay_frame": true'
 require_contains scripts/verify-session-replay.sh '"app_switcher_overlay_frame": true'
+require_contains scripts/verify-compositor-socket.sh '"session_socket_bound": true'
+require_contains scripts/verify-compositor-socket.sh '"socket_accepts_client_connection": true'
 require_contains scripts/verify-linux-e2e.sh './scripts/verify-drm-session-smoke.sh'
 require_contains scripts/verify-linux-e2e.sh './scripts/verify-mvp1-contract.sh'
 
@@ -66,6 +69,7 @@ drm_session_smoke_ready_artifact=false
 debian_package_install_replay_artifact=false
 debian_system_install_replay_artifact=false
 nested_wayland_artifact=false
+compositor_socket_artifact=false
 
 if [ -n "$artifact_root" ] && [ -d "$artifact_root" ]; then
   artifact_manifests_checked=true
@@ -77,6 +81,7 @@ if [ -n "$artifact_root" ] && [ -d "$artifact_root" ]; then
   require_file "$artifact_root/launch-performance/manifest.json"
   require_file "$artifact_root/resource-budget/manifest.json"
   require_file "$artifact_root/compositor-runtime/manifest.json"
+  require_file "$artifact_root/compositor-socket/manifest.json"
   require_file "$artifact_root/debian-package-install/manifest.json"
   require_file "$artifact_root/debian-system-install/manifest.json"
 
@@ -134,6 +139,14 @@ if [ -n "$artifact_root" ] && [ -d "$artifact_root" ]; then
   else
     require_contains "$artifact_root/resource-budget/manifest.json" '"resource_budget_blocked_expected": true'
   fi
+  if grep '"session_socket_bound": true' "$artifact_root/compositor-socket/manifest.json" >/dev/null; then
+    require_contains "$artifact_root/compositor-socket/manifest.json" '"socket_accepts_client_connection": true'
+    require_contains "$artifact_root/compositor-socket/manifest.json" '"session_socket_cleanup": true'
+    compositor_socket_artifact=true
+  else
+    require_contains "$artifact_root/compositor-socket/manifest.json" '"socket_blocked_expected": true'
+    require_contains "$artifact_root/compositor-socket/manifest.json" '"socket_permission_denied": true'
+  fi
   require_contains "$artifact_root/compositor-runtime/manifest.json" '"surface_policy_preview": true'
   require_contains "$artifact_root/compositor-runtime/manifest.json" '"targeted_surface_damage": true'
   require_contains "$artifact_root/compositor-runtime/manifest.json" '"client_disconnect_cleanup": true'
@@ -190,6 +203,8 @@ cat > "$manifest" <<EOF
     "session_replay_contract": true,
     "package_install_contract": true,
     "resource_budget_contract": true,
+    "compositor_socket_contract": true,
+    "compositor_socket_artifact": $compositor_socket_artifact,
     "drm_launch_ready_artifact": $drm_launch_ready_artifact,
     "drm_session_smoke_ready_artifact": $drm_session_smoke_ready_artifact,
     "debian_package_install_replay_artifact": $debian_package_install_replay_artifact,

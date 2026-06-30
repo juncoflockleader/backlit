@@ -1,5 +1,6 @@
 usr/lib/backlit/dev-tools/verify-gui-smoke.sh
 usr/lib/backlit/dev-tools/verify-compositor-runtime.sh
+usr/lib/backlit/dev-tools/verify-compositor-socket.sh
 usr/lib/backlit/dev-tools/verify-package-manifests.sh
 usr/lib/backlit/dev-tools/verify-debian-package-build.sh
 usr/lib/backlit/dev-tools/verify-debian-package-install.sh
