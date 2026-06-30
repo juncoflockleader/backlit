@@ -126,6 +126,16 @@ grep '"clock_visible":true' "$out_dir/shell.jsonl" >/dev/null
 grep '"battery_visible":true' "$out_dir/shell.jsonl" >/dev/null
 grep '"network_visible":true' "$out_dir/shell.jsonl" >/dev/null
 grep '"volume_visible":true' "$out_dir/shell.jsonl" >/dev/null
+grep '"network_status_ready":true' "$out_dir/shell.jsonl" >/dev/null
+grep '"network_backend":"NetworkManager"' "$out_dir/shell.jsonl" >/dev/null
+grep '"network_control_tool":"nmcli"' "$out_dir/shell.jsonl" >/dev/null
+grep '"network_connected":true' "$out_dir/shell.jsonl" >/dev/null
+grep '"network_strength_percent":84' "$out_dir/shell.jsonl" >/dev/null
+grep '"audio_status_ready":true' "$out_dir/shell.jsonl" >/dev/null
+grep '"audio_backend":"PipeWire"' "$out_dir/shell.jsonl" >/dev/null
+grep '"audio_control_tool":"wpctl"' "$out_dir/shell.jsonl" >/dev/null
+grep '"audio_muted":false' "$out_dir/shell.jsonl" >/dev/null
+grep '"audio_volume_percent":72' "$out_dir/shell.jsonl" >/dev/null
 grep '"workspace_indicator_visible":true' "$out_dir/shell.jsonl" >/dev/null
 grep '"workspace_count":4' "$out_dir/shell.jsonl" >/dev/null
 grep '"active_workspace":0' "$out_dir/shell.jsonl" >/dev/null
@@ -244,6 +254,8 @@ cat > "$out_dir/manifest.json" <<EOF
     "shell_required_roles": 4,
     "shell_wallpaper": true,
     "shell_panel_status": true,
+    "shell_network_status": true,
+    "shell_audio_status": true,
     "shell_workspace_indicator": true,
     "shell_launcher_targets": 3,
     "shell_app_switcher": true,

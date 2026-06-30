@@ -29,6 +29,45 @@ impl WorkspaceIndicator {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
+pub struct NetworkStatus {
+    pub backend: &'static str,
+    pub control_tool: &'static str,
+    pub device: &'static str,
+    pub connected: bool,
+    pub ssid: &'static str,
+    pub strength_percent: u64,
+}
+
+impl NetworkStatus {
+    pub fn ready(&self) -> bool {
+        !self.backend.is_empty()
+            && self.control_tool == "nmcli"
+            && !self.device.is_empty()
+            && self.connected
+            && !self.ssid.is_empty()
+            && self.strength_percent <= 100
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct AudioStatus {
+    pub backend: &'static str,
+    pub control_tool: &'static str,
+    pub sink: &'static str,
+    pub volume_percent: u64,
+    pub muted: bool,
+}
+
+impl AudioStatus {
+    pub fn ready(&self) -> bool {
+        !self.backend.is_empty()
+            && self.control_tool == "wpctl"
+            && !self.sink.is_empty()
+            && self.volume_percent <= 100
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct PanelState {
     pub output: &'static str,
     pub height_px: u64,
@@ -36,6 +75,8 @@ pub struct PanelState {
     pub battery_visible: bool,
     pub network_visible: bool,
     pub volume_visible: bool,
+    pub network: NetworkStatus,
+    pub audio: AudioStatus,
     pub workspace: WorkspaceIndicator,
 }
 
@@ -47,6 +88,8 @@ impl PanelState {
             && self.battery_visible
             && self.network_visible
             && self.volume_visible
+            && self.network.ready()
+            && self.audio.ready()
             && self.workspace.ready()
     }
 }
@@ -129,6 +172,21 @@ pub fn run_shell_chrome_smoke() -> ShellChromeReport {
             battery_visible: true,
             network_visible: true,
             volume_visible: true,
+            network: NetworkStatus {
+                backend: "NetworkManager",
+                control_tool: "nmcli",
+                device: "wlan0",
+                connected: true,
+                ssid: "Backlit Lab",
+                strength_percent: 84,
+            },
+            audio: AudioStatus {
+                backend: "PipeWire",
+                control_tool: "wpctl",
+                sink: "@DEFAULT_AUDIO_SINK@",
+                volume_percent: 72,
+                muted: false,
+            },
             workspace: WorkspaceIndicator {
                 active: 0,
                 count: 4,
@@ -171,9 +229,25 @@ mod tests {
         assert!(report.panel.battery_visible);
         assert!(report.panel.network_visible);
         assert!(report.panel.volume_visible);
+        assert!(report.panel.network.ready());
+        assert!(report.panel.audio.ready());
         assert!(report.panel.workspace.visible);
         assert_eq!(report.panel.workspace.active, 0);
         assert_eq!(report.panel.workspace.count, 4);
+    }
+
+    #[test]
+    fn panel_status_uses_existing_system_tools() {
+        let report = run_shell_chrome_smoke();
+
+        assert_eq!(report.panel.network.backend, "NetworkManager");
+        assert_eq!(report.panel.network.control_tool, "nmcli");
+        assert!(report.panel.network.connected);
+        assert!(report.panel.network.strength_percent <= 100);
+        assert_eq!(report.panel.audio.backend, "PipeWire");
+        assert_eq!(report.panel.audio.control_tool, "wpctl");
+        assert!(!report.panel.audio.muted);
+        assert!(report.panel.audio.volume_percent <= 100);
     }
 
     #[test]

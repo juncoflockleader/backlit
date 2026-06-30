@@ -100,6 +100,40 @@ fn run() -> Result<(), String> {
                     FieldValue::Bool(report.panel.volume_visible)
                 ),
                 (
+                    "network_status_ready",
+                    FieldValue::Bool(report.panel.network.ready())
+                ),
+                (
+                    "network_backend",
+                    FieldValue::Str(report.panel.network.backend)
+                ),
+                (
+                    "network_control_tool",
+                    FieldValue::Str(report.panel.network.control_tool)
+                ),
+                (
+                    "network_connected",
+                    FieldValue::Bool(report.panel.network.connected)
+                ),
+                (
+                    "network_strength_percent",
+                    FieldValue::U64(report.panel.network.strength_percent)
+                ),
+                (
+                    "audio_status_ready",
+                    FieldValue::Bool(report.panel.audio.ready())
+                ),
+                ("audio_backend", FieldValue::Str(report.panel.audio.backend)),
+                (
+                    "audio_control_tool",
+                    FieldValue::Str(report.panel.audio.control_tool)
+                ),
+                ("audio_muted", FieldValue::Bool(report.panel.audio.muted)),
+                (
+                    "audio_volume_percent",
+                    FieldValue::U64(report.panel.audio.volume_percent)
+                ),
+                (
                     "workspace_indicator_visible",
                     FieldValue::Bool(report.panel.workspace.visible)
                 ),
