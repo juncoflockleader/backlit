@@ -30,7 +30,7 @@ The launch-path regression check is:
 ./scripts/verify-launch-performance.sh
 ```
 
-It builds the session, compositor, and shell binaries, runs `backlit-session` directly, and verifies the current MVP budgets for GUI readiness after session launch, shell-ready service probes after launch, and terminal hotkey spawn time. The Linux E2E gate includes this verifier and publishes `target/linux-e2e/launch-performance/manifest.json`.
+It builds the session, compositor, shell, and settings daemon binaries, runs `backlit-session` directly, and verifies the current MVP budgets for GUI readiness after session launch, service probes after launch, and terminal hotkey spawn time. The Linux E2E gate includes this verifier and publishes `target/linux-e2e/launch-performance/manifest.json`.
 
 The Linux resource-budget regression check is:
 

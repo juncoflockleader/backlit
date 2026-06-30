@@ -67,7 +67,7 @@ WAYLAND_DISPLAY="$socket_name" cargo run -p backlit-launcher -- \
   --spawn-smoke \
   --spawn-program="$info_tool" \
   --wayland-display="$socket_name" > "$out_dir/launcher-spawn.jsonl"
-cargo build -p backlit-session -p backlit-compositor -p backlit-shell
+cargo build -p backlit-session -p backlit-compositor -p backlit-shell -p backlit-settings-daemon
 WAYLAND_DISPLAY="$socket_name" cargo run -p backlit-session -- \
   --backend=wayland \
   --socket=backlit-0 \
@@ -99,6 +99,7 @@ grep '"exit_success":true' "$out_dir/session.jsonl" >/dev/null
 grep '"wayland_display_set":true' "$out_dir/session.jsonl" >/dev/null
 grep '"compositor_ready":true' "$out_dir/session.jsonl" >/dev/null
 grep '"shell_ready":true' "$out_dir/session.jsonl" >/dev/null
+grep '"settings_ready":true' "$out_dir/session.jsonl" >/dev/null
 grep '"children_exited_cleanly":true' "$out_dir/session.jsonl" >/dev/null
 grep '"windows_before_shutdown":3' "$out_dir/session.jsonl" >/dev/null
 grep '"windows_closed":3' "$out_dir/session.jsonl" >/dev/null
@@ -131,6 +132,7 @@ cat > "$out_dir/manifest.json" <<EOF
     "launcher_wayland_client_spawn": true,
     "session_wayland_client_spawn": true,
     "session_wayland_services": true,
+    "session_settings_service": true,
     "session_wayland_clean_exit": true
   }
 }

@@ -34,6 +34,7 @@ require_executable scripts/verify-gui-smoke.sh
 require_executable scripts/render-gui-preview.sh
 require_executable scripts/verify-launch-performance.sh
 require_executable scripts/verify-resource-budget.sh
+require_executable scripts/verify-settings-daemon.sh
 require_executable scripts/verify-portal-security.sh
 require_executable scripts/verify-linux-e2e.sh
 require_executable scripts/verify-ci-contract.sh
@@ -51,6 +52,7 @@ require_contains Cargo.toml '"crates/perf"'
 require_contains Cargo.toml '"crates/session"'
 require_contains Cargo.toml '"crates/shell"'
 require_contains Cargo.toml '"crates/launcher"'
+require_contains Cargo.toml '"crates/settings-daemon"'
 require_contains Cargo.toml '"crates/portal-backend"'
 require_contains Cargo.toml '"crates/surface"'
 require_contains Cargo.toml '"crates/window-policy"'
@@ -62,6 +64,7 @@ require_contains scripts/verify-gui-smoke.sh 'cargo run -p backlit-perf -- --ver
 require_contains scripts/verify-gui-smoke.sh 'cargo run -p backlit-input -- --verify'
 require_contains scripts/verify-gui-smoke.sh 'cargo run -p backlit-surface -- --verify'
 require_contains scripts/verify-gui-smoke.sh 'cargo run -p backlit-demo-client --'
+require_contains scripts/verify-gui-smoke.sh 'cargo run -p backlit-settings-daemon -- --verify'
 require_contains scripts/verify-gui-smoke.sh 'cargo run -p backlit-portal-backend -- --verify'
 require_contains scripts/verify-gui-smoke.sh '"golden_checksum": true'
 require_contains scripts/verify-launch-performance.sh '"name": "backlit-launch-performance"'
@@ -69,6 +72,7 @@ require_contains scripts/verify-linux-e2e.sh './scripts/verify-nested-wayland-sm
 require_contains scripts/verify-linux-e2e.sh './scripts/render-gui-preview.sh'
 require_contains scripts/verify-linux-e2e.sh './scripts/verify-launch-performance.sh'
 require_contains scripts/verify-linux-e2e.sh './scripts/verify-resource-budget.sh'
+require_contains scripts/verify-linux-e2e.sh './scripts/verify-settings-daemon.sh'
 require_contains scripts/verify-linux-e2e.sh './scripts/verify-portal-security.sh'
 require_contains scripts/verify-linux-e2e.sh './scripts/verify-ci-contract.sh'
 require_contains scripts/verify-linux-e2e.sh './scripts/verify-packaging-contract.sh'
@@ -79,6 +83,7 @@ require_contains scripts/verify-linux-e2e.sh './scripts/verify-session-clean-exi
 require_contains packaging/sessions/backlit.desktop 'Exec=backlit-session'
 require_contains packaging/systemd/backlit-compositor.service 'ExecStart=/usr/bin/backlit-compositor'
 require_contains packaging/systemd/backlit-shell.service 'ExecStart=/usr/bin/backlit-shell'
+require_contains packaging/systemd/backlit-settings-daemon.service 'ExecStart=/usr/bin/backlit-settings-daemon'
 require_contains packaging/debian/control.stub 'Package: fastgui-session'
 
 artifact_manifests_checked=false
@@ -89,6 +94,7 @@ if [ -n "$artifact_root" ] && [ -d "$artifact_root" ]; then
   require_file "$artifact_root/gui-preview/manifest.json"
   require_file "$artifact_root/launch-performance/manifest.json"
   require_file "$artifact_root/resource-budget/manifest.json"
+  require_file "$artifact_root/settings-daemon/manifest.json"
   require_file "$artifact_root/portal-security/manifest.json"
   require_file "$artifact_root/ci-contract/manifest.json"
   require_file "$artifact_root/packaging-contract/manifest.json"
@@ -108,16 +114,20 @@ if [ -n "$artifact_root" ] && [ -d "$artifact_root" ]; then
   require_contains "$artifact_root/gui-smoke/manifest.json" '"targeted_damage": true'
   require_contains "$artifact_root/gui-smoke/manifest.json" '"direct_scanout": true'
   require_contains "$artifact_root/gui-smoke/manifest.json" '"drag_frame_pacing": true'
+  require_contains "$artifact_root/gui-smoke/manifest.json" '"settings_daemon": true'
   require_contains "$artifact_root/gui-smoke/manifest.json" '"portal_security": true'
   require_contains "$artifact_root/gui-smoke/manifest.json" '"session_services": true'
+  require_contains "$artifact_root/gui-smoke/manifest.json" '"session_settings_service": true'
   require_contains "$artifact_root/gui-smoke/manifest.json" '"session_launch_spawn": true'
   require_contains "$artifact_root/gui-smoke/manifest.json" '"session_move_resize": true'
   require_contains "$artifact_root/gui-smoke/manifest.json" '"golden_checksum": true'
   require_contains "$artifact_root/gui-preview/manifest.json" '"session_verified": true'
   require_contains "$artifact_root/gui-preview/manifest.json" '"session_services": true'
+  require_contains "$artifact_root/gui-preview/manifest.json" '"settings_service": true'
   require_contains "$artifact_root/launch-performance/manifest.json" '"startup_budget": true'
   require_contains "$artifact_root/launch-performance/manifest.json" '"terminal_launch_budget": true'
   require_contains "$artifact_root/launch-performance/manifest.json" '"shell_ready_budget": true'
+  require_contains "$artifact_root/launch-performance/manifest.json" '"settings_service": true'
   require_contains "$artifact_root/resource-budget/manifest.json" '"name": "backlit-resource-budget"'
   if grep '"resource_budget_checked": true' "$artifact_root/resource-budget/manifest.json" >/dev/null; then
     require_contains "$artifact_root/resource-budget/manifest.json" '"idle_cpu_budget": true'
@@ -125,6 +135,9 @@ if [ -n "$artifact_root" ] && [ -d "$artifact_root" ]; then
   else
     require_contains "$artifact_root/resource-budget/manifest.json" '"resource_budget_blocked_expected": true'
   fi
+  require_contains "$artifact_root/settings-daemon/manifest.json" '"display_validated": true'
+  require_contains "$artifact_root/settings-daemon/manifest.json" '"input_validated": true'
+  require_contains "$artifact_root/settings-daemon/manifest.json" '"power_validated": true'
   require_contains "$artifact_root/portal-security/manifest.json" '"direct_screenshot_denied": true'
   require_contains "$artifact_root/portal-security/manifest.json" '"direct_screencast_denied": true'
   require_contains "$artifact_root/portal-security/manifest.json" '"consented_screenshot_allowed": true'
@@ -134,12 +147,14 @@ if [ -n "$artifact_root" ] && [ -d "$artifact_root" ]; then
   require_contains "$artifact_root/staged-session-install/manifest.json" '"desktop_exec_resolves": true'
   require_contains "$artifact_root/staged-session-install/manifest.json" '"staged_session_gui": true'
   require_contains "$artifact_root/staged-session-install/manifest.json" '"staged_session_services": true'
+  require_contains "$artifact_root/staged-session-install/manifest.json" '"staged_settings_daemon_verify": true'
   require_contains "$artifact_root/session-clean-exit/manifest.json" '"clean_exit_event": true'
   require_contains "$artifact_root/session-clean-exit/manifest.json" '"windows_after_shutdown": 0'
   require_contains "$artifact_root/session-clean-exit/manifest.json" '"focus_cleared": true'
   require_contains "$artifact_root/drm-session-smoke/manifest.json" '"name": "backlit-drm-session-smoke"'
   if grep '"drm_session_smoke_ready": true' "$artifact_root/drm-session-smoke/manifest.json" >/dev/null; then
     require_contains "$artifact_root/drm-session-smoke/manifest.json" '"drm_session_clean_exit": true'
+    require_contains "$artifact_root/drm-session-smoke/manifest.json" '"settings_service": true'
   else
     require_contains "$artifact_root/drm-session-smoke/manifest.json" '"drm_session_smoke_blocked_expected": true'
   fi
@@ -151,6 +166,7 @@ if [ -n "$artifact_root" ] && [ -d "$artifact_root" ]; then
     require_contains "$artifact_root/nested-wayland/manifest.json" '"compositor_wayland_smoke": true'
     require_contains "$artifact_root/nested-wayland/manifest.json" '"session_wayland_client_spawn": true'
     require_contains "$artifact_root/nested-wayland/manifest.json" '"session_wayland_services": true'
+    require_contains "$artifact_root/nested-wayland/manifest.json" '"session_settings_service": true'
     require_contains "$artifact_root/nested-wayland/manifest.json" '"session_wayland_clean_exit": true'
   fi
 fi
@@ -174,6 +190,7 @@ cat > "$out_dir/manifest.json" <<EOF
     "performance_smoke": true,
     "launch_performance": true,
     "resource_budget": true,
+    "settings_daemon": true,
     "portal_security": true,
     "input_smoke": true,
     "surface_lifecycle": true,

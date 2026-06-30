@@ -15,7 +15,7 @@ MVP 0 is the development harness:
 - Input event routing smoke for keyboard shortcuts, pointer focus, window move, and resize.
 - xdg-shell-style toplevel lifecycle smoke for configure/ack/map, focus, maximize, fullscreen, and close.
 - Session interaction smoke for app switching and terminal launch resolution.
-- Session service orchestration smoke for launching compositor and shell probes from `backlit-session`.
+- Session service orchestration smoke for launching compositor, shell, and settings daemon probes from `backlit-session`.
 - Session move/resize smoke through pure window policy.
 - Minimized-window focus skipping in session smoke.
 - Focus fallback after closing a window.
@@ -23,6 +23,7 @@ MVP 0 is the development harness:
 - Output work-area policy for panel-aware maximize and fullscreen geometry.
 - Session supervisor crash isolation smoke.
 - Clipboard state smoke for text owner, replacement, and clearing.
+- Settings daemon smoke for display, input, and power policy validation.
 - Portal security smoke for denied direct capture and consented portal-mediated flows.
 - Deterministic demo GUI renderer.
 - Headless session launch verification.
@@ -36,7 +37,7 @@ MVP 0 is the development harness:
 - Launch performance budget verifier for session GUI readiness, shell readiness, and terminal hotkey spawn.
 - Linux resource budget verifier for bounded idle CPU and compositor+shell RSS probes.
 - JSON metrics.
-- Linux E2E verifier for fmt, tests, clippy, GUI smoke, launch performance, resource budgets, packaging contract, session clean exit, and nested Wayland smoke inside an Ubuntu guest.
+- Linux E2E verifier for fmt, tests, clippy, GUI smoke, launch performance, resource budgets, settings daemon policy, packaging contract, session clean exit, and nested Wayland smoke inside an Ubuntu guest.
 - GitHub Actions Linux E2E workflow with artifact upload and local contract verification.
 - MVP 0 contract verifier that checks the executable harness still covers the design deliverables and, inside E2E, validates the generated artifact manifests.
 - Parallels runner for repeatable macOS-to-Ubuntu guest verification.

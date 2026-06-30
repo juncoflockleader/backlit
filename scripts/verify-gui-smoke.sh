@@ -26,6 +26,7 @@ cargo run -p backlit-input -- --verify > "$out_dir/input.jsonl"
 cargo run -p backlit-surface -- --verify > "$out_dir/surface.jsonl"
 cargo run -p backlit-session-supervisor -- --verify > "$out_dir/supervisor.jsonl"
 cargo run -p backlit-clipboard -- --verify > "$out_dir/clipboard.jsonl"
+cargo run -p backlit-settings-daemon -- --verify > "$out_dir/settings-daemon.jsonl"
 cargo run -p backlit-portal-backend -- --verify > "$out_dir/portal.jsonl"
 cargo run -p backlit-session -- \
   --backend=headless \
@@ -81,6 +82,7 @@ grep '"passed":true' "$out_dir/session.jsonl" >/dev/null
 grep '"golden_ok":true' "$out_dir/session.jsonl" >/dev/null
 grep '"compositor_ready":true' "$out_dir/session.jsonl" >/dev/null
 grep '"shell_ready":true' "$out_dir/session.jsonl" >/dev/null
+grep '"settings_ready":true' "$out_dir/session.jsonl" >/dev/null
 grep '"children_exited_cleanly":true' "$out_dir/session.jsonl" >/dev/null
 grep '"logs_written":true' "$out_dir/session.jsonl" >/dev/null
 grep '"windows_before_shutdown":3' "$out_dir/session.jsonl" >/dev/null
@@ -138,6 +140,14 @@ grep '"shell_crash_isolated":true' "$out_dir/supervisor.jsonl" >/dev/null
 grep '"compositor_crash_ends_session":true' "$out_dir/supervisor.jsonl" >/dev/null
 grep '"event":"clipboard.smoke"' "$out_dir/clipboard.jsonl" >/dev/null
 grep '"generation":3' "$out_dir/clipboard.jsonl" >/dev/null
+grep '"event":"settings_daemon.verified"' "$out_dir/settings-daemon.jsonl" >/dev/null
+grep '"display_validated":true' "$out_dir/settings-daemon.jsonl" >/dev/null
+grep '"input_validated":true' "$out_dir/settings-daemon.jsonl" >/dev/null
+grep '"power_validated":true' "$out_dir/settings-daemon.jsonl" >/dev/null
+grep '"invalid_display_rejected":true' "$out_dir/settings-daemon.jsonl" >/dev/null
+grep '"invalid_input_rejected":true' "$out_dir/settings-daemon.jsonl" >/dev/null
+grep '"invalid_power_rejected":true' "$out_dir/settings-daemon.jsonl" >/dev/null
+grep '"power_menu_complete":true' "$out_dir/settings-daemon.jsonl" >/dev/null
 grep '"event":"portal_backend.security_smoke"' "$out_dir/portal.jsonl" >/dev/null
 grep '"direct_screenshot_denied":true' "$out_dir/portal.jsonl" >/dev/null
 grep '"direct_screencast_denied":true' "$out_dir/portal.jsonl" >/dev/null
@@ -180,6 +190,7 @@ cat > "$out_dir/manifest.json" <<EOF
     "surface_log": "$out_dir/surface.jsonl",
     "supervisor_log": "$out_dir/supervisor.jsonl",
     "clipboard_log": "$out_dir/clipboard.jsonl",
+    "settings_daemon_log": "$out_dir/settings-daemon.jsonl",
     "portal_log": "$out_dir/portal.jsonl",
     "session_log": "$out_dir/session.jsonl",
     "session_services_dir": "$out_dir/session-services",
@@ -203,10 +214,12 @@ cat > "$out_dir/manifest.json" <<EOF
     "drag_frame_pacing": true,
     "shell_crash_isolated": true,
     "clipboard_generation": 3,
+    "settings_daemon": true,
     "portal_security": true,
     "session_windows_after_launch": 4,
     "session_launch_spawn": true,
     "session_services": true,
+    "session_settings_service": true,
     "session_clean_exit": true,
     "session_move_resize": true,
     "session_minimize_skips_focus": true,

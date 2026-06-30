@@ -1,0 +1,12 @@
+[Unit]
+Description=Backlit settings daemon
+After=backlit-compositor.service
+PartOf=graphical-session.target
+
+[Service]
+Type=simple
+ExecStart=/usr/bin/backlit-settings-daemon
+Restart=on-failure
+
+[Install]
+WantedBy=graphical-session.target

@@ -24,7 +24,7 @@ crates/
   window-policy/       Focus, placement, workspaces, snapping; pure logic.
   shell-protocol/      Private shell/compositor protocol model.
   shell/               Shell host stub for panel/launcher/wallpaper work.
-  settings-daemon/     Future power/input/display state daemon.
+  settings-daemon/     Display, input, and power policy daemon smoke checks.
   portal-backend/      Future xdg-desktop-portal backend.
 apps/
   settings/            Future settings UI.
@@ -128,7 +128,7 @@ The Linux-side verifier can also be run directly inside any Ubuntu checkout:
 ./scripts/verify-linux-e2e.sh
 ```
 
-It runs `cargo fmt`, workspace tests, `cargo clippy`, the deterministic GUI smoke verifier, the preview renderer, launch-performance verifier, resource-budget verifier, portal-security verifier, CI contract verifier, packaging contract verifier, staged session install verifier, launch-readiness verifier, session launch verifier, session clean-exit verifier, nested Wayland smoke verifier, and MVP 0 contract verifier, then writes `target/linux-e2e/manifest.json`.
+It runs `cargo fmt`, workspace tests, `cargo clippy`, the deterministic GUI smoke verifier, the preview renderer, launch-performance verifier, resource-budget verifier, settings-daemon verifier, portal-security verifier, CI contract verifier, packaging contract verifier, staged session install verifier, launch-readiness verifier, session launch verifier, session clean-exit verifier, nested Wayland smoke verifier, and MVP 0 contract verifier, then writes `target/linux-e2e/manifest.json`.
 
 ## GUI Linux VM Workflow
 
@@ -190,6 +190,7 @@ cargo run -p backlit-input -- --verify
 cargo run -p backlit-surface -- --verify
 cargo run -p backlit-session-supervisor -- --verify
 cargo run -p backlit-clipboard -- --verify
+cargo run -p backlit-settings-daemon -- --verify
 cargo run -p backlit-portal-backend -- --verify
 cargo run -p backlit-session -- --backend=headless --screenshot target/backlit-session.ppm --verify --verify-services --verify-clean-exit
 ./scripts/render-gui-preview.sh
@@ -197,6 +198,7 @@ cargo run -p backlit-session -- --backend=headless --screenshot target/backlit-s
 ./scripts/verify-gui-smoke.sh
 ./scripts/verify-launch-performance.sh
 ./scripts/verify-resource-budget.sh
+./scripts/verify-settings-daemon.sh
 ./scripts/verify-portal-security.sh
 ./scripts/verify-launch-readiness.sh
 ./scripts/verify-session-launch.sh
@@ -266,9 +268,11 @@ It also runs `backlit-perf --verify`, which measures the deterministic GUI rende
 
 The compositor smoke path also checks the headless direct-scanout policy: an opaque fullscreen dmabuf surface covering the output is eligible, while overlays and SHM buffers block scanout.
 
-The launch-performance verifier runs the built `backlit-session`, `backlit-compositor`, and `backlit-shell` binaries directly, then writes `target/launch-performance/manifest.json`. It enforces the current MVP budgets for session GUI readiness under 500 ms, shell-ready service probes under 2 seconds, and terminal hotkey spawn under 300 ms.
+The launch-performance verifier runs the built `backlit-session`, `backlit-compositor`, `backlit-shell`, and `backlit-settings-daemon` binaries directly, then writes `target/launch-performance/manifest.json`. It enforces the current MVP budgets for session GUI readiness under 500 ms, service-ready probes under 2 seconds, and terminal hotkey spawn under 300 ms.
 
 The resource-budget verifier runs bounded idle probes for `backlit-compositor` and `backlit-shell`, samples Linux `/proc`, then writes `target/resource-budget/manifest.json`. On Linux it enforces compositor idle CPU under 0.5% and combined compositor+shell RSS under 250 MB; on non-Linux hosts it records an expected skip so Parallels remains the authoritative resource-budget proof.
+
+Settings daemon state is covered by `backlit-settings-daemon --verify`, which validates display mode/scale/refresh settings, keyboard and pointer policy, power idle policy, and the lock/logout/reboot/shutdown power menu.
 
 Portal security is covered by `backlit-portal-backend --verify`, which denies direct screenshot, screencast, and remote-desktop capture while allowing consented portal-mediated screenshot, screencast, and file-chooser requests.
 
@@ -288,7 +292,7 @@ Surface lifecycle is verified by `backlit-surface --verify`, which proves the xd
 
 The session smoke path consumes those routes too: `Alt+Tab` cycles focus and `Super+Enter` resolves the terminal launch path, pointer input verifies focus/move/resize routing, surface lifecycle verifies map/configure/close behavior, spawns the terminal launch target with `WAYLAND_DISPLAY` set when `--verify-launch-spawn` is enabled, then records the resulting window-policy state in `session.jsonl`.
 
-With `--verify-services`, `backlit-session` also resolves sibling `backlit-compositor` and `backlit-shell` binaries, runs their readiness probes, captures their logs, and emits `session.services_verified`.
+With `--verify-services`, `backlit-session` also resolves sibling `backlit-compositor`, `backlit-shell`, and `backlit-settings-daemon` binaries, runs their readiness probes, captures their logs, and emits `session.services_verified`.
 
 With `--verify-clean-exit`, `backlit-session` also requests shutdown, closes all managed windows, clears focus, and emits `session.clean_exit`.
 
@@ -323,7 +327,7 @@ To capture the current host's launch readiness:
 ./scripts/verify-drm-session-smoke.sh
 ```
 
-These write `target/launch-readiness/manifest.json`, `target/session-launch/manifest.json`, `target/session-clean-exit/manifest.json`, and `target/drm-session-smoke/manifest.json`. On macOS or headless CI they can pass with DRM expected-blocked; inside the Parallels Ubuntu GUI VM they should report DRM expected-ready and ready. The session launch verifier also checks that `packaging/sessions/backlit.desktop` resolves to `backlit-session` and that `backlit-session --preflight-only` exits cleanly for launchable backends. The session clean-exit verifier checks requested shutdown from the headless session path. The DRM session smoke verifier runs the full `backlit-session --backend=drm` path with GUI verification, terminal spawn verification, compositor/shell service probes, and clean shutdown when the host is launch-ready.
+These write `target/launch-readiness/manifest.json`, `target/session-launch/manifest.json`, `target/session-clean-exit/manifest.json`, and `target/drm-session-smoke/manifest.json`. On macOS or headless CI they can pass with DRM expected-blocked; inside the Parallels Ubuntu GUI VM they should report DRM expected-ready and ready. The session launch verifier also checks that `packaging/sessions/backlit.desktop` resolves to `backlit-session` and that `backlit-session --preflight-only` exits cleanly for launchable backends. The session clean-exit verifier checks requested shutdown from the headless session path. The DRM session smoke verifier runs the full `backlit-session --backend=drm` path with GUI verification, terminal spawn verification, compositor/shell/settings service probes, and clean shutdown when the host is launch-ready.
 
 ## Packaging Contract Verification
 
@@ -337,13 +341,13 @@ It writes `target/packaging-contract/manifest.json` by default.
 
 ## Staged Session Install Verification
 
-The staged install verifier builds the session, compositor, and shell binaries, lays them out under a fake `/usr`, installs the session desktop entry and user systemd units, and verifies that all launch commands resolve to staged executables:
+The staged install verifier builds the session, compositor, shell, and settings daemon binaries, lays them out under a fake `/usr`, installs the session desktop entry and user systemd units, and verifies that all launch commands resolve to staged executables:
 
 ```bash
 ./scripts/verify-staged-session-install.sh
 ```
 
-It then launches the staged `backlit-session` with the headless backend, `--verify`, and `--verify-services`, checks the deterministic GUI output plus compositor/shell startup probes, and writes `target/staged-session-install/manifest.json`.
+It then launches the staged `backlit-session` with the headless backend, `--verify`, and `--verify-services`, checks the deterministic GUI output plus compositor/shell/settings startup probes, and writes `target/staged-session-install/manifest.json`.
 
 ## Engineering Rules
 

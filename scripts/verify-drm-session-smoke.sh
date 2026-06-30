@@ -60,7 +60,7 @@ drm_session_smoke_blocked_expected=false
 drm_session_clean_exit=false
 
 if [ "$drm_expected_ready" = true ]; then
-  cargo build -p backlit-session -p backlit-compositor -p backlit-shell
+  cargo build -p backlit-session -p backlit-compositor -p backlit-shell -p backlit-settings-daemon
   target/debug/backlit-session \
     --backend=drm \
     --socket=backlit-drm-smoke \
@@ -88,6 +88,7 @@ if [ "$drm_expected_ready" = true ]; then
   grep '"wayland_display_set":true' "$session_log" >/dev/null
   grep '"compositor_ready":true' "$session_log" >/dev/null
   grep '"shell_ready":true' "$session_log" >/dev/null
+  grep '"settings_ready":true' "$session_log" >/dev/null
   grep '"children_exited_cleanly":true' "$session_log" >/dev/null
   grep '"windows_before_shutdown":3' "$session_log" >/dev/null
   grep '"windows_closed":3' "$session_log" >/dev/null
@@ -135,6 +136,7 @@ cat > "$out_dir/manifest.json" <<EOF
     "drm_session_smoke_ready": $drm_session_smoke_ready,
     "drm_session_smoke_blocked_expected": $drm_session_smoke_blocked_expected,
     "drm_session_clean_exit": $drm_session_clean_exit,
+    "settings_service": $drm_session_smoke_ready,
     "xdg_runtime_dir_present": $runtime_present,
     "session_present": $session_present,
     "drm_card_nodes": $drm_card_nodes,

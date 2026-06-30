@@ -36,6 +36,7 @@ require_package() {
 require_file packaging/sessions/backlit.desktop
 require_file packaging/systemd/backlit-compositor.service
 require_file packaging/systemd/backlit-shell.service
+require_file packaging/systemd/backlit-settings-daemon.service
 require_file packaging/debian/control.stub
 
 require_line packaging/sessions/backlit.desktop "[Desktop Entry]"
@@ -57,6 +58,13 @@ require_line packaging/systemd/backlit-shell.service "ExecStart=/usr/bin/backlit
 require_line packaging/systemd/backlit-shell.service "Restart=on-failure"
 require_line packaging/systemd/backlit-shell.service "WantedBy=graphical-session.target"
 
+require_line packaging/systemd/backlit-settings-daemon.service "After=backlit-compositor.service"
+require_line packaging/systemd/backlit-settings-daemon.service "PartOf=graphical-session.target"
+require_line packaging/systemd/backlit-settings-daemon.service "Type=simple"
+require_line packaging/systemd/backlit-settings-daemon.service "ExecStart=/usr/bin/backlit-settings-daemon"
+require_line packaging/systemd/backlit-settings-daemon.service "Restart=on-failure"
+require_line packaging/systemd/backlit-settings-daemon.service "WantedBy=graphical-session.target"
+
 for package in \
   fastgui-compositor \
   fastgui-shell \
@@ -73,6 +81,7 @@ require_contains packaging/debian/control.stub "fastgui-session, fastgui-portal,
 require_contains Cargo.toml "\"crates/compositor\""
 require_contains Cargo.toml "\"crates/session\""
 require_contains Cargo.toml "\"crates/shell\""
+require_contains Cargo.toml "\"crates/settings-daemon\""
 
 package_count="$(grep -c '^Package: ' packaging/debian/control.stub)"
 
@@ -85,6 +94,7 @@ cat > "$out_dir/manifest.json" <<EOF
     "session_desktop": "packaging/sessions/backlit.desktop",
     "compositor_service": "packaging/systemd/backlit-compositor.service",
     "shell_service": "packaging/systemd/backlit-shell.service",
+    "settings_daemon_service": "packaging/systemd/backlit-settings-daemon.service",
     "debian_control_stub": "packaging/debian/control.stub"
   },
   "checks": {

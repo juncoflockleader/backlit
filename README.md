@@ -24,6 +24,7 @@ cargo run -p backlit-input -- --verify
 cargo run -p backlit-surface -- --verify
 cargo run -p backlit-session-supervisor -- --verify
 cargo run -p backlit-clipboard -- --verify
+cargo run -p backlit-settings-daemon -- --verify
 cargo run -p backlit-portal-backend -- --verify
 cargo run -p backlit-shell -- --component=all --verify
 cargo run -p backlit-session -- --backend=headless --screenshot target/backlit-session.ppm --verify --verify-services --verify-clean-exit
@@ -32,6 +33,7 @@ cargo run -p backlit-session -- --backend=headless --screenshot target/backlit-s
 ./scripts/verify-gui-smoke.sh
 ./scripts/verify-launch-performance.sh
 ./scripts/verify-resource-budget.sh
+./scripts/verify-settings-daemon.sh
 ./scripts/verify-portal-security.sh
 ./scripts/verify-ci-contract.sh
 ./scripts/verify-launch-readiness.sh
@@ -44,7 +46,7 @@ cargo run -p backlit-session -- --backend=headless --screenshot target/backlit-s
 ./scripts/verify-linux-e2e.sh
 ```
 
-The preview renderer writes `target/gui-preview/backlit-session.ppm` and, on macOS, a PNG you can open. The Parallels preview renderer runs the same path in Ubuntu and copies the artifact back to `target/gui-preview-parallels/`. The smoke verifier writes a top-level artifact manifest to `target/gui-smoke/manifest.json`; the perf smoke checks render/present time, idle no-redraw behavior, targeted surface damage, drag-frame pacing, and headless direct-scanout eligibility; the launch-performance verifier enforces MVP startup, shell-ready, and terminal-hotkey budgets from built binaries; the resource-budget verifier checks Linux idle CPU and compositor+shell RSS budgets from bounded idle probes; the portal-security verifier checks that direct screenshot, screencast, and remote-desktop capture are denied while consented portal-mediated requests are allowed; the launch-readiness verifier records whether the current host has the runtime, DRM, input, and session state needed for the future DRM backend; the session launch verifier checks the desktop session entry and `backlit-session --preflight-only`; the session clean-exit verifier checks that requested shutdown closes managed windows and clears focus; the DRM session smoke verifier runs the full DRM session path on launch-ready Linux hosts and requires clean session shutdown; the MVP 0 contract verifier checks that the executable harness still covers the design deliverables. CI runs the same Linux E2E gate on GitHub Actions.
+The preview renderer writes `target/gui-preview/backlit-session.ppm` and, on macOS, a PNG you can open. The Parallels preview renderer runs the same path in Ubuntu and copies the artifact back to `target/gui-preview-parallels/`. The smoke verifier writes a top-level artifact manifest to `target/gui-smoke/manifest.json`; the perf smoke checks render/present time, idle no-redraw behavior, targeted surface damage, drag-frame pacing, and headless direct-scanout eligibility; the launch-performance verifier enforces MVP startup, service-ready, and terminal-hotkey budgets from built binaries; the resource-budget verifier checks Linux idle CPU and compositor+shell RSS budgets from bounded idle probes; the settings-daemon verifier checks display, input, and power policy validation; the portal-security verifier checks that direct screenshot, screencast, and remote-desktop capture are denied while consented portal-mediated requests are allowed; the launch-readiness verifier records whether the current host has the runtime, DRM, input, and session state needed for the future DRM backend; the session launch verifier checks the desktop session entry and `backlit-session --preflight-only`; the session clean-exit verifier checks that requested shutdown closes managed windows and clears focus; the DRM session smoke verifier runs the full DRM session path on launch-ready Linux hosts and requires clean session shutdown; the MVP 0 contract verifier checks that the executable harness still covers the design deliverables. CI runs the same Linux E2E gate on GitHub Actions.
 
 When a Parallels Ubuntu VM is available, the full Linux guest verification can be run from macOS with:
 

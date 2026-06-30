@@ -48,7 +48,7 @@ require_le() {
   fi
 }
 
-cargo build -p backlit-session -p backlit-compositor -p backlit-shell
+cargo build -p backlit-session -p backlit-compositor -p backlit-shell -p backlit-settings-daemon
 
 target/debug/backlit-session \
   --backend=headless \
@@ -73,6 +73,7 @@ grep -F '"exit_success":true' "$session_log" >/dev/null || fail "terminal launch
 grep -F '"wayland_display_set":true' "$session_log" >/dev/null || fail "terminal launch target did not receive WAYLAND_DISPLAY"
 grep -F '"compositor_ready":true' "$session_log" >/dev/null || fail "compositor service probe was not ready"
 grep -F '"shell_ready":true' "$session_log" >/dev/null || fail "shell service probe was not ready"
+grep -F '"settings_ready":true' "$session_log" >/dev/null || fail "settings service probe was not ready"
 grep -F '"children_exited_cleanly":true' "$session_log" >/dev/null || fail "service probes did not exit cleanly"
 test -s "$session_screenshot" || fail "missing session screenshot"
 
@@ -81,6 +82,7 @@ terminal_launch_ms="$(json_u64 session.launch_spawn elapsed_ms)"
 shell_ready_ms="$(json_u64 session.services_verified elapsed_ms)"
 compositor_probe_ms="$(json_u64 session.services_verified compositor_probe_ms)"
 shell_probe_ms="$(json_u64 session.services_verified shell_probe_ms)"
+settings_probe_ms="$(json_u64 session.services_verified settings_probe_ms)"
 session_exit_ms="$(json_u64 session.exit elapsed_ms)"
 session_ppm_bytes="$(wc -c < "$session_screenshot" | tr -d ' ')"
 
@@ -111,6 +113,7 @@ cat > "$out_dir/manifest.json" <<EOF
     "shell_ready_ms": $shell_ready_ms,
     "compositor_probe_ms": $compositor_probe_ms,
     "shell_probe_ms": $shell_probe_ms,
+    "settings_probe_ms": $settings_probe_ms,
     "session_exit_ms": $session_exit_ms,
     "session_ppm_bytes": $session_ppm_bytes
   },
@@ -120,6 +123,7 @@ cat > "$out_dir/manifest.json" <<EOF
     "shell_ready_budget": true,
     "session_launch_spawn": true,
     "session_services": true,
+    "settings_service": true,
     "golden_gui": true
   }
 }

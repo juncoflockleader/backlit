@@ -10,3 +10,5 @@ publish = false
 [dependencies]
 backlit-common = { path = "../common" }
 
+[lib]
+path = "src/lib.rs"
