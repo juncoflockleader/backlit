@@ -97,9 +97,12 @@ The Parallels runner bootstraps an Ubuntu guest, updates a clean checkout from `
 
 ```bash
 ./scripts/verify-parallels-linux-e2e.sh
+./scripts/render-parallels-gui-preview.sh
 ```
 
-The runner reads a local credential file that is ignored by Git:
+The E2E runner verifies the full Ubuntu path. The preview runner renders the Backlit preview inside Ubuntu, copies the generated PPM/session logs/manifest back to `target/gui-preview-parallels/`, and converts the PPM to a local PNG on macOS when possible.
+
+The runners read a local credential file that is ignored by Git:
 
 ```bash
 mkdir -p .local
@@ -185,6 +188,7 @@ cargo run -p backlit-session-supervisor -- --verify
 cargo run -p backlit-clipboard -- --verify
 cargo run -p backlit-session -- --backend=headless --screenshot target/backlit-session.ppm --verify --verify-services
 ./scripts/render-gui-preview.sh
+./scripts/render-parallels-gui-preview.sh
 ./scripts/verify-gui-smoke.sh
 ./scripts/verify-packaging-contract.sh
 ./scripts/verify-staged-session-install.sh
@@ -213,6 +217,14 @@ To render the current preview for inspection:
 ```
 
 This writes `target/gui-preview/backlit-session.ppm` and, when `sips`, ImageMagick, or netpbm is available, `target/gui-preview/backlit-session.png`.
+
+To render the same preview inside the Ubuntu Parallels guest and copy it back for inspection:
+
+```bash
+./scripts/render-parallels-gui-preview.sh
+```
+
+This writes host-side artifacts under `target/gui-preview-parallels/`, including `backlit-session.png` on macOS.
 
 ```bash
 ./scripts/verify-gui-smoke.sh

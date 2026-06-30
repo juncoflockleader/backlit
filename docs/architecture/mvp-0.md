@@ -23,6 +23,7 @@ MVP 0 is the development harness:
 - Deterministic demo GUI renderer.
 - Headless session launch verification.
 - Viewable GUI preview renderer with verified session services.
+- Parallels GUI preview export from Ubuntu guest artifacts to the host workspace.
 - Basic MVP protocol smoke registry.
 - Headless performance smoke checks.
 - JSON metrics.
