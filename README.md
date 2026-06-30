@@ -21,6 +21,7 @@ cargo run -p backlit-launcher -- --verify --list --target=terminal --desktop-dir
 cargo run -p backlit-launcher -- --verify --target=terminal --spawn-smoke --spawn-program=true --wayland-display=backlit-0
 cargo run -p backlit-shortcuts -- --verify --list --resolve=Super+Enter
 cargo run -p backlit-input -- --verify
+cargo run -p backlit-surface -- --verify
 cargo run -p backlit-session-supervisor -- --verify
 cargo run -p backlit-clipboard -- --verify
 cargo run -p backlit-shell -- --component=all --verify
@@ -48,6 +49,6 @@ When a Parallels Ubuntu VM is available, the full Linux guest verification can b
 ./scripts/render-parallels-gui-preview.sh
 ```
 
-The session smoke path also verifies input interactions: app switching, terminal launch resolution, pointer-driven focus, move/resize routing, and deterministic terminal spawn with `WAYLAND_DISPLAY` propagation.
+The session smoke path also verifies input and toplevel lifecycle interactions: app switching, terminal launch resolution, pointer-driven focus, move/resize routing, xdg-shell-style map/configure/maximize/fullscreen/close behavior, and deterministic terminal spawn with `WAYLAND_DISPLAY` propagation.
 
 See [DEVELOPMENT.md](DEVELOPMENT.md) for environment setup, VM workflow, project layout, and contribution rules.

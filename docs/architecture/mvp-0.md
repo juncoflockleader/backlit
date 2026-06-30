@@ -13,6 +13,7 @@ MVP 0 is the development harness:
 - Launcher process-spawn smoke with Wayland display environment propagation.
 - Keyboard shortcut routing for launcher, app switcher, and core launch targets.
 - Input event routing smoke for keyboard shortcuts, pointer focus, window move, and resize.
+- xdg-shell-style toplevel lifecycle smoke for configure/ack/map, focus, maximize, fullscreen, and close.
 - Session interaction smoke for app switching and terminal launch resolution.
 - Session service orchestration smoke for launching compositor and shell probes from `backlit-session`.
 - Session move/resize smoke through pure window policy.

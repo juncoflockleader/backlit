@@ -1,0 +1,16 @@
+[package]
+name = "backlit-surface"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+publish = false
+
+[dependencies]
+backlit-common = { path = "../common" }
+backlit-protocols = { path = "../protocols" }
+backlit-window-policy = { path = "../window-policy" }
+
+[lib]
+path = "src/lib.rs"

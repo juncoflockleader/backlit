@@ -16,6 +16,7 @@ use backlit_demo_client::{
 use backlit_input::run_input_smoke;
 use backlit_launcher::{default_catalog, resolve_command, LaunchTarget};
 use backlit_shortcuts::{resolve_shortcut, ShortcutAction};
+use backlit_surface::run_surface_lifecycle_smoke;
 use backlit_window_policy::{OutputLayout, WindowPolicy, WindowState};
 
 fn main() {
@@ -179,6 +180,14 @@ fn run() -> Result<(), String> {
                 (
                     "input_final_height",
                     FieldValue::U64(interaction_report.input_final_height),
+                ),
+                (
+                    "surface_lifecycle_ok",
+                    FieldValue::Bool(interaction_report.surface_lifecycle_ok),
+                ),
+                (
+                    "surface_windows_after_close",
+                    FieldValue::U64(interaction_report.surface_windows_after_close),
                 ),
                 (
                     "windows_after_close",
@@ -641,6 +650,8 @@ struct InteractionReport {
     input_windows_after_terminal_launch: u64,
     input_final_width: u64,
     input_final_height: u64,
+    surface_lifecycle_ok: bool,
+    surface_windows_after_close: u64,
 }
 
 impl InteractionReport {
@@ -659,6 +670,8 @@ impl InteractionReport {
             && self.keyboard_input_ok
             && self.pointer_input_ok
             && self.input_windows_after_terminal_launch == 4
+            && self.surface_lifecycle_ok
+            && self.surface_windows_after_close == 0
     }
 }
 
@@ -745,6 +758,7 @@ fn verify_session_interactions(policy: &WindowPolicy, layout: OutputLayout) -> I
         && input_report.pointer_move_window
         && input_report.pointer_resize_window
         && input_report.pointer_grab_ended;
+    let surface_report = run_surface_lifecycle_smoke();
 
     InteractionReport {
         initial_focus,
@@ -765,6 +779,8 @@ fn verify_session_interactions(policy: &WindowPolicy, layout: OutputLayout) -> I
         input_windows_after_terminal_launch: input_report.windows_after_terminal_launch,
         input_final_width: input_report.final_width,
         input_final_height: input_report.final_height,
+        surface_lifecycle_ok: surface_report.passed(),
+        surface_windows_after_close: surface_report.windows_after_close,
     }
 }
 

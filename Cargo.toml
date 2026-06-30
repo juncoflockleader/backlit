@@ -17,6 +17,7 @@ members = [
   "crates/shell",
   "crates/shell-protocol",
   "crates/shortcuts",
+  "crates/surface",
   "crates/window-policy",
 ]
 

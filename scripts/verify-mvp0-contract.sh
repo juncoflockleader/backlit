@@ -48,6 +48,7 @@ require_contains Cargo.toml '"crates/perf"'
 require_contains Cargo.toml '"crates/session"'
 require_contains Cargo.toml '"crates/shell"'
 require_contains Cargo.toml '"crates/launcher"'
+require_contains Cargo.toml '"crates/surface"'
 require_contains Cargo.toml '"crates/window-policy"'
 
 require_contains scripts/verify-gui-smoke.sh 'cargo run -p backlit-compositor -- --backend=headless --smoke-test'
@@ -55,6 +56,7 @@ require_contains scripts/verify-gui-smoke.sh 'cargo run -p backlit-compositor-ba
 require_contains scripts/verify-gui-smoke.sh 'cargo run -p backlit-protocols -- --verify --list'
 require_contains scripts/verify-gui-smoke.sh 'cargo run -p backlit-perf -- --verify'
 require_contains scripts/verify-gui-smoke.sh 'cargo run -p backlit-input -- --verify'
+require_contains scripts/verify-gui-smoke.sh 'cargo run -p backlit-surface -- --verify'
 require_contains scripts/verify-gui-smoke.sh 'cargo run -p backlit-demo-client --'
 require_contains scripts/verify-gui-smoke.sh '"golden_checksum": true'
 require_contains scripts/verify-launch-performance.sh '"name": "backlit-launch-performance"'
@@ -89,6 +91,8 @@ if [ -n "$artifact_root" ] && [ -d "$artifact_root" ]; then
   require_contains "$artifact_root/gui-smoke/manifest.json" '"keyboard_input": true'
   require_contains "$artifact_root/gui-smoke/manifest.json" '"pointer_input": true'
   require_contains "$artifact_root/gui-smoke/manifest.json" '"session_input": true'
+  require_contains "$artifact_root/gui-smoke/manifest.json" '"surface_lifecycle": true'
+  require_contains "$artifact_root/gui-smoke/manifest.json" '"session_surface_lifecycle": true'
   require_contains "$artifact_root/gui-smoke/manifest.json" '"session_services": true'
   require_contains "$artifact_root/gui-smoke/manifest.json" '"session_launch_spawn": true'
   require_contains "$artifact_root/gui-smoke/manifest.json" '"session_move_resize": true'
@@ -135,6 +139,7 @@ cat > "$out_dir/manifest.json" <<EOF
     "performance_smoke": true,
     "launch_performance": true,
     "input_smoke": true,
+    "surface_lifecycle": true,
     "protocol_smoke": true,
     "golden_gui": true,
     "viewable_preview": true,

@@ -14,4 +14,5 @@ backlit-demo-client = { path = "../demo-client" }
 backlit-input = { path = "../input" }
 backlit-launcher = { path = "../launcher" }
 backlit-shortcuts = { path = "../shortcuts" }
+backlit-surface = { path = "../surface" }
 backlit-window-policy = { path = "../window-policy" }

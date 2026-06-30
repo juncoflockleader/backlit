@@ -23,6 +23,7 @@ cargo run -p backlit-launcher -- \
   --wayland-display=backlit-0 > "$out_dir/launcher-spawn.jsonl"
 cargo run -p backlit-shortcuts -- --verify --list --resolve=Super+Enter > "$out_dir/shortcuts.jsonl"
 cargo run -p backlit-input -- --verify > "$out_dir/input.jsonl"
+cargo run -p backlit-surface -- --verify > "$out_dir/surface.jsonl"
 cargo run -p backlit-session-supervisor -- --verify > "$out_dir/supervisor.jsonl"
 cargo run -p backlit-clipboard -- --verify > "$out_dir/clipboard.jsonl"
 cargo run -p backlit-session -- \
@@ -59,6 +60,8 @@ grep '"close_fallback_focus_ok":true' "$out_dir/session.jsonl" >/dev/null
 grep '"keyboard_input_ok":true' "$out_dir/session.jsonl" >/dev/null
 grep '"pointer_input_ok":true' "$out_dir/session.jsonl" >/dev/null
 grep '"input_windows_after_terminal_launch":4' "$out_dir/session.jsonl" >/dev/null
+grep '"surface_lifecycle_ok":true' "$out_dir/session.jsonl" >/dev/null
+grep '"surface_windows_after_close":0' "$out_dir/session.jsonl" >/dev/null
 grep '"windows_after_close":3' "$out_dir/session.jsonl" >/dev/null
 grep '"passed":true' "$out_dir/session.jsonl" >/dev/null
 grep '"golden_ok":true' "$out_dir/session.jsonl" >/dev/null
@@ -94,6 +97,13 @@ grep '"app_switcher_changed_focus":true' "$out_dir/input.jsonl" >/dev/null
 grep '"pointer_move_window":true' "$out_dir/input.jsonl" >/dev/null
 grep '"pointer_resize_window":true' "$out_dir/input.jsonl" >/dev/null
 grep '"pointer_grab_ended":true' "$out_dir/input.jsonl" >/dev/null
+grep '"event":"surface.lifecycle"' "$out_dir/surface.jsonl" >/dev/null
+grep '"xdg_shell_registered":true' "$out_dir/surface.jsonl" >/dev/null
+grep '"mapped_window":true' "$out_dir/surface.jsonl" >/dev/null
+grep '"focused_after_map":true' "$out_dir/surface.jsonl" >/dev/null
+grep '"maximize_uses_work_area":true' "$out_dir/surface.jsonl" >/dev/null
+grep '"fullscreen_uses_output":true' "$out_dir/surface.jsonl" >/dev/null
+grep '"window_removed":true' "$out_dir/surface.jsonl" >/dev/null
 grep '"event":"supervisor.crash_smoke"' "$out_dir/supervisor.jsonl" >/dev/null
 grep '"shell_crash_isolated":true' "$out_dir/supervisor.jsonl" >/dev/null
 grep '"compositor_crash_ends_session":true' "$out_dir/supervisor.jsonl" >/dev/null
@@ -130,6 +140,7 @@ cat > "$out_dir/manifest.json" <<EOF
     "launcher_spawn_log": "$out_dir/launcher-spawn.jsonl",
     "shortcuts_log": "$out_dir/shortcuts.jsonl",
     "input_log": "$out_dir/input.jsonl",
+    "surface_log": "$out_dir/surface.jsonl",
     "supervisor_log": "$out_dir/supervisor.jsonl",
     "clipboard_log": "$out_dir/clipboard.jsonl",
     "session_log": "$out_dir/session.jsonl",
@@ -147,6 +158,7 @@ cat > "$out_dir/manifest.json" <<EOF
     "shortcut_required_bindings": 6,
     "keyboard_input": true,
     "pointer_input": true,
+    "surface_lifecycle": true,
     "shell_crash_isolated": true,
     "clipboard_generation": 3,
     "session_windows_after_launch": 4,
@@ -156,6 +168,7 @@ cat > "$out_dir/manifest.json" <<EOF
     "session_minimize_skips_focus": true,
     "session_close_fallback_focus": true,
     "session_input": true,
+    "session_surface_lifecycle": true,
     "work_area_y": 42,
     "session_ppm_bytes": $session_ppm_bytes,
     "demo_ppm_bytes": $demo_ppm_bytes,

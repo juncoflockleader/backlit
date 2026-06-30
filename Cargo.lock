@@ -87,6 +87,7 @@ dependencies = [
  "backlit-input",
  "backlit-launcher",
  "backlit-shortcuts",
+ "backlit-surface",
  "backlit-window-policy",
 ]
 
@@ -122,6 +123,15 @@ version = "0.1.0"
 dependencies = [
  "backlit-common",
  "backlit-launcher",
+]
+
+[[package]]
+name = "backlit-surface"
+version = "0.1.0"
+dependencies = [
+ "backlit-common",
+ "backlit-protocols",
+ "backlit-window-policy",
 ]
 
 [[package]]
