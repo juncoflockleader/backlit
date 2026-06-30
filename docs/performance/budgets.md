@@ -31,3 +31,11 @@ The launch-path regression check is:
 ```
 
 It builds the session, compositor, and shell binaries, runs `backlit-session` directly, and verifies the current MVP budgets for GUI readiness after session launch, shell-ready service probes after launch, and terminal hotkey spawn time. The Linux E2E gate includes this verifier and publishes `target/linux-e2e/launch-performance/manifest.json`.
+
+The Linux resource-budget regression check is:
+
+```bash
+./scripts/verify-resource-budget.sh
+```
+
+It runs bounded idle probes for the compositor and shell, samples `/proc`, and verifies compositor idle CPU stays under 0.5% while combined compositor+shell RSS stays under 250 MB. Non-Linux hosts record an expected skip; use Parallels Ubuntu or another Linux host for the real budget proof.

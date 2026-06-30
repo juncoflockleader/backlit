@@ -8,6 +8,7 @@ out_dir="${1:-target/linux-e2e}"
 smoke_dir="$out_dir/gui-smoke"
 preview_dir="$out_dir/gui-preview"
 launch_performance_dir="$out_dir/launch-performance"
+resource_budget_dir="$out_dir/resource-budget"
 ci_contract_dir="$out_dir/ci-contract"
 packaging_dir="$out_dir/packaging-contract"
 staged_install_dir="$out_dir/staged-session-install"
@@ -29,6 +30,7 @@ cargo clippy --workspace --all-targets -- -D warnings
 ./scripts/verify-gui-smoke.sh "$smoke_dir"
 ./scripts/render-gui-preview.sh "$preview_dir"
 ./scripts/verify-launch-performance.sh "$launch_performance_dir"
+./scripts/verify-resource-budget.sh "$resource_budget_dir"
 ./scripts/verify-ci-contract.sh "$ci_contract_dir"
 ./scripts/verify-packaging-contract.sh "$packaging_dir"
 ./scripts/verify-staged-session-install.sh "$staged_install_dir"
@@ -59,6 +61,7 @@ cat > "$out_dir/manifest.json" <<EOF
     "gui_smoke_manifest": "$smoke_dir/manifest.json",
     "gui_preview_manifest": "$preview_dir/manifest.json",
     "launch_performance_manifest": "$launch_performance_dir/manifest.json",
+    "resource_budget_manifest": "$resource_budget_dir/manifest.json",
     "ci_contract_manifest": "$ci_contract_dir/manifest.json",
     "packaging_contract_manifest": "$packaging_dir/manifest.json",
     "staged_session_install_manifest": "$staged_install_dir/manifest.json",
@@ -76,6 +79,7 @@ cat > "$out_dir/manifest.json" <<EOF
     "gui_smoke": true,
     "gui_preview": true,
     "launch_performance": true,
+    "resource_budget": true,
     "ci_contract": true,
     "packaging_contract": true,
     "staged_session_install": true,

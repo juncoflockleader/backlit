@@ -1,5 +1,7 @@
 use std::env;
 use std::process;
+use std::thread;
+use std::time::Duration;
 use std::time::Instant;
 
 use backlit_common::metrics::{event_json, FieldValue};
@@ -51,6 +53,20 @@ fn run() -> Result<(), String> {
             "compositor.stub_ready",
             &config,
             &[("accepting_clients", FieldValue::Bool(false))],
+        );
+    }
+
+    if let Some(duration_ms) = config.idle_probe_ms {
+        emit(
+            "compositor.idle_probe_start",
+            &config,
+            &[("duration_ms", FieldValue::U64(duration_ms))],
+        );
+        thread::sleep(Duration::from_millis(duration_ms));
+        emit(
+            "compositor.idle_probe_complete",
+            &config,
+            &[("duration_ms", FieldValue::U64(duration_ms))],
         );
     }
 
@@ -176,12 +192,14 @@ fn print_help() {
 backlit-compositor
 
 Usage:
-  backlit-compositor [--backend=headless|wayland|drm] [--socket=backlit-0] [--smoke-test]
+  backlit-compositor [--backend=headless|wayland|drm] [--socket=backlit-0] [--smoke-test] [--idle-probe-ms=1000]
 
 Flags:
   --backend      Select compositor backend. Defaults to headless.
   --socket       Wayland socket name to create or target. Defaults to backlit-0.
   --smoke-test   Run the current MVP 0 policy/metrics smoke test and exit.
+  --idle-probe-ms
+                 Stay alive without doing work for bounded resource sampling.
   --help         Show this help text.
 
 Backend launch preflight runs before smoke or service readiness events.

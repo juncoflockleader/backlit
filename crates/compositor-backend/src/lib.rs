@@ -277,6 +277,7 @@ pub struct RunConfig {
     pub backend: BackendKind,
     pub socket: String,
     pub smoke_test: bool,
+    pub idle_probe_ms: Option<u64>,
     pub help: bool,
 }
 
@@ -286,6 +287,7 @@ impl Default for RunConfig {
             backend: BackendKind::Headless,
             socket: String::from("backlit-0"),
             smoke_test: false,
+            idle_probe_ms: None,
             help: false,
         }
     }
@@ -294,6 +296,7 @@ impl Default for RunConfig {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum ArgError {
     InvalidBackend(String),
+    InvalidValue(&'static str, String),
     MissingValue(&'static str),
     UnknownFlag(String),
 }
@@ -302,6 +305,7 @@ impl fmt::Display for ArgError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Self::InvalidBackend(value) => write!(f, "invalid backend: {value}"),
+            Self::InvalidValue(flag, value) => write!(f, "invalid value for {flag}: {value}"),
             Self::MissingValue(flag) => write!(f, "missing value for {flag}"),
             Self::UnknownFlag(flag) => write!(f, "unknown flag: {flag}"),
         }
@@ -330,6 +334,13 @@ where
             config.socket = value.to_string();
         } else if arg == "--socket" {
             config.socket = args.next().ok_or(ArgError::MissingValue("--socket"))?;
+        } else if let Some(value) = arg.strip_prefix("--idle-probe-ms=") {
+            config.idle_probe_ms = Some(parse_u64("--idle-probe-ms", value)?);
+        } else if arg == "--idle-probe-ms" {
+            let value = args
+                .next()
+                .ok_or(ArgError::MissingValue("--idle-probe-ms"))?;
+            config.idle_probe_ms = Some(parse_u64("--idle-probe-ms", &value)?);
         } else {
             return Err(ArgError::UnknownFlag(arg));
         }
@@ -342,6 +353,12 @@ fn parse_backend(value: &str) -> Result<BackendKind, ArgError> {
     value
         .parse()
         .map_err(|_| ArgError::InvalidBackend(value.to_string()))
+}
+
+fn parse_u64(flag: &'static str, value: &str) -> Result<u64, ArgError> {
+    value
+        .parse::<u64>()
+        .map_err(|_| ArgError::InvalidValue(flag, value.to_string()))
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -514,12 +531,15 @@ mod tests {
             "--socket",
             "backlit-test",
             "--smoke-test",
+            "--idle-probe-ms",
+            "250",
         ])
         .unwrap();
 
         assert_eq!(config.backend, BackendKind::Wayland);
         assert_eq!(config.socket, "backlit-test");
         assert!(config.smoke_test);
+        assert_eq!(config.idle_probe_ms, Some(250));
     }
 
     #[test]

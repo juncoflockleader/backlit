@@ -1,5 +1,7 @@
 use std::env;
 use std::process;
+use std::thread;
+use std::time::Duration;
 
 use backlit_common::metrics::{event_json, FieldValue};
 use backlit_shell_protocol::{ShellSurfaceRole, MVP_SHELL_ROLES};
@@ -15,6 +17,7 @@ fn run() -> Result<(), String> {
     let mut socket = String::from("backlit-0");
     let mut component = ComponentSelection::One(ShellSurfaceRole::Panel);
     let mut verify = false;
+    let mut idle_probe_ms = None;
 
     let mut args = env::args().skip(1);
     while let Some(arg) = args.next() {
@@ -23,6 +26,13 @@ fn run() -> Result<(), String> {
             return Ok(());
         } else if arg == "--verify" {
             verify = true;
+        } else if let Some(value) = arg.strip_prefix("--idle-probe-ms=") {
+            idle_probe_ms = Some(parse_u64("--idle-probe-ms", value)?);
+        } else if arg == "--idle-probe-ms" {
+            let value = args
+                .next()
+                .ok_or_else(|| String::from("missing value for --idle-probe-ms"))?;
+            idle_probe_ms = Some(parse_u64("--idle-probe-ms", &value)?);
         } else if let Some(value) = arg.strip_prefix("--socket=") {
             socket = value.to_string();
         } else if arg == "--socket" {
@@ -61,6 +71,32 @@ fn run() -> Result<(), String> {
             ],
         )
     );
+
+    if let Some(duration_ms) = idle_probe_ms {
+        println!(
+            "{}",
+            event_json(
+                "shell.idle_probe_start",
+                &[
+                    ("socket", FieldValue::Str(socket.as_str())),
+                    ("duration_ms", FieldValue::U64(duration_ms)),
+                    ("components", FieldValue::U64(components.len() as u64)),
+                ],
+            )
+        );
+        thread::sleep(Duration::from_millis(duration_ms));
+        println!(
+            "{}",
+            event_json(
+                "shell.idle_probe_complete",
+                &[
+                    ("socket", FieldValue::Str(socket.as_str())),
+                    ("duration_ms", FieldValue::U64(duration_ms)),
+                    ("components", FieldValue::U64(components.len() as u64)),
+                ],
+            )
+        );
+    }
 
     Ok(())
 }
@@ -116,7 +152,13 @@ fn print_help() {
 backlit-shell
 
 Usage:
-  backlit-shell [--component=all|panel|launcher|wallpaper|app-switcher|notification-host|lock-screen] [--socket=backlit-0] [--verify]
+  backlit-shell [--component=all|panel|launcher|wallpaper|app-switcher|notification-host|lock-screen] [--socket=backlit-0] [--verify] [--idle-probe-ms=1000]
 "
     );
+}
+
+fn parse_u64(flag: &str, value: &str) -> Result<u64, String> {
+    value
+        .parse::<u64>()
+        .map_err(|_| format!("invalid value for {flag}: {value}"))
 }

@@ -33,6 +33,7 @@ require_file docs/architecture/mvp-0.md
 require_executable scripts/verify-gui-smoke.sh
 require_executable scripts/render-gui-preview.sh
 require_executable scripts/verify-launch-performance.sh
+require_executable scripts/verify-resource-budget.sh
 require_executable scripts/verify-linux-e2e.sh
 require_executable scripts/verify-ci-contract.sh
 require_executable scripts/verify-packaging-contract.sh
@@ -64,6 +65,7 @@ require_contains scripts/verify-launch-performance.sh '"name": "backlit-launch-p
 require_contains scripts/verify-linux-e2e.sh './scripts/verify-nested-wayland-smoke.sh'
 require_contains scripts/verify-linux-e2e.sh './scripts/render-gui-preview.sh'
 require_contains scripts/verify-linux-e2e.sh './scripts/verify-launch-performance.sh'
+require_contains scripts/verify-linux-e2e.sh './scripts/verify-resource-budget.sh'
 require_contains scripts/verify-linux-e2e.sh './scripts/verify-ci-contract.sh'
 require_contains scripts/verify-linux-e2e.sh './scripts/verify-packaging-contract.sh'
 require_contains scripts/verify-linux-e2e.sh './scripts/verify-staged-session-install.sh'
@@ -82,6 +84,7 @@ if [ -n "$artifact_root" ] && [ -d "$artifact_root" ]; then
   require_file "$artifact_root/gui-smoke/manifest.json"
   require_file "$artifact_root/gui-preview/manifest.json"
   require_file "$artifact_root/launch-performance/manifest.json"
+  require_file "$artifact_root/resource-budget/manifest.json"
   require_file "$artifact_root/ci-contract/manifest.json"
   require_file "$artifact_root/packaging-contract/manifest.json"
   require_file "$artifact_root/staged-session-install/manifest.json"
@@ -107,6 +110,13 @@ if [ -n "$artifact_root" ] && [ -d "$artifact_root" ]; then
   require_contains "$artifact_root/launch-performance/manifest.json" '"startup_budget": true'
   require_contains "$artifact_root/launch-performance/manifest.json" '"terminal_launch_budget": true'
   require_contains "$artifact_root/launch-performance/manifest.json" '"shell_ready_budget": true'
+  require_contains "$artifact_root/resource-budget/manifest.json" '"name": "backlit-resource-budget"'
+  if grep '"resource_budget_checked": true' "$artifact_root/resource-budget/manifest.json" >/dev/null; then
+    require_contains "$artifact_root/resource-budget/manifest.json" '"idle_cpu_budget": true'
+    require_contains "$artifact_root/resource-budget/manifest.json" '"idle_rss_budget": true'
+  else
+    require_contains "$artifact_root/resource-budget/manifest.json" '"resource_budget_blocked_expected": true'
+  fi
   require_contains "$artifact_root/ci-contract/manifest.json" '"linux_e2e_gate": true'
   require_contains "$artifact_root/packaging-contract/manifest.json" '"desktop_entry": true'
   require_contains "$artifact_root/packaging-contract/manifest.json" '"package_split": true'
@@ -146,6 +156,7 @@ cat > "$out_dir/manifest.json" <<EOF
     "demo_client": true,
     "performance_smoke": true,
     "launch_performance": true,
+    "resource_budget": true,
     "input_smoke": true,
     "surface_lifecycle": true,
     "frame_damage": true,
