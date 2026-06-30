@@ -92,6 +92,7 @@ repo_dir=$(quote_shell "$repo_dir")
 branch=$(quote_shell "$branch")
 e2e_out_dir=$(quote_shell "$e2e_out_dir")
 uploaded_verifier="/tmp/backlit-verify-linux-e2e.sh"
+uploaded_packaging_verifier="/tmp/backlit-verify-packaging-contract.sh"
 uploaded_nested_verifier="/tmp/backlit-verify-nested-wayland-smoke.sh"
 
 export DEBIAN_FRONTEND=noninteractive
@@ -138,6 +139,7 @@ git reset --hard \"origin/\$branch\"
 "
 
 install -m 0755 -o "\$guest_user" -g "\$guest_user" "\$uploaded_verifier" "\$repo_dir/scripts/verify-linux-e2e.sh"
+install -m 0755 -o "\$guest_user" -g "\$guest_user" "\$uploaded_packaging_verifier" "\$repo_dir/scripts/verify-packaging-contract.sh"
 install -m 0755 -o "\$guest_user" -g "\$guest_user" "\$uploaded_nested_verifier" "\$repo_dir/scripts/verify-nested-wayland-smoke.sh"
 
 runuser -u "\$guest_user" -- bash -lc "
@@ -153,6 +155,7 @@ printf 'Using Parallels VM: %s\n' "$vm_name"
 "$prlctl_bin" list --all | grep -F "$vm_name" >/dev/null
 
 upload_script "$repo_root/scripts/verify-linux-e2e.sh" "/tmp/backlit-verify-linux-e2e.sh"
+upload_script "$repo_root/scripts/verify-packaging-contract.sh" "/tmp/backlit-verify-packaging-contract.sh"
 upload_script "$repo_root/scripts/verify-nested-wayland-smoke.sh" "/tmp/backlit-verify-nested-wayland-smoke.sh"
 upload_script "$root_runner" "/tmp/backlit-parallels-root-runner.sh"
 

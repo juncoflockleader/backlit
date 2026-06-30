@@ -123,7 +123,7 @@ The Linux-side verifier can also be run directly inside any Ubuntu checkout:
 ./scripts/verify-linux-e2e.sh
 ```
 
-It runs `cargo fmt`, workspace tests, `cargo clippy`, the deterministic GUI smoke verifier, and the nested Wayland smoke verifier, then writes `target/linux-e2e/manifest.json`.
+It runs `cargo fmt`, workspace tests, `cargo clippy`, the deterministic GUI smoke verifier, the packaging contract verifier, and the nested Wayland smoke verifier, then writes `target/linux-e2e/manifest.json`.
 
 ## GUI Linux VM Workflow
 
@@ -184,6 +184,7 @@ cargo run -p backlit-session-supervisor -- --verify
 cargo run -p backlit-clipboard -- --verify
 cargo run -p backlit-session -- --backend=headless --screenshot target/backlit-session.ppm --verify
 ./scripts/verify-gui-smoke.sh
+./scripts/verify-packaging-contract.sh
 ./scripts/verify-nested-wayland-smoke.sh
 ./scripts/verify-linux-e2e.sh
 cargo run -p backlit-shell -- --component=all --socket=backlit-0 --verify
@@ -248,6 +249,16 @@ cargo run -p backlit-compositor-backend -- --backend=drm --verify
 ```
 
 The Wayland preflight expects `WAYLAND_DISPLAY` and `XDG_RUNTIME_DIR`; the DRM preflight only becomes meaningful inside a real Linux session.
+
+## Packaging Contract Verification
+
+The packaging contract verifier checks that the session desktop entry, systemd units, Debian package split, and workspace binary names agree:
+
+```bash
+./scripts/verify-packaging-contract.sh
+```
+
+It writes `target/packaging-contract/manifest.json` by default.
 
 ## Engineering Rules
 

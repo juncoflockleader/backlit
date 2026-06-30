@@ -23,6 +23,7 @@ cargo run -p backlit-session-supervisor -- --verify
 cargo run -p backlit-clipboard -- --verify
 cargo run -p backlit-shell -- --component=all --verify
 ./scripts/verify-gui-smoke.sh
+./scripts/verify-packaging-contract.sh
 ./scripts/verify-linux-e2e.sh
 ```
 

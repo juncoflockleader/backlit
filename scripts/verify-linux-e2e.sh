@@ -6,6 +6,7 @@ cd "$repo_root"
 
 out_dir="${1:-target/linux-e2e}"
 smoke_dir="$out_dir/gui-smoke"
+packaging_dir="$out_dir/packaging-contract"
 mkdir -p "$out_dir"
 
 commit="$(git rev-parse --short HEAD 2>/dev/null || printf unknown)"
@@ -17,11 +18,14 @@ cargo fmt --all -- --check
 cargo test --workspace --all-targets
 cargo clippy --workspace --all-targets -- -D warnings
 ./scripts/verify-gui-smoke.sh "$smoke_dir"
+./scripts/verify-packaging-contract.sh "$packaging_dir"
 
 nested_wayland=false
+nested_wayland_manifest=""
 if [ "$(uname -s)" = "Linux" ]; then
   ./scripts/verify-nested-wayland-smoke.sh "$out_dir/nested-wayland"
   nested_wayland=true
+  nested_wayland_manifest="$out_dir/nested-wayland/manifest.json"
 fi
 
 cat > "$out_dir/manifest.json" <<EOF
@@ -34,13 +38,15 @@ cat > "$out_dir/manifest.json" <<EOF
   "cargo": "$cargo_version",
   "artifacts": {
     "gui_smoke_manifest": "$smoke_dir/manifest.json",
-    "nested_wayland_manifest": "$out_dir/nested-wayland/manifest.json"
+    "packaging_contract_manifest": "$packaging_dir/manifest.json",
+    "nested_wayland_manifest": "$nested_wayland_manifest"
   },
   "checks": {
     "fmt": true,
     "tests": true,
     "clippy": true,
     "gui_smoke": true,
+    "packaging_contract": true,
     "nested_wayland": $nested_wayland
   }
 }
