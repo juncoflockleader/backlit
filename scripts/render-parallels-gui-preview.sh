@@ -168,6 +168,13 @@ host_session_log="$host_out_dir/session.jsonl"
 host_ppm="$host_out_dir/backlit-session.ppm"
 host_png="$host_out_dir/backlit-session.png"
 
+rm -f \
+  "$host_guest_manifest" \
+  "$host_session_log" \
+  "$host_ppm" \
+  "$host_png" \
+  "$host_out_dir/manifest.json"
+
 download_file "$guest_manifest" "$host_guest_manifest"
 download_file "$guest_session_log" "$host_session_log"
 download_file "$guest_ppm" "$host_ppm"
