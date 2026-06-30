@@ -133,6 +133,7 @@ cargo fmt --all
 cargo clippy --workspace --all-targets -- -D warnings
 cargo test --workspace --all-targets
 cargo run -p backlit-compositor -- --backend=headless --smoke-test
+cargo run -p backlit-protocols -- --verify --list
 cargo run -p backlit-session -- --backend=headless --screenshot target/backlit-session.ppm --verify
 ./scripts/verify-gui-smoke.sh
 cargo run -p backlit-shell -- --component=panel --socket=backlit-0
@@ -160,6 +161,8 @@ Artifacts are written to `target/gui-smoke/`:
 - `backlit-session.ppm`: deterministic session screenshot.
 - `demo-client.ppm`: deterministic demo client screenshot.
 - `*.jsonl`: structured launch and verification events.
+
+The verifier also runs `backlit-protocols --verify --list` so MVP protocol coverage stays explicit while the real Smithay compositor is being brought up.
 
 ## Engineering Rules
 

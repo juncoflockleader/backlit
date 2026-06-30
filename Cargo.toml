@@ -5,6 +5,7 @@ members = [
   "crates/compositor-backend",
   "crates/compositor",
   "crates/portal-backend",
+  "crates/protocols",
   "crates/demo-client",
   "crates/session",
   "crates/settings-daemon",
