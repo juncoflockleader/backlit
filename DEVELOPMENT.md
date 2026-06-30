@@ -167,6 +167,8 @@ The verifier also runs `backlit-protocols --verify --list` so MVP protocol cover
 
 It also runs `backlit-perf --verify`, which measures the deterministic GUI render path and headless backend present path against generous MVP 0 smoke budgets.
 
+The default GUI render is guarded by checksum `5635038614353063225`; update it only when an intentional visual change is made.
+
 ## Engineering Rules
 
 - Keep compositor policy small, measurable, and hard to crash.

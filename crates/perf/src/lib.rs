@@ -24,6 +24,8 @@ pub struct PerfSmokeReport {
     pub render_ms: u64,
     pub present_us: u64,
     pub non_background_pixels: u64,
+    pub checksum: u64,
+    pub golden_ok: bool,
     pub protocol_count: u64,
     pub surface_count: u64,
     pub screenshot_verified: bool,
@@ -64,6 +66,8 @@ pub fn run_perf_smoke(width: u32, height: u32, budgets: PerfBudgets) -> PerfSmok
         render_ms,
         present_us,
         non_background_pixels: verification.non_background_pixels,
+        checksum: verification.checksum,
+        golden_ok: verification.golden_ok,
         protocol_count: protocol_report.registered_protocols as u64,
         surface_count: frame.surface_count,
         screenshot_verified: verification.passed(),
@@ -82,6 +86,7 @@ mod tests {
 
         assert!(report.passed(), "{report:?}");
         assert!(report.non_background_pixels > 10_000);
+        assert!(report.golden_ok);
         assert_eq!(report.protocol_count, 7);
         assert_eq!(report.surface_count, 2);
     }

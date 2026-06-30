@@ -5,7 +5,9 @@ use std::time::Instant;
 
 use backlit_common::metrics::{event_json, FieldValue};
 use backlit_compositor_backend::BackendKind;
-use backlit_demo_client::{render_demo_gui, verify_demo_gui};
+use backlit_demo_client::{
+    render_demo_gui, verify_demo_gui, DEFAULT_DEMO_HEIGHT, DEFAULT_DEMO_WIDTH,
+};
 use backlit_window_policy::WindowPolicy;
 
 fn main() {
@@ -58,6 +60,7 @@ fn run() -> Result<(), String> {
             ("windows", FieldValue::U64(policy.windows().len() as u64)),
             ("width", FieldValue::U64(canvas.width() as u64)),
             ("height", FieldValue::U64(canvas.height() as u64)),
+            ("checksum", FieldValue::U64(canvas.checksum())),
         ],
     );
 
@@ -72,6 +75,8 @@ fn run() -> Result<(), String> {
                     "non_background_pixels",
                     FieldValue::U64(report.non_background_pixels),
                 ),
+                ("checksum", FieldValue::U64(report.checksum)),
+                ("golden_ok", FieldValue::Bool(report.golden_ok)),
                 ("panel_ok", FieldValue::Bool(report.panel_ok)),
                 ("launcher_ok", FieldValue::Bool(report.launcher_ok)),
                 ("window_ok", FieldValue::Bool(report.window_ok)),
@@ -121,8 +126,8 @@ impl Default for Config {
             backend: BackendKind::Headless,
             socket: String::from("backlit-0"),
             screenshot: None,
-            width: 800,
-            height: 520,
+            width: DEFAULT_DEMO_WIDTH,
+            height: DEFAULT_DEMO_HEIGHT,
             verify: false,
             help: false,
         }

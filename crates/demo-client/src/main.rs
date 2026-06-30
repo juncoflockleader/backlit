@@ -2,7 +2,9 @@ use std::env;
 use std::process;
 
 use backlit_common::metrics::{event_json, FieldValue};
-use backlit_demo_client::{render_demo_gui, verify_demo_gui};
+use backlit_demo_client::{
+    render_demo_gui, verify_demo_gui, DEFAULT_DEMO_HEIGHT, DEFAULT_DEMO_WIDTH,
+};
 
 fn main() {
     if let Err(error) = run() {
@@ -38,6 +40,7 @@ fn run() -> Result<(), String> {
                     "non_background_pixels",
                     FieldValue::U64(report.non_background_pixels),
                 ),
+                ("checksum", FieldValue::U64(report.checksum)),
             ],
         )
     );
@@ -49,6 +52,7 @@ fn run() -> Result<(), String> {
                 "demo_client.verified",
                 &[
                     ("passed", FieldValue::Bool(report.passed())),
+                    ("golden_ok", FieldValue::Bool(report.golden_ok)),
                     ("panel_ok", FieldValue::Bool(report.panel_ok)),
                     ("launcher_ok", FieldValue::Bool(report.launcher_ok)),
                     ("window_ok", FieldValue::Bool(report.window_ok)),
@@ -78,8 +82,8 @@ impl Default for Config {
     fn default() -> Self {
         Self {
             output: String::from("target/backlit-demo-client.ppm"),
-            width: 800,
-            height: 520,
+            width: DEFAULT_DEMO_WIDTH,
+            height: DEFAULT_DEMO_HEIGHT,
             verify: false,
             help: false,
         }

@@ -41,6 +41,8 @@ fn run() -> Result<(), String> {
                     "non_background_pixels",
                     FieldValue::U64(report.non_background_pixels),
                 ),
+                ("checksum", FieldValue::U64(report.checksum)),
+                ("golden_ok", FieldValue::Bool(report.golden_ok)),
                 ("protocol_count", FieldValue::U64(report.protocol_count)),
                 ("surface_count", FieldValue::U64(report.surface_count)),
                 (

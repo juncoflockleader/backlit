@@ -26,6 +26,10 @@ const TERMINAL: Color = Color::rgb(23, 27, 30);
 const GRAPH: Color = Color::rgb(223, 148, 67);
 const POINTER: Color = Color::rgb(255, 255, 255);
 
+pub const DEFAULT_DEMO_WIDTH: u32 = 800;
+pub const DEFAULT_DEMO_HEIGHT: u32 = 520;
+pub const GOLDEN_DEMO_CHECKSUM: u64 = 5_635_038_614_353_063_225;
+
 #[derive(Debug, Clone)]
 pub struct Canvas {
     width: u32,
@@ -87,11 +91,34 @@ impl Canvas {
 
         fs::write(path, bytes)
     }
+
+    pub fn checksum(&self) -> u64 {
+        let mut hash = 0xcbf29ce484222325;
+
+        for byte in self
+            .width
+            .to_le_bytes()
+            .into_iter()
+            .chain(self.height.to_le_bytes())
+        {
+            hash = fnv1a(hash, byte);
+        }
+
+        for pixel in &self.pixels {
+            hash = fnv1a(hash, pixel.red);
+            hash = fnv1a(hash, pixel.green);
+            hash = fnv1a(hash, pixel.blue);
+        }
+
+        hash
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct VerificationReport {
     pub non_background_pixels: u64,
+    pub checksum: u64,
+    pub golden_ok: bool,
     pub panel_ok: bool,
     pub launcher_ok: bool,
     pub window_ok: bool,
@@ -105,6 +132,7 @@ impl VerificationReport {
             && self.launcher_ok
             && self.window_ok
             && self.pointer_ok
+            && self.golden_ok
     }
 }
 
@@ -137,8 +165,17 @@ pub fn verify_demo_gui(canvas: &Canvas) -> VerificationReport {
         .filter(|pixel| **pixel != BACKGROUND)
         .count() as u64;
 
+    let checksum = canvas.checksum();
+    let golden_ok = if canvas.width == DEFAULT_DEMO_WIDTH && canvas.height == DEFAULT_DEMO_HEIGHT {
+        checksum == GOLDEN_DEMO_CHECKSUM
+    } else {
+        true
+    };
+
     VerificationReport {
         non_background_pixels,
+        checksum,
+        golden_ok,
         panel_ok: canvas.pixel(104, 18) == Some(PANEL),
         launcher_ok: canvas.pixel(10, 78) == Some(LAUNCHER),
         window_ok: canvas.pixel(364, 86) == Some(TITLE_BAR),
@@ -147,6 +184,10 @@ pub fn verify_demo_gui(canvas: &Canvas) -> VerificationReport {
             canvas.height.saturating_sub(116),
         ) == Some(POINTER),
     }
+}
+
+fn fnv1a(hash: u64, byte: u8) -> u64 {
+    (hash ^ byte as u64).wrapping_mul(0x00000100000001b3)
 }
 
 fn draw_panel(canvas: &mut Canvas) {
@@ -240,7 +281,7 @@ fn draw_pointer(canvas: &mut Canvas, x: u32, y: u32) {
 
 #[cfg(test)]
 mod tests {
-    use super::{render_demo_gui, verify_demo_gui, Color};
+    use super::{render_demo_gui, verify_demo_gui, Color, GOLDEN_DEMO_CHECKSUM};
 
     #[test]
     fn renders_minimum_size_preview() {
@@ -256,6 +297,8 @@ mod tests {
         let report = verify_demo_gui(&canvas);
 
         assert!(report.passed(), "{report:?}");
+        assert!(report.golden_ok, "{report:?}");
+        assert_eq!(report.checksum, GOLDEN_DEMO_CHECKSUM);
         assert_eq!(canvas.pixel(104, 18), Some(Color::rgb(235, 238, 242)));
     }
 }
