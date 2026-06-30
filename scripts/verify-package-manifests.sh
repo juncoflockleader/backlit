@@ -68,6 +68,7 @@ require_line packaging/debian/fastgui-shell.install "usr/bin/backlit-shell"
 require_line packaging/debian/fastgui-shell.install "usr/bin/backlit-notification-daemon"
 
 require_line packaging/debian/fastgui-session.install "usr/bin/backlit-session"
+require_line packaging/debian/fastgui-session.install "usr/bin/backlit-demo-client"
 require_line packaging/debian/fastgui-session.install "usr/share/wayland-sessions/backlit.desktop"
 require_line packaging/debian/fastgui-session.install "usr/lib/systemd/user/backlit-session.target"
 require_line packaging/debian/fastgui-session.install "usr/lib/systemd/user/backlit-compositor.service"

@@ -151,6 +151,7 @@ require_executable /usr/bin/backlit-compositor
 require_executable /usr/bin/backlit-shell
 require_executable /usr/bin/backlit-notification-daemon
 require_executable /usr/bin/backlit-session
+require_executable /usr/bin/backlit-demo-client
 require_executable /usr/bin/backlit-settings
 require_executable /usr/bin/backlit-settings-daemon
 
@@ -209,6 +210,10 @@ grep -F '"spawned":true' "$session_log" >/dev/null || fail "session launch targe
 grep -F '"wayland_display_set":true' "$session_log" >/dev/null || fail "session launch target did not receive WAYLAND_DISPLAY"
 grep -F '"compositor_resolved":true' "$session_log" >/dev/null || fail "session compositor binary did not resolve from /usr/bin"
 grep -F '"compositor_ready":true' "$session_log" >/dev/null || fail "session compositor service did not become ready"
+grep -F '"compositor_demo_client_resolved":true' "$session_log" >/dev/null || fail "session demo client binary did not resolve from /usr/bin"
+grep -F '"compositor_demo_client_connected":true' "$session_log" >/dev/null || fail "session demo client did not connect to system compositor"
+grep -F '"compositor_demo_surface_mapped":true' "$session_log" >/dev/null || fail "session demo client surface did not map from system install"
+grep -F '"compositor_service_socket_cleanup":true' "$session_log" >/dev/null || fail "session compositor socket did not clean up from system install"
 grep -F '"shell_resolved":true' "$session_log" >/dev/null || fail "session shell binary did not resolve from /usr/bin"
 grep -F '"shell_ready":true' "$session_log" >/dev/null || fail "session shell service did not become ready"
 grep -F '"notification_resolved":true' "$session_log" >/dev/null || fail "notification daemon did not resolve from /usr/bin"
@@ -268,6 +273,7 @@ cat > "$manifest" <<EOF
     "systemd_units_from_system_install": true,
     "session_gui_from_system_install": true,
     "session_services_from_system_install": true,
+    "session_compositor_demo_client_from_system_install": true,
     "session_replay_from_system_install": true,
     "session_clean_exit_from_system_install": true,
     "settings_app_from_system_install": true,

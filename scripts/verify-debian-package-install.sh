@@ -165,6 +165,7 @@ require_executable "$bin_dir/backlit-compositor"
 require_executable "$bin_dir/backlit-shell"
 require_executable "$bin_dir/backlit-notification-daemon"
 require_executable "$bin_dir/backlit-session"
+require_executable "$bin_dir/backlit-demo-client"
 require_executable "$bin_dir/backlit-settings"
 require_executable "$bin_dir/backlit-settings-daemon"
 
@@ -220,6 +221,10 @@ grep -F '"spawned":true' "$session_log" >/dev/null || fail "session launch targe
 grep -F '"wayland_display_set":true' "$session_log" >/dev/null || fail "session launch target did not receive WAYLAND_DISPLAY"
 grep -F '"compositor_resolved":true' "$session_log" >/dev/null || fail "session compositor binary did not resolve from extracted debs"
 grep -F '"compositor_ready":true' "$session_log" >/dev/null || fail "session compositor service did not become ready"
+grep -F '"compositor_demo_client_resolved":true' "$session_log" >/dev/null || fail "session demo client binary did not resolve from extracted debs"
+grep -F '"compositor_demo_client_connected":true' "$session_log" >/dev/null || fail "session demo client did not connect to extracted compositor"
+grep -F '"compositor_demo_surface_mapped":true' "$session_log" >/dev/null || fail "session demo client surface did not map from extracted debs"
+grep -F '"compositor_service_socket_cleanup":true' "$session_log" >/dev/null || fail "session compositor socket did not clean up from extracted debs"
 grep -F '"shell_resolved":true' "$session_log" >/dev/null || fail "session shell binary did not resolve from extracted debs"
 grep -F '"shell_ready":true' "$session_log" >/dev/null || fail "session shell service did not become ready"
 grep -F '"notification_resolved":true' "$session_log" >/dev/null || fail "notification daemon did not resolve from extracted debs"
@@ -273,6 +278,7 @@ cat > "$manifest" <<EOF
     "session_systemd_units_from_extracted_debs": true,
     "session_gui_from_extracted_debs": true,
     "session_services_from_extracted_debs": true,
+    "session_compositor_demo_client_from_extracted_debs": true,
     "session_replay_from_extracted_debs": true,
     "session_clean_exit_from_extracted_debs": true,
     "settings_app_from_extracted_debs": true

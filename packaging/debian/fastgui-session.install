@@ -1,4 +1,5 @@
 usr/bin/backlit-session
+usr/bin/backlit-demo-client
 usr/share/wayland-sessions/backlit.desktop
 usr/lib/systemd/user/backlit-session.target
 usr/lib/systemd/user/backlit-compositor.service

@@ -102,6 +102,8 @@ require_contains scripts/verify-gui-smoke.sh '"compositor_popup_lifecycle": true
 require_contains scripts/verify-gui-smoke.sh '"settings_power_actions": true'
 require_contains scripts/verify-gui-smoke.sh '"crash_logs": true'
 require_contains scripts/verify-gui-smoke.sh '"session_policy_preview": true'
+require_contains scripts/verify-gui-smoke.sh '"compositor_demo_surface_mapped":true'
+require_contains scripts/verify-gui-smoke.sh '"session_compositor_demo_client":'
 require_contains scripts/verify-gui-smoke.sh '"session_focused_title_bar": true'
 require_contains scripts/verify-gui-smoke.sh '"session_workspace_indicator": true'
 require_contains scripts/verify-gui-smoke.sh '"golden_checksum": true'
@@ -186,6 +188,7 @@ require_contains packaging/debian/control.stub 'Package: fastgui-session'
 require_contains packaging/debian/control.stub 'Package: fastgui-core'
 require_contains packaging/debian/control.stub 'Depends: ${misc:Depends}, fastgui-compositor, fastgui-shell, fastgui-settings'
 require_contains packaging/debian/control.stub 'Depends: ${misc:Depends}, fastgui-core, fastgui-portal'
+require_contains packaging/debian/fastgui-session.install 'usr/bin/backlit-demo-client'
 
 artifact_manifests_checked=false
 nested_wayland_artifact=false
@@ -255,6 +258,11 @@ if [ -n "$artifact_root" ] && [ -d "$artifact_root" ]; then
   require_contains "$artifact_root/gui-smoke/manifest.json" '"portal_security": true'
   require_contains "$artifact_root/gui-smoke/manifest.json" '"crash_logs": true'
   require_contains "$artifact_root/gui-smoke/manifest.json" '"session_services": true'
+  if grep '"session_compositor_demo_client": true' "$artifact_root/gui-smoke/manifest.json" >/dev/null; then
+    require_contains "$artifact_root/gui-smoke/manifest.json" '"session_compositor_demo_client": true'
+  else
+    require_contains "$artifact_root/gui-smoke/manifest.json" '"session_compositor_client_blocked_expected": true'
+  fi
   require_contains "$artifact_root/gui-smoke/manifest.json" '"session_notification_service": true'
   require_contains "$artifact_root/gui-smoke/manifest.json" '"session_settings_service": true'
   require_contains "$artifact_root/gui-smoke/manifest.json" '"session_launch_spawn": true'
@@ -370,6 +378,7 @@ if [ -n "$artifact_root" ] && [ -d "$artifact_root" ]; then
     require_contains "$artifact_root/debian-package-install/manifest.json" '"session_systemd_units_from_extracted_debs": true'
     require_contains "$artifact_root/debian-package-install/manifest.json" '"session_gui_from_extracted_debs": true'
     require_contains "$artifact_root/debian-package-install/manifest.json" '"session_services_from_extracted_debs": true'
+    require_contains "$artifact_root/debian-package-install/manifest.json" '"session_compositor_demo_client_from_extracted_debs": true'
     require_contains "$artifact_root/debian-package-install/manifest.json" '"session_replay_from_extracted_debs": true'
     require_contains "$artifact_root/debian-package-install/manifest.json" '"session_clean_exit_from_extracted_debs": true'
     require_contains "$artifact_root/debian-package-install/manifest.json" '"settings_app_from_extracted_debs": true'
@@ -384,6 +393,7 @@ if [ -n "$artifact_root" ] && [ -d "$artifact_root" ]; then
     require_contains "$artifact_root/debian-system-install/manifest.json" '"systemd_units_from_system_install": true'
     require_contains "$artifact_root/debian-system-install/manifest.json" '"session_gui_from_system_install": true'
     require_contains "$artifact_root/debian-system-install/manifest.json" '"session_services_from_system_install": true'
+    require_contains "$artifact_root/debian-system-install/manifest.json" '"session_compositor_demo_client_from_system_install": true'
     require_contains "$artifact_root/debian-system-install/manifest.json" '"session_replay_from_system_install": true'
     require_contains "$artifact_root/debian-system-install/manifest.json" '"session_clean_exit_from_system_install": true'
     require_contains "$artifact_root/debian-system-install/manifest.json" '"settings_app_from_system_install": true'
@@ -398,6 +408,7 @@ if [ -n "$artifact_root" ] && [ -d "$artifact_root" ]; then
   require_contains "$artifact_root/staged-session-install/manifest.json" '"session_systemd_launch_plan": true'
   require_contains "$artifact_root/staged-session-install/manifest.json" '"systemd_journal_output": true'
   require_contains "$artifact_root/staged-session-install/manifest.json" '"staged_session_gui": true'
+  require_contains "$artifact_root/staged-session-install/manifest.json" '"staged_demo_client_binary": true'
   require_contains "$artifact_root/staged-session-install/manifest.json" '"staged_session_services": true'
   require_contains "$artifact_root/staged-session-install/manifest.json" '"staged_compositor_surface_lifecycle": true'
   require_contains "$artifact_root/staged-session-install/manifest.json" '"staged_compositor_popup_lifecycle": true'

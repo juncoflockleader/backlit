@@ -61,7 +61,8 @@ cargo build \
   -p backlit-shell \
   -p backlit-notification-daemon \
   -p backlit-settings \
-  -p backlit-settings-daemon
+  -p backlit-settings-daemon \
+  -p backlit-demo-client
 
 install -m 0755 target/debug/backlit-session "$bin_dir/backlit-session"
 install -m 0755 target/debug/backlit-compositor "$bin_dir/backlit-compositor"
@@ -69,6 +70,7 @@ install -m 0755 target/debug/backlit-shell "$bin_dir/backlit-shell"
 install -m 0755 target/debug/backlit-notification-daemon "$bin_dir/backlit-notification-daemon"
 install -m 0755 target/debug/backlit-settings "$bin_dir/backlit-settings"
 install -m 0755 target/debug/backlit-settings-daemon "$bin_dir/backlit-settings-daemon"
+install -m 0755 target/debug/backlit-demo-client "$bin_dir/backlit-demo-client"
 install -m 0644 packaging/sessions/backlit.desktop "$session_desktop"
 install -m 0644 packaging/applications/org.backlit.Settings.desktop "$settings_desktop"
 install -m 0644 packaging/systemd/backlit-session.target "$session_target"
@@ -136,8 +138,10 @@ require_executable "$(resolve_usr_bin "$compositor_command")"
 require_executable "$(resolve_usr_bin "$shell_command")"
 require_executable "$(resolve_usr_bin "$notification_command")"
 require_executable "$(resolve_usr_bin "$settings_command")"
+require_executable "$bin_dir/backlit-demo-client"
 
 "$bin_dir/backlit-session" --help > "$out_dir/backlit-session.help"
+"$bin_dir/backlit-demo-client" --help > "$out_dir/backlit-demo-client.help"
 "$bin_dir/backlit-compositor" --help > "$out_dir/backlit-compositor.help"
 "$bin_dir/backlit-shell" --help > "$out_dir/backlit-shell.help"
 "$bin_dir/backlit-notification-daemon" --help > "$out_dir/backlit-notification-daemon.help"
@@ -260,6 +264,7 @@ cat > "$out_dir/manifest.json" <<EOF
     "systemd_journal_output": true,
     "rust_backtrace_enabled": true,
     "staged_session_help": true,
+    "staged_demo_client_binary": true,
     "staged_session_gui": true,
     "staged_session_launch_spawn": true,
     "staged_session_services": true,

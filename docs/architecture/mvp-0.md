@@ -19,7 +19,7 @@ MVP 0 is the development harness:
 - Compositor service socket smoke that binds the configured socket inside `XDG_RUNTIME_DIR`, accepts `backlit-demo-client`, maps its announced surface into window policy, and cleans the socket up on bounded exit.
 - Session interaction smoke for app switching and terminal launch resolution.
 - Scripted session replay frames for focus, terminal launch, move, resize, snap, and workspace switching.
-- Session service orchestration smoke for launching compositor, shell, and settings daemon probes from `backlit-session`.
+- Session service orchestration smoke for launching the compositor service, connecting `backlit-demo-client` to its socket, and probing shell/settings daemons from `backlit-session`.
 - Session move/resize smoke through pure window policy.
 - Workspace switching smoke that hides non-active workspace windows from focus and pointer routing.
 - Window snap smoke for left/right work-area tiling.

@@ -88,6 +88,7 @@ cargo build \
   -p backlit-shell \
   -p backlit-notification-daemon \
   -p backlit-session \
+  -p backlit-demo-client \
   -p backlit-settings \
   -p backlit-settings-daemon \
   -p backlit-portal-backend
@@ -219,6 +220,7 @@ copy_file target/debug/backlit-shell "$(package_root fastgui-shell)/usr/bin/back
 copy_file target/debug/backlit-notification-daemon "$(package_root fastgui-shell)/usr/bin/backlit-notification-daemon" 0755
 
 copy_file target/debug/backlit-session "$(package_root fastgui-session)/usr/bin/backlit-session" 0755
+copy_file target/debug/backlit-demo-client "$(package_root fastgui-session)/usr/bin/backlit-demo-client" 0755
 copy_file packaging/sessions/backlit.desktop "$(package_root fastgui-session)/usr/share/wayland-sessions/backlit.desktop" 0644
 copy_file packaging/systemd/backlit-session.target "$(package_root fastgui-session)/usr/lib/systemd/user/backlit-session.target" 0644
 copy_file packaging/systemd/backlit-compositor.service "$(package_root fastgui-session)/usr/lib/systemd/user/backlit-compositor.service" 0644
@@ -273,6 +275,7 @@ require_deb_contains fastgui-compositor usr/bin/backlit-compositor
 require_deb_contains fastgui-shell usr/bin/backlit-shell
 require_deb_contains fastgui-shell usr/bin/backlit-notification-daemon
 require_deb_contains fastgui-session usr/bin/backlit-session
+require_deb_contains fastgui-session usr/bin/backlit-demo-client
 require_deb_contains fastgui-session usr/share/wayland-sessions/backlit.desktop
 require_deb_contains fastgui-session usr/lib/systemd/user/backlit-session.target
 require_deb_contains fastgui-session usr/lib/systemd/user/backlit-compositor.service

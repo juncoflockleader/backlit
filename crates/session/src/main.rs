@@ -1,10 +1,11 @@
 use std::env;
 use std::fs;
+use std::os::unix::fs::{FileTypeExt, PermissionsExt};
 use std::path::{Path, PathBuf};
-use std::process::{self, Command};
+use std::process::{self, Child, Command, Stdio};
 use std::str::FromStr;
 use std::thread;
-use std::time::{Duration, Instant};
+use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
 use backlit_common::metrics::{event_json, FieldValue};
 use backlit_compositor_backend::{
@@ -836,8 +837,51 @@ impl ServiceProbe {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
+struct CompositorServiceVerification {
+    service: ServiceProbe,
+    demo_client: ServiceProbe,
+    socket_bound: bool,
+    demo_client_connected: bool,
+    demo_surface_mapped: bool,
+    socket_cleanup: bool,
+    socket_blocked_expected: bool,
+}
+
+impl CompositorServiceVerification {
+    fn missing() -> Self {
+        Self {
+            service: ServiceProbe::missing(),
+            demo_client: ServiceProbe::missing(),
+            socket_bound: false,
+            demo_client_connected: false,
+            demo_surface_mapped: false,
+            socket_cleanup: false,
+            socket_blocked_expected: false,
+        }
+    }
+
+    fn passed(&self) -> bool {
+        self.service.resolved
+            && self.service.exit_ok
+            && self.service.ready
+            && ((self.socket_bound
+                && self.demo_client.resolved
+                && self.demo_client.exit_ok
+                && self.demo_client.ready
+                && self.demo_client_connected
+                && self.demo_surface_mapped
+                && self.socket_cleanup)
+                || self.socket_blocked_expected)
+    }
+
+    fn children_exited_cleanly(&self) -> bool {
+        self.service.exit_ok && (self.demo_client.exit_ok || self.socket_blocked_expected)
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
 struct ServiceVerification {
-    compositor: ServiceProbe,
+    compositor: CompositorServiceVerification,
     shell: ServiceProbe,
     notification: ServiceProbe,
     settings: ServiceProbe,
@@ -846,9 +890,7 @@ struct ServiceVerification {
 
 impl ServiceVerification {
     fn passed(&self) -> bool {
-        self.compositor.resolved
-            && self.compositor.exit_ok
-            && self.compositor.ready
+        self.compositor.passed()
             && self.shell.resolved
             && self.shell.exit_ok
             && self.shell.ready
@@ -861,7 +903,7 @@ impl ServiceVerification {
     }
 
     fn children_exited_cleanly(&self) -> bool {
-        self.compositor.exit_ok
+        self.compositor.children_exited_cleanly()
             && self.shell.exit_ok
             && self.notification.exit_ok
             && self.settings.exit_ok
@@ -870,11 +912,12 @@ impl ServiceVerification {
 
 fn verify_session_services(config: &Config) -> Result<ServiceVerification, String> {
     let compositor_path = sibling_binary("backlit-compositor");
+    let demo_client_path = sibling_binary("backlit-demo-client");
     let shell_path = sibling_binary("backlit-shell");
     let notification_path = sibling_binary("backlit-notification-daemon");
     let settings_path = sibling_binary("backlit-settings-daemon");
 
-    let compositor = run_compositor_probe(&compositor_path, config)?;
+    let compositor = run_compositor_probe(&compositor_path, &demo_client_path, config)?;
     let shell = run_shell_probe(&shell_path, config)?;
     let notification = run_notification_probe(&notification_path)?;
     let settings = run_settings_probe(&settings_path)?;
@@ -910,7 +953,39 @@ fn binary_name(name: &str) -> String {
     format!("{name}{}", env::consts::EXE_SUFFIX)
 }
 
-fn run_compositor_probe(path: &Path, config: &Config) -> Result<ServiceProbe, String> {
+fn run_compositor_probe(
+    path: &Path,
+    demo_client_path: &Path,
+    config: &Config,
+) -> Result<CompositorServiceVerification, String> {
+    if !path.is_file() {
+        return Ok(CompositorServiceVerification::missing());
+    }
+
+    if !demo_client_path.is_file() {
+        let mut missing = CompositorServiceVerification::missing();
+        missing.service = run_compositor_smoke_probe(path, config)?;
+        return Ok(missing);
+    }
+
+    let runtime_dir = create_private_runtime_dir("blsvc")?;
+    let socket_name = format!("bls-{}", process::id());
+    let socket_path = runtime_dir.join(socket_name.as_str());
+
+    let result = run_compositor_service_client_probe(
+        path,
+        demo_client_path,
+        config,
+        runtime_dir.as_path(),
+        socket_name.as_str(),
+        socket_path.as_path(),
+    );
+
+    let _ = fs::remove_dir_all(&runtime_dir);
+    result
+}
+
+fn run_compositor_smoke_probe(path: &Path, config: &Config) -> Result<ServiceProbe, String> {
     let backend_event = format!("\"backend\":\"{}\"", config.backend.as_str());
 
     run_service_probe(
@@ -931,6 +1006,119 @@ fn run_compositor_probe(path: &Path, config: &Config) -> Result<ServiceProbe, St
             String::from("\"xdg_popup_backend_surface_presented\":true"),
         ],
     )
+}
+
+fn run_compositor_service_client_probe(
+    path: &Path,
+    demo_client_path: &Path,
+    config: &Config,
+    runtime_dir: &Path,
+    socket_name: &str,
+    socket_path: &Path,
+) -> Result<CompositorServiceVerification, String> {
+    let started = Instant::now();
+    let mut child = Command::new(path)
+        .env("XDG_RUNTIME_DIR", runtime_dir)
+        .arg("--backend")
+        .arg(config.backend.as_str())
+        .arg("--socket")
+        .arg(socket_name)
+        .arg("--serve")
+        .arg("--serve-for-ms")
+        .arg("650")
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .spawn()
+        .map_err(|error| format!("failed to run {}: {error}", path.display()))?;
+
+    let socket_seen = wait_for_socket(socket_path, &mut child, Duration::from_millis(400))?;
+    if !socket_seen {
+        let output = child
+            .wait_with_output()
+            .map_err(|error| format!("failed to wait for {}: {error}", path.display()))?;
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        if stderr.contains("Operation not permitted") {
+            let fallback = run_compositor_smoke_probe(path, config)?;
+            let mut report = CompositorServiceVerification::missing();
+            report.service = fallback;
+            report.socket_blocked_expected = true;
+            return Ok(report);
+        }
+
+        let mut report = CompositorServiceVerification::missing();
+        report.service = service_probe_from_output(
+            output,
+            started.elapsed().as_millis() as u64,
+            &[
+                String::from("\"event\":\"compositor.socket_bound\""),
+                String::from("\"event\":\"compositor.socket_client\""),
+            ],
+        );
+        return Ok(report);
+    }
+
+    let demo_started = Instant::now();
+    let demo_output = Command::new(demo_client_path)
+        .env("XDG_RUNTIME_DIR", runtime_dir)
+        .arg("--connect-socket")
+        .arg(socket_name)
+        .arg("--connect-title")
+        .arg("session-demo")
+        .arg("--connect-only")
+        .arg("--width")
+        .arg("640")
+        .arg("--height")
+        .arg("480")
+        .output()
+        .map_err(|error| format!("failed to run {}: {error}", demo_client_path.display()))?;
+    let demo_client = service_probe_from_output(
+        demo_output,
+        demo_started.elapsed().as_millis() as u64,
+        &[
+            String::from("\"event\":\"demo_client.socket_connected\""),
+            String::from("\"title\":\"session-demo\""),
+            String::from("\"connected\":true"),
+        ],
+    );
+
+    let output = child
+        .wait_with_output()
+        .map_err(|error| format!("failed to wait for {}: {error}", path.display()))?;
+    let elapsed_ms = started.elapsed().as_millis() as u64;
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    let socket_bound = stdout.contains("\"event\":\"compositor.socket_bound\"");
+    let demo_client_connected =
+        demo_client.ready && stdout.contains("\"event\":\"compositor.socket_client\"");
+    let demo_surface_mapped = stdout.contains("\"title\":\"session-demo\"")
+        && stdout.contains("\"backend_surface_presented\":true")
+        && stdout.contains("\"policy_window_mapped\":true");
+    let socket_cleanup = stdout.contains("\"event\":\"compositor.socket_unbound\"")
+        && stdout.contains("\"removed\":true")
+        && !socket_path.exists();
+    let service = service_probe_from_output(
+        output,
+        elapsed_ms,
+        &[
+            String::from("\"event\":\"compositor.ready\""),
+            String::from("\"ready\":true"),
+            String::from("\"event\":\"compositor.socket_bound\""),
+            String::from("\"event\":\"compositor.socket_client\""),
+            String::from("\"title\":\"session-demo\""),
+            String::from("\"backend_surface_presented\":true"),
+            String::from("\"policy_window_mapped\":true"),
+            String::from("\"event\":\"compositor.service_exit\""),
+        ],
+    );
+
+    Ok(CompositorServiceVerification {
+        service,
+        demo_client,
+        socket_bound,
+        demo_client_connected,
+        demo_surface_mapped,
+        socket_cleanup,
+        socket_blocked_expected: false,
+    })
 }
 
 fn run_shell_probe(path: &Path, config: &Config) -> Result<ServiceProbe, String> {
@@ -1012,13 +1200,113 @@ fn run_service_probe(
     Ok(probe)
 }
 
+fn service_probe_from_output(
+    output: process::Output,
+    elapsed_ms: u64,
+    required_stdout: &[String],
+) -> ServiceProbe {
+    let mut probe = ServiceProbe {
+        resolved: true,
+        exit_ok: output.status.success(),
+        ready: false,
+        elapsed_ms,
+        stdout: output.stdout,
+        stderr: output.stderr,
+    };
+    probe.ready = probe.exit_ok
+        && required_stdout
+            .iter()
+            .all(|needle| probe.stdout_contains(needle.as_str()));
+    probe
+}
+
+fn create_private_runtime_dir(prefix: &str) -> Result<PathBuf, String> {
+    let unique = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .map_err(|error| format!("system clock before Unix epoch: {error}"))?
+        .as_nanos();
+    let base = if cfg!(target_os = "macos") {
+        PathBuf::from("/private/tmp")
+    } else {
+        env::temp_dir()
+    };
+    let path = base.join(format!("{prefix}-{}-{unique}", process::id()));
+    fs::create_dir_all(&path).map_err(|error| {
+        format!(
+            "failed to create private runtime dir {}: {error}",
+            path.display()
+        )
+    })?;
+    let mut permissions = fs::metadata(&path)
+        .map_err(|error| {
+            format!(
+                "failed to stat private runtime dir {}: {error}",
+                path.display()
+            )
+        })?
+        .permissions();
+    permissions.set_mode(0o700);
+    fs::set_permissions(&path, permissions).map_err(|error| {
+        format!(
+            "failed to chmod private runtime dir {}: {error}",
+            path.display()
+        )
+    })?;
+    Ok(path)
+}
+
+fn wait_for_socket(
+    socket_path: &Path,
+    child: &mut Child,
+    timeout: Duration,
+) -> Result<bool, String> {
+    let deadline = Instant::now() + timeout;
+
+    while Instant::now() < deadline {
+        if fs::symlink_metadata(socket_path)
+            .map(|metadata| metadata.file_type().is_socket())
+            .unwrap_or(false)
+        {
+            return Ok(true);
+        }
+
+        if child
+            .try_wait()
+            .map_err(|error| format!("failed to poll compositor service: {error}"))?
+            .is_some()
+        {
+            return Ok(false);
+        }
+
+        thread::sleep(Duration::from_millis(10));
+    }
+
+    Ok(false)
+}
+
 fn write_service_logs(log_dir: &Path, report: &ServiceVerification) -> Result<(), String> {
     fs::create_dir_all(log_dir)
         .map_err(|error| format!("failed to create {}: {error}", log_dir.display()))?;
-    fs::write(log_dir.join("compositor.jsonl"), &report.compositor.stdout)
-        .map_err(|error| format!("failed to write compositor service log: {error}"))?;
-    fs::write(log_dir.join("compositor.stderr"), &report.compositor.stderr)
-        .map_err(|error| format!("failed to write compositor service stderr: {error}"))?;
+    fs::write(
+        log_dir.join("compositor.jsonl"),
+        &report.compositor.service.stdout,
+    )
+    .map_err(|error| format!("failed to write compositor service log: {error}"))?;
+    fs::write(
+        log_dir.join("compositor.stderr"),
+        &report.compositor.service.stderr,
+    )
+    .map_err(|error| format!("failed to write compositor service stderr: {error}"))?;
+    fs::write(
+        log_dir.join("demo-client-socket.jsonl"),
+        &report.compositor.demo_client.stdout,
+    )
+    .map_err(|error| format!("failed to write demo client socket log: {error}"))?;
+    fs::write(
+        log_dir.join("demo-client-socket.stderr"),
+        &report.compositor.demo_client.stderr,
+    )
+    .map_err(|error| format!("failed to write demo client socket stderr: {error}"))?;
     fs::write(log_dir.join("shell.jsonl"), &report.shell.stdout)
         .map_err(|error| format!("failed to write shell service log: {error}"))?;
     fs::write(log_dir.join("shell.stderr"), &report.shell.stderr)
@@ -1055,11 +1343,39 @@ fn emit_service_verification(config: &Config, report: &ServiceVerification, elap
             ("elapsed_ms", FieldValue::U64(elapsed_ms)),
             (
                 "compositor_resolved",
-                FieldValue::Bool(report.compositor.resolved),
+                FieldValue::Bool(report.compositor.service.resolved),
             ),
             (
                 "compositor_ready",
-                FieldValue::Bool(report.compositor.ready),
+                FieldValue::Bool(report.compositor.service.ready),
+            ),
+            (
+                "compositor_service_socket_bound",
+                FieldValue::Bool(report.compositor.socket_bound),
+            ),
+            (
+                "compositor_demo_client_resolved",
+                FieldValue::Bool(report.compositor.demo_client.resolved),
+            ),
+            (
+                "compositor_demo_client_exit_ok",
+                FieldValue::Bool(report.compositor.demo_client.exit_ok),
+            ),
+            (
+                "compositor_demo_client_connected",
+                FieldValue::Bool(report.compositor.demo_client_connected),
+            ),
+            (
+                "compositor_demo_surface_mapped",
+                FieldValue::Bool(report.compositor.demo_surface_mapped),
+            ),
+            (
+                "compositor_service_socket_cleanup",
+                FieldValue::Bool(report.compositor.socket_cleanup),
+            ),
+            (
+                "compositor_client_blocked_expected",
+                FieldValue::Bool(report.compositor.socket_blocked_expected),
             ),
             ("shell_resolved", FieldValue::Bool(report.shell.resolved)),
             ("shell_ready", FieldValue::Bool(report.shell.ready)),
@@ -1083,7 +1399,11 @@ fn emit_service_verification(config: &Config, report: &ServiceVerification, elap
             ("logs_written", FieldValue::Bool(report.logs_written)),
             (
                 "compositor_probe_ms",
-                FieldValue::U64(report.compositor.elapsed_ms),
+                FieldValue::U64(report.compositor.service.elapsed_ms),
+            ),
+            (
+                "compositor_demo_client_probe_ms",
+                FieldValue::U64(report.compositor.demo_client.elapsed_ms),
             ),
             ("shell_probe_ms", FieldValue::U64(report.shell.elapsed_ms)),
             (
@@ -1096,7 +1416,11 @@ fn emit_service_verification(config: &Config, report: &ServiceVerification, elap
             ),
             (
                 "compositor_stdout_bytes",
-                FieldValue::U64(report.compositor.stdout.len() as u64),
+                FieldValue::U64(report.compositor.service.stdout.len() as u64),
+            ),
+            (
+                "compositor_demo_client_stdout_bytes",
+                FieldValue::U64(report.compositor.demo_client.stdout.len() as u64),
             ),
             (
                 "shell_stdout_bytes",
@@ -2428,12 +2752,12 @@ Flags:
   --socket       Wayland socket name. Defaults to backlit-0.
   --screenshot   Write a deterministic PPM GUI screenshot.
   --service-log-dir
-                 Write compositor and shell probe logs to this directory.
+                 Write compositor, demo-client socket, and shell probe logs to this directory.
   --width        Screenshot width in pixels.
   --height       Screenshot height in pixels.
   --verify       Fail if expected GUI regions are missing.
   --verify-services
-                 Fail if sibling compositor, shell, and settings probes cannot launch.
+                 Fail if sibling compositor, demo client, shell, and settings probes cannot launch.
   --verify-launch-spawn
                  Spawn the terminal launch target resolved from Super+Enter.
   --verify-clean-exit
@@ -2469,7 +2793,8 @@ mod tests {
     use std::time::{SystemTime, UNIX_EPOCH};
 
     use super::{
-        binary_name, run_systemd_activation, systemd_launch_plan, verify_systemd_units, Config,
+        binary_name, run_systemd_activation, systemd_launch_plan, verify_systemd_units,
+        CompositorServiceVerification, Config, ServiceProbe,
     };
 
     #[test]
@@ -2526,6 +2851,54 @@ mod tests {
     #[test]
     fn binary_name_uses_platform_suffix() {
         assert!(binary_name("backlit-compositor").starts_with("backlit-compositor"));
+    }
+
+    #[test]
+    fn compositor_service_verification_requires_launched_client_or_expected_block() {
+        let ready_service = ServiceProbe {
+            resolved: true,
+            exit_ok: true,
+            ready: true,
+            elapsed_ms: 7,
+            stdout: Vec::new(),
+            stderr: Vec::new(),
+        };
+        let ready_client = ServiceProbe {
+            resolved: true,
+            exit_ok: true,
+            ready: true,
+            elapsed_ms: 2,
+            stdout: Vec::new(),
+            stderr: Vec::new(),
+        };
+
+        let mapped = CompositorServiceVerification {
+            service: ready_service.clone(),
+            demo_client: ready_client,
+            socket_bound: true,
+            demo_client_connected: true,
+            demo_surface_mapped: true,
+            socket_cleanup: true,
+            socket_blocked_expected: false,
+        };
+        assert!(mapped.passed());
+
+        let blocked = CompositorServiceVerification {
+            service: ready_service,
+            demo_client: ServiceProbe::missing(),
+            socket_bound: false,
+            demo_client_connected: false,
+            demo_surface_mapped: false,
+            socket_cleanup: false,
+            socket_blocked_expected: true,
+        };
+        assert!(blocked.passed());
+
+        let incomplete = CompositorServiceVerification {
+            socket_blocked_expected: false,
+            ..blocked
+        };
+        assert!(!incomplete.passed());
     }
 
     #[test]

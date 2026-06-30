@@ -41,6 +41,7 @@ require_file packaging/systemd/backlit-shell.service
 require_file packaging/systemd/backlit-notification-daemon.service
 require_file packaging/systemd/backlit-settings-daemon.service
 require_file packaging/debian/control.stub
+require_file packaging/debian/fastgui-session.install
 
 require_line packaging/sessions/backlit.desktop "[Desktop Entry]"
 require_line packaging/sessions/backlit.desktop "Name=Backlit"
@@ -124,9 +125,11 @@ require_contains packaging/debian/control.stub "Depends: \${misc:Depends}, fastg
 require_contains Cargo.toml "\"crates/compositor\""
 require_contains Cargo.toml "\"crates/notification-daemon\""
 require_contains Cargo.toml "\"crates/session\""
+require_contains Cargo.toml "\"crates/demo-client\""
 require_contains Cargo.toml "\"crates/shell\""
 require_contains Cargo.toml "\"crates/settings\""
 require_contains Cargo.toml "\"crates/settings-daemon\""
+require_line packaging/debian/fastgui-session.install "usr/bin/backlit-demo-client"
 
 package_count="$(grep -c '^Package: ' packaging/debian/control.stub)"
 
@@ -143,7 +146,8 @@ cat > "$out_dir/manifest.json" <<EOF
     "shell_service": "packaging/systemd/backlit-shell.service",
     "notification_daemon_service": "packaging/systemd/backlit-notification-daemon.service",
     "settings_daemon_service": "packaging/systemd/backlit-settings-daemon.service",
-    "debian_control_stub": "packaging/debian/control.stub"
+    "debian_control_stub": "packaging/debian/control.stub",
+    "session_install_manifest": "packaging/debian/fastgui-session.install"
   },
   "checks": {
     "desktop_entry": true,
@@ -151,6 +155,7 @@ cat > "$out_dir/manifest.json" <<EOF
     "systemd_session_target": true,
     "systemd_services": true,
     "journal_logging": true,
+    "session_demo_client_binary": true,
     "package_split": true,
     "bare_session_meta_package": true,
     "workspace_binaries": true

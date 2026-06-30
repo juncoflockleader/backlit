@@ -119,6 +119,19 @@ grep '"notification_ready":true' "$out_dir/session.jsonl" >/dev/null
 grep '"settings_ready":true' "$out_dir/session.jsonl" >/dev/null
 grep '"children_exited_cleanly":true' "$out_dir/session.jsonl" >/dev/null
 grep '"logs_written":true' "$out_dir/session.jsonl" >/dev/null
+session_compositor_demo_client=false
+session_compositor_client_blocked_expected=false
+if grep '"compositor_demo_surface_mapped":true' "$out_dir/session.jsonl" >/dev/null; then
+  grep '"compositor_service_socket_bound":true' "$out_dir/session.jsonl" >/dev/null
+  grep '"compositor_demo_client_resolved":true' "$out_dir/session.jsonl" >/dev/null
+  grep '"compositor_demo_client_exit_ok":true' "$out_dir/session.jsonl" >/dev/null
+  grep '"compositor_demo_client_connected":true' "$out_dir/session.jsonl" >/dev/null
+  grep '"compositor_service_socket_cleanup":true' "$out_dir/session.jsonl" >/dev/null
+  session_compositor_demo_client=true
+else
+  grep '"compositor_client_blocked_expected":true' "$out_dir/session.jsonl" >/dev/null
+  session_compositor_client_blocked_expected=true
+fi
 grep '"windows_before_shutdown":3' "$out_dir/session.jsonl" >/dev/null
 grep '"windows_closed":3' "$out_dir/session.jsonl" >/dev/null
 grep '"windows_after_shutdown":0' "$out_dir/session.jsonl" >/dev/null
@@ -381,6 +394,8 @@ cat > "$out_dir/manifest.json" <<EOF
     "session_windows_after_launch": 4,
     "session_launch_spawn": true,
     "session_services": true,
+    "session_compositor_demo_client": $session_compositor_demo_client,
+    "session_compositor_client_blocked_expected": $session_compositor_client_blocked_expected,
     "session_notification_service": true,
     "session_settings_service": true,
     "session_policy_preview": true,

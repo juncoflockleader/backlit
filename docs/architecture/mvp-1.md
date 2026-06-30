@@ -43,7 +43,7 @@ Current launch-readiness checks:
 - `backlit-session-supervisor --verify` and `scripts/verify-crash-logs.sh` verify crash isolation plus user-journal crash records for compositor and shell failures.
 - `scripts/verify-launch-performance.sh` verifies MVP launch budgets from built binaries: GUI ready under 500 ms, terminal hotkey spawn under 300 ms, and shell-ready service probes under 2 seconds.
 - `scripts/verify-resource-budget.sh` verifies Linux idle resource budgets from bounded compositor and shell probes: the non-smoke compositor path accepts a bootstrap client and presents a bootstrap surface, compositor idle CPU stays under 0.5%, and combined compositor+shell RSS stays under 250 MB.
-- `scripts/verify-drm-session-smoke.sh` runs the full DRM session path with GUI verification, launch spawn, compositor/shell/settings service probes, and clean shutdown on launch-ready Linux hosts.
+- `scripts/verify-drm-session-smoke.sh` runs the full DRM session path with GUI verification, launch spawn, compositor/shell/settings service probes, demo-client launch through the session-started compositor socket, and clean shutdown on launch-ready Linux hosts.
 - `scripts/verify-mvp1-contract.sh` collects the MVP 1 readiness evidence into one gate. On non-launch-ready hosts it requires expected-blocked DRM artifacts; inside the Parallels Ubuntu GUI guest it requires launch-ready DRM preflight, DRM session smoke, package-installed replay, system-installed replay, nested Wayland, launch-performance, resource-budget, compositor-runtime, and compositor-socket evidence.
 - The Linux E2E manifest includes the launch-readiness manifest.
 - The Linux E2E manifest includes the session launch manifest.
