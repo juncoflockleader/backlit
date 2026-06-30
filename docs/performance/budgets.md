@@ -22,7 +22,7 @@ The render/present regression check is:
 cargo run -p backlit-perf -- --verify
 ```
 
-It measures the deterministic headless GUI render path and the in-memory headless backend present path. This does not prove real compositor latency, but it catches early regressions while nested Wayland and DRM/KMS backends are still being built.
+It measures the deterministic headless GUI render path, the in-memory headless backend present path, no-redraw idle frames, and targeted surface damage. This does not prove real compositor latency, but it catches early regressions while nested Wayland and DRM/KMS backends are still being built.
 
 The launch-path regression check is:
 

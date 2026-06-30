@@ -40,6 +40,12 @@ cargo run -p backlit-demo-client -- \
   --output="$out_dir/demo-client.ppm" \
   --verify > "$out_dir/demo-client.jsonl"
 
+grep '"event":"compositor.smoke_test"' "$out_dir/compositor.jsonl" >/dev/null
+grep '"idle_damaged_surfaces":0' "$out_dir/compositor.jsonl" >/dev/null
+grep '"targeted_damage_surfaces":1' "$out_dir/compositor.jsonl" >/dev/null
+grep '"post_damage_idle_surfaces":0' "$out_dir/compositor.jsonl" >/dev/null
+grep '"no_idle_redraw":true' "$out_dir/compositor.jsonl" >/dev/null
+grep '"targeted_damage_ok":true' "$out_dir/compositor.jsonl" >/dev/null
 grep '"event":"session.verified"' "$out_dir/session.jsonl" >/dev/null
 grep '"event":"session.interactions"' "$out_dir/session.jsonl" >/dev/null
 grep '"event":"session.launch_spawn"' "$out_dir/session.jsonl" >/dev/null
@@ -77,6 +83,11 @@ grep '"required_protocols":7' "$out_dir/protocols.jsonl" >/dev/null
 grep '"event":"perf.smoke"' "$out_dir/perf.jsonl" >/dev/null
 grep '"passed":true' "$out_dir/perf.jsonl" >/dev/null
 grep '"golden_ok":true' "$out_dir/perf.jsonl" >/dev/null
+grep '"idle_damaged_surfaces":0' "$out_dir/perf.jsonl" >/dev/null
+grep '"targeted_damage_surfaces":1' "$out_dir/perf.jsonl" >/dev/null
+grep '"post_damage_idle_surfaces":0' "$out_dir/perf.jsonl" >/dev/null
+grep '"no_idle_redraw":true' "$out_dir/perf.jsonl" >/dev/null
+grep '"targeted_damage_ok":true' "$out_dir/perf.jsonl" >/dev/null
 grep '"event":"shell.verified"' "$out_dir/shell.jsonl" >/dev/null
 grep '"required_components":4' "$out_dir/shell.jsonl" >/dev/null
 grep '"event":"launcher.verified"' "$out_dir/launcher.jsonl" >/dev/null
@@ -159,6 +170,8 @@ cat > "$out_dir/manifest.json" <<EOF
     "keyboard_input": true,
     "pointer_input": true,
     "surface_lifecycle": true,
+    "no_idle_redraw": true,
+    "targeted_damage": true,
     "shell_crash_isolated": true,
     "clipboard_generation": 3,
     "session_windows_after_launch": 4,

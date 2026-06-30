@@ -75,13 +75,22 @@ fn run_smoke_test(config: &RunConfig) {
 
     let mut backend = HeadlessCompositor::default();
     let client = backend.connect_client("backlit-demo-client");
-    let _terminal = backend
+    let terminal = backend
         .submit_surface(client, "demo-terminal", 800, 600)
         .expect("smoke client should be registered");
     let _browser = backend
         .submit_surface(client, "demo-browser", 1200, 800)
         .expect("smoke client should be registered");
     let frame = backend.present();
+    let idle_frame = backend.present();
+    backend
+        .mark_damaged(terminal)
+        .expect("smoke surface should be registered");
+    let damage_frame = backend.present();
+    let post_damage_idle_frame = backend.present();
+    let no_idle_redraw =
+        idle_frame.damaged_surfaces == 0 && post_damage_idle_frame.damaged_surfaces == 0;
+    let targeted_damage_ok = damage_frame.damaged_surfaces == 1;
 
     emit(
         "compositor.smoke_test",
@@ -91,6 +100,21 @@ fn run_smoke_test(config: &RunConfig) {
             ("clients", FieldValue::U64(frame.client_count)),
             ("surfaces", FieldValue::U64(frame.surface_count)),
             ("damaged_surfaces", FieldValue::U64(frame.damaged_surfaces)),
+            (
+                "idle_damaged_surfaces",
+                FieldValue::U64(idle_frame.damaged_surfaces),
+            ),
+            (
+                "targeted_damage_surfaces",
+                FieldValue::U64(damage_frame.damaged_surfaces),
+            ),
+            (
+                "post_damage_idle_surfaces",
+                FieldValue::U64(post_damage_idle_frame.damaged_surfaces),
+            ),
+            ("no_idle_redraw", FieldValue::Bool(no_idle_redraw)),
+            ("targeted_damage_ok", FieldValue::Bool(targeted_damage_ok)),
+            ("frames", FieldValue::U64(post_damage_idle_frame.frame)),
             ("total_surface_pixels", FieldValue::U64(frame.total_pixels)),
             ("first_window", FieldValue::U64(first.0)),
             ("focused_window", FieldValue::U64(second.0)),

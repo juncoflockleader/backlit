@@ -258,7 +258,7 @@ Artifacts are written to `target/gui-smoke/`:
 
 The verifier also runs `backlit-protocols --verify --list` so MVP protocol coverage stays explicit while the real Smithay compositor is being brought up.
 
-It also runs `backlit-perf --verify`, which measures the deterministic GUI render path and headless backend present path against generous MVP 0 smoke budgets.
+It also runs `backlit-perf --verify`, which measures the deterministic GUI render path, headless backend present path, idle no-redraw behavior, and targeted surface damage path against generous MVP 0 smoke budgets.
 
 The launch-performance verifier runs the built `backlit-session`, `backlit-compositor`, and `backlit-shell` binaries directly, then writes `target/launch-performance/manifest.json`. It enforces the current MVP budgets for session GUI readiness under 500 ms, shell-ready service probes under 2 seconds, and terminal hotkey spawn under 300 ms.
 

@@ -46,6 +46,28 @@ fn run() -> Result<(), String> {
                 ("protocol_count", FieldValue::U64(report.protocol_count)),
                 ("surface_count", FieldValue::U64(report.surface_count)),
                 (
+                    "initial_damaged_surfaces",
+                    FieldValue::U64(report.initial_damaged_surfaces),
+                ),
+                (
+                    "idle_damaged_surfaces",
+                    FieldValue::U64(report.idle_damaged_surfaces),
+                ),
+                (
+                    "targeted_damage_surfaces",
+                    FieldValue::U64(report.targeted_damage_surfaces),
+                ),
+                (
+                    "post_damage_idle_surfaces",
+                    FieldValue::U64(report.post_damage_idle_surfaces),
+                ),
+                ("frames_presented", FieldValue::U64(report.frames_presented)),
+                ("no_idle_redraw", FieldValue::Bool(report.no_idle_redraw)),
+                (
+                    "targeted_damage_ok",
+                    FieldValue::Bool(report.targeted_damage_ok),
+                ),
+                (
                     "screenshot_verified",
                     FieldValue::Bool(report.screenshot_verified),
                 ),
