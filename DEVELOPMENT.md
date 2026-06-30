@@ -184,6 +184,7 @@ cargo run -p backlit-shortcuts -- --verify --list --resolve=Super+Enter
 cargo run -p backlit-session-supervisor -- --verify
 cargo run -p backlit-clipboard -- --verify
 cargo run -p backlit-session -- --backend=headless --screenshot target/backlit-session.ppm --verify --verify-services
+./scripts/render-gui-preview.sh
 ./scripts/verify-gui-smoke.sh
 ./scripts/verify-packaging-contract.sh
 ./scripts/verify-staged-session-install.sh
@@ -204,6 +205,14 @@ Current compositor flags:
 ## GUI Smoke Verification
 
 MVP 0 includes a deterministic headless GUI harness. It does not replace nested Wayland or real DRM/KMS testing, but it proves that the session launch path can create a visible shell preview and verify expected GUI regions in CI.
+
+To render the current preview for inspection:
+
+```bash
+./scripts/render-gui-preview.sh
+```
+
+This writes `target/gui-preview/backlit-session.ppm` and, when `sips`, ImageMagick, or netpbm is available, `target/gui-preview/backlit-session.png`.
 
 ```bash
 ./scripts/verify-gui-smoke.sh

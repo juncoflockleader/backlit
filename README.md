@@ -24,13 +24,14 @@ cargo run -p backlit-session-supervisor -- --verify
 cargo run -p backlit-clipboard -- --verify
 cargo run -p backlit-shell -- --component=all --verify
 cargo run -p backlit-session -- --backend=headless --screenshot target/backlit-session.ppm --verify --verify-services
+./scripts/render-gui-preview.sh
 ./scripts/verify-gui-smoke.sh
 ./scripts/verify-packaging-contract.sh
 ./scripts/verify-staged-session-install.sh
 ./scripts/verify-linux-e2e.sh
 ```
 
-The smoke verifier writes a top-level artifact manifest to `target/gui-smoke/manifest.json`.
+The preview renderer writes `target/gui-preview/backlit-session.ppm` and, on macOS, a PNG you can open. The smoke verifier writes a top-level artifact manifest to `target/gui-smoke/manifest.json`.
 
 When a Parallels Ubuntu VM is available, the full Linux guest verification can be run from macOS with:
 

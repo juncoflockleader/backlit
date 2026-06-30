@@ -22,6 +22,7 @@ MVP 0 is the development harness:
 - Clipboard state smoke for text owner, replacement, and clearing.
 - Deterministic demo GUI renderer.
 - Headless session launch verification.
+- Viewable GUI preview renderer with verified session services.
 - Basic MVP protocol smoke registry.
 - Headless performance smoke checks.
 - JSON metrics.
