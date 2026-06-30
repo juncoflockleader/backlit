@@ -55,11 +55,24 @@ base64_one_line() {
 upload_script() {
   local local_path="$1"
   local remote_path="$2"
-  local payload
-  payload="$(base64_one_line "$local_path")"
+  local payload_file chunk_file chunk remote_payload_path chunk_prefix
+  payload_file="$tmp_dir/$(basename "$local_path").b64"
+  remote_payload_path="$remote_path.b64"
+  chunk_prefix="$tmp_dir/$(basename "$local_path").chunk."
+  base64_one_line "$local_path" > "$payload_file"
+  split -b 3000 "$payload_file" "$chunk_prefix"
 
   "$prlctl_bin" exec "$vm_name" --user root python3 -c \
-    "\"import base64,os,pathlib; p=pathlib.Path(\\\"$remote_path\\\"); p.write_bytes(base64.b64decode(\\\"$payload\\\")); os.chmod(p,0o755)\""
+    "\"import pathlib; pathlib.Path(\\\"$remote_payload_path\\\").write_text(\\\"\\\")\""
+
+  for chunk_file in "$chunk_prefix"*; do
+    chunk="$(cat "$chunk_file")"
+    "$prlctl_bin" exec "$vm_name" --user root python3 -c \
+      "\"import pathlib; pathlib.Path(\\\"$remote_payload_path\\\").open(\\\"a\\\").write(\\\"$chunk\\\")\""
+  done
+
+  "$prlctl_bin" exec "$vm_name" --user root python3 -c \
+    "\"import base64,os,pathlib; src=pathlib.Path(\\\"$remote_payload_path\\\"); dst=pathlib.Path(\\\"$remote_path\\\"); data=base64.b64decode(src.read_text()); assert data, \\\"empty upload\\\"; dst.write_bytes(data); os.chmod(dst,0o755); src.unlink()\""
 }
 
 tmp_dir="$(mktemp -d "${TMPDIR:-/tmp}/backlit-parallels-e2e.XXXXXX")"
@@ -79,6 +92,7 @@ repo_dir=$(quote_shell "$repo_dir")
 branch=$(quote_shell "$branch")
 e2e_out_dir=$(quote_shell "$e2e_out_dir")
 uploaded_verifier="/tmp/backlit-verify-linux-e2e.sh"
+uploaded_nested_verifier="/tmp/backlit-verify-nested-wayland-smoke.sh"
 
 export DEBIAN_FRONTEND=noninteractive
 
@@ -124,6 +138,7 @@ git reset --hard \"origin/\$branch\"
 "
 
 install -m 0755 -o "\$guest_user" -g "\$guest_user" "\$uploaded_verifier" "\$repo_dir/scripts/verify-linux-e2e.sh"
+install -m 0755 -o "\$guest_user" -g "\$guest_user" "\$uploaded_nested_verifier" "\$repo_dir/scripts/verify-nested-wayland-smoke.sh"
 
 runuser -u "\$guest_user" -- bash -lc "
 set -euo pipefail
@@ -138,6 +153,7 @@ printf 'Using Parallels VM: %s\n' "$vm_name"
 "$prlctl_bin" list --all | grep -F "$vm_name" >/dev/null
 
 upload_script "$repo_root/scripts/verify-linux-e2e.sh" "/tmp/backlit-verify-linux-e2e.sh"
+upload_script "$repo_root/scripts/verify-nested-wayland-smoke.sh" "/tmp/backlit-verify-nested-wayland-smoke.sh"
 upload_script "$root_runner" "/tmp/backlit-parallels-root-runner.sh"
 
 "$prlctl_bin" exec "$vm_name" --user root /tmp/backlit-parallels-root-runner.sh

@@ -18,6 +18,12 @@ cargo test --workspace --all-targets
 cargo clippy --workspace --all-targets -- -D warnings
 ./scripts/verify-gui-smoke.sh "$smoke_dir"
 
+nested_wayland=false
+if [ "$(uname -s)" = "Linux" ]; then
+  ./scripts/verify-nested-wayland-smoke.sh "$out_dir/nested-wayland"
+  nested_wayland=true
+fi
+
 cat > "$out_dir/manifest.json" <<EOF
 {
   "name": "backlit-linux-e2e",
@@ -27,13 +33,15 @@ cat > "$out_dir/manifest.json" <<EOF
   "rustc": "$rustc_version",
   "cargo": "$cargo_version",
   "artifacts": {
-    "gui_smoke_manifest": "$smoke_dir/manifest.json"
+    "gui_smoke_manifest": "$smoke_dir/manifest.json",
+    "nested_wayland_manifest": "$out_dir/nested-wayland/manifest.json"
   },
   "checks": {
     "fmt": true,
     "tests": true,
     "clippy": true,
-    "gui_smoke": true
+    "gui_smoke": true,
+    "nested_wayland": $nested_wayland
   }
 }
 EOF

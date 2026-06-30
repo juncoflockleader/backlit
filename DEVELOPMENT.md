@@ -123,7 +123,7 @@ The Linux-side verifier can also be run directly inside any Ubuntu checkout:
 ./scripts/verify-linux-e2e.sh
 ```
 
-It runs `cargo fmt`, workspace tests, `cargo clippy`, and the deterministic GUI smoke verifier, then writes `target/linux-e2e/manifest.json`.
+It runs `cargo fmt`, workspace tests, `cargo clippy`, the deterministic GUI smoke verifier, and the nested Wayland smoke verifier, then writes `target/linux-e2e/manifest.json`.
 
 ## GUI Linux VM Workflow
 
@@ -139,6 +139,14 @@ In another terminal inside the VM:
 export WAYLAND_DISPLAY=parent-wayland
 cargo run -p backlit-compositor -- --backend=wayland --socket=backlit-0 --smoke-test
 ```
+
+The nested Wayland path can be checked without a visible VM desktop by running Weston's headless backend:
+
+```bash
+./scripts/verify-nested-wayland-smoke.sh
+```
+
+This starts a temporary parent Weston compositor, verifies the parent socket with `wayland-info` or `weston-info`, then runs Backlit's Wayland backend preflight and compositor smoke path against that socket.
 
 When the real compositor loop lands, launch clients into Backlit with:
 
@@ -176,6 +184,7 @@ cargo run -p backlit-session-supervisor -- --verify
 cargo run -p backlit-clipboard -- --verify
 cargo run -p backlit-session -- --backend=headless --screenshot target/backlit-session.ppm --verify
 ./scripts/verify-gui-smoke.sh
+./scripts/verify-nested-wayland-smoke.sh
 ./scripts/verify-linux-e2e.sh
 cargo run -p backlit-shell -- --component=all --socket=backlit-0 --verify
 ```
