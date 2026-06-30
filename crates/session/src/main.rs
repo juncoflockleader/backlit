@@ -14,11 +14,15 @@ use backlit_compositor_backend::{
 use backlit_demo_client::{
     render_policy_gui, verify_policy_gui, DEFAULT_DEMO_HEIGHT, DEFAULT_DEMO_WIDTH,
 };
-use backlit_input::run_input_smoke;
+use backlit_input::{
+    run_input_smoke, ButtonState, InputEvent, InputRouter, PointerButton, RoutedAction,
+};
 use backlit_launcher::{default_catalog, resolve_command, LaunchTarget};
 use backlit_shortcuts::{resolve_shortcut, ShortcutAction};
 use backlit_surface::run_surface_lifecycle_smoke;
-use backlit_window_policy::{OutputLayout, SnapTarget, WindowPolicy, WindowState, WorkspaceId};
+use backlit_window_policy::{
+    OutputLayout, Rect, SnapTarget, WindowId, WindowPolicy, WindowState, WorkspaceId,
+};
 
 fn main() {
     if let Err(error) = run() {
@@ -315,6 +319,15 @@ fn run() -> Result<(), String> {
         }
     }
 
+    if let Some(replay_dir) = &config.scripted_replay_dir {
+        let replay_report = run_scripted_replay(&config, &policy, layout, Path::new(replay_dir))?;
+        emit_replay(&config, &replay_report);
+
+        if !replay_report.passed() {
+            return Err(String::from("session scripted replay verification failed"));
+        }
+    }
+
     if config.verify_launch_spawn {
         let launch_spawn_report = verify_launch_spawn(&config);
         emit_launch_spawn(&config, &launch_spawn_report);
@@ -374,6 +387,366 @@ fn initial_session_policy(layout: OutputLayout) -> WindowPolicy {
     policy.move_window(browser, scaled_x(214), scaled_y(260));
 
     policy
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+struct ReplayFrame {
+    checksum: u64,
+    written: bool,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct ScriptedReplayReport {
+    frame_count: u64,
+    frames_written: u64,
+    distinct_checksums: u64,
+    initial_focus: u64,
+    focus_after_switcher: u64,
+    app_switcher_focus_changed: bool,
+    terminal_launch_resolved: bool,
+    launched_window: u64,
+    windows_after_launch: u64,
+    move_begin: bool,
+    move_frame_changed: bool,
+    move_grab_ended: bool,
+    moved_x: u64,
+    moved_y: u64,
+    resize_begin: bool,
+    resize_frame_changed: bool,
+    resize_grab_ended: bool,
+    resized_width: u64,
+    resized_height: u64,
+    snap_frame_ok: bool,
+    workspace_hidden: bool,
+    workspace_switch_ok: bool,
+    final_visible_windows: u64,
+}
+
+impl ScriptedReplayReport {
+    fn passed(&self) -> bool {
+        self.frame_count == 8
+            && self.frames_written == self.frame_count
+            && self.distinct_checksums >= 7
+            && self.initial_focus != 0
+            && self.app_switcher_focus_changed
+            && self.terminal_launch_resolved
+            && self.launched_window != 0
+            && self.windows_after_launch == 4
+            && self.move_begin
+            && self.move_frame_changed
+            && self.move_grab_ended
+            && self.moved_x > 0
+            && self.moved_y > 0
+            && self.resize_begin
+            && self.resize_frame_changed
+            && self.resize_grab_ended
+            && self.resized_width >= 320
+            && self.resized_height >= 220
+            && self.snap_frame_ok
+            && self.workspace_hidden
+            && self.workspace_switch_ok
+            && self.final_visible_windows == 1
+    }
+}
+
+fn run_scripted_replay(
+    config: &Config,
+    policy: &WindowPolicy,
+    layout: OutputLayout,
+    replay_dir: &Path,
+) -> Result<ScriptedReplayReport, String> {
+    fs::create_dir_all(replay_dir)
+        .map_err(|error| format!("failed to create {}: {error}", replay_dir.display()))?;
+
+    let mut router = InputRouter::new(policy.clone(), layout);
+    let mut frames = Vec::new();
+    frames.push(write_replay_frame(
+        config,
+        replay_dir,
+        "00-initial.ppm",
+        router.policy(),
+        layout,
+    )?);
+    let initial_focus = router.policy().focused().map(|id| id.0).unwrap_or(0);
+
+    let focus_after_switcher = match router.route(InputEvent::shortcut("Alt+Tab")) {
+        RoutedAction::AppSwitcher { focused } => focused,
+        _ => None,
+    };
+    frames.push(write_replay_frame(
+        config,
+        replay_dir,
+        "01-app-switcher.ppm",
+        router.policy(),
+        layout,
+    )?);
+    let focus_after_switcher_u64 = focus_after_switcher.map(|id| id.0).unwrap_or(0);
+    let app_switcher_focus_changed =
+        focus_after_switcher_u64 != 0 && focus_after_switcher_u64 != initial_focus;
+
+    let terminal_launch_resolved = matches!(
+        router.route(InputEvent::shortcut("Super+Enter")),
+        RoutedAction::LaunchTarget {
+            target: LaunchTarget::Terminal,
+        }
+    );
+    let launched_window = if terminal_launch_resolved {
+        router.policy_mut().add_window("terminal-2", (320, 220))
+    } else {
+        WindowId(0)
+    };
+    frames.push(write_replay_frame(
+        config,
+        replay_dir,
+        "02-terminal-launch.ppm",
+        router.policy(),
+        layout,
+    )?);
+    let windows_after_launch = router.policy().windows().len() as u64;
+
+    let original = router
+        .policy()
+        .window(launched_window)
+        .map(|window| window.geometry)
+        .unwrap_or(Rect::new(0, 0, 0, 0));
+    let title_x = original.x + 18;
+    let title_y = original.y + 12;
+    router.route(InputEvent::PointerMotion {
+        x: title_x,
+        y: title_y,
+    });
+    let move_begin = matches!(
+        router.route(InputEvent::PointerButton {
+            button: PointerButton::Left,
+            state: ButtonState::Pressed,
+        }),
+        RoutedAction::MoveBegin { window } if window == launched_window
+    );
+    let moved_x_i32 = original.x + 44;
+    let moved_y_i32 = original.y + 36;
+    let move_frame_changed = matches!(
+        router.route(InputEvent::PointerMotion {
+            x: title_x + 44,
+            y: title_y + 36,
+        }),
+        RoutedAction::WindowMoved { window, x, y }
+            if window == launched_window && x == moved_x_i32 && y == moved_y_i32
+    );
+    let move_grab_ended = matches!(
+        router.route(InputEvent::PointerButton {
+            button: PointerButton::Left,
+            state: ButtonState::Released,
+        }),
+        RoutedAction::PointerGrabEnd
+    );
+    frames.push(write_replay_frame(
+        config,
+        replay_dir,
+        "03-window-moved.ppm",
+        router.policy(),
+        layout,
+    )?);
+
+    let resized_from = router
+        .policy()
+        .window(launched_window)
+        .map(|window| window.geometry)
+        .unwrap_or(original);
+    let resize_x = resized_from.x + resized_from.width - 4;
+    let resize_y = resized_from.y + resized_from.height - 4;
+    router.route(InputEvent::PointerMotion {
+        x: resize_x,
+        y: resize_y,
+    });
+    let resize_begin = matches!(
+        router.route(InputEvent::PointerButton {
+            button: PointerButton::Left,
+            state: ButtonState::Pressed,
+        }),
+        RoutedAction::ResizeBegin { window } if window == launched_window
+    );
+    let (resize_frame_changed, resized_width, resized_height) =
+        match router.route(InputEvent::PointerMotion {
+            x: resize_x + 72,
+            y: resize_y + 48,
+        }) {
+            RoutedAction::WindowResized {
+                window,
+                width,
+                height,
+            } if window == launched_window => (true, width as u64, height as u64),
+            _ => (false, 0, 0),
+        };
+    let resize_grab_ended = matches!(
+        router.route(InputEvent::PointerButton {
+            button: PointerButton::Left,
+            state: ButtonState::Released,
+        }),
+        RoutedAction::PointerGrabEnd
+    );
+    frames.push(write_replay_frame(
+        config,
+        replay_dir,
+        "04-window-resized.ppm",
+        router.policy(),
+        layout,
+    )?);
+
+    let snap_frame_ok =
+        router
+            .policy_mut()
+            .snap_window(launched_window, layout.work_area(), SnapTarget::LeftHalf);
+    frames.push(write_replay_frame(
+        config,
+        replay_dir,
+        "05-window-snapped.ppm",
+        router.policy(),
+        layout,
+    )?);
+
+    let moved_to_workspace = router
+        .policy_mut()
+        .move_window_to_workspace(launched_window, WorkspaceId(2));
+    let workspace_hidden = moved_to_workspace
+        && router
+            .policy()
+            .visible_windows()
+            .all(|window| window.id != launched_window);
+    frames.push(write_replay_frame(
+        config,
+        replay_dir,
+        "06-workspace-hidden.ppm",
+        router.policy(),
+        layout,
+    )?);
+
+    let switched_workspace = router.policy_mut().switch_workspace(WorkspaceId(2));
+    let final_visible_windows = router.policy().visible_windows().count() as u64;
+    let workspace_switch_ok =
+        switched_workspace && router.policy().focused() == Some(launched_window);
+    frames.push(write_replay_frame(
+        config,
+        replay_dir,
+        "07-workspace-switched.ppm",
+        router.policy(),
+        layout,
+    )?);
+
+    let frames_written = frames.iter().filter(|frame| frame.written).count() as u64;
+    let mut checksums: Vec<u64> = frames.iter().map(|frame| frame.checksum).collect();
+    checksums.sort_unstable();
+    checksums.dedup();
+
+    Ok(ScriptedReplayReport {
+        frame_count: frames.len() as u64,
+        frames_written,
+        distinct_checksums: checksums.len() as u64,
+        initial_focus,
+        focus_after_switcher: focus_after_switcher_u64,
+        app_switcher_focus_changed,
+        terminal_launch_resolved,
+        launched_window: launched_window.0,
+        windows_after_launch,
+        move_begin,
+        move_frame_changed,
+        move_grab_ended,
+        moved_x: moved_x_i32.max(0) as u64,
+        moved_y: moved_y_i32.max(0) as u64,
+        resize_begin,
+        resize_frame_changed,
+        resize_grab_ended,
+        resized_width,
+        resized_height,
+        snap_frame_ok,
+        workspace_hidden,
+        workspace_switch_ok,
+        final_visible_windows,
+    })
+}
+
+fn write_replay_frame(
+    config: &Config,
+    replay_dir: &Path,
+    file_name: &str,
+    policy: &WindowPolicy,
+    layout: OutputLayout,
+) -> Result<ReplayFrame, String> {
+    let path = replay_dir.join(file_name);
+    let canvas = render_policy_gui(config.width, config.height, policy, layout);
+    canvas
+        .write_ppm(&path)
+        .map_err(|error| format!("failed to write {}: {error}", path.display()))?;
+
+    Ok(ReplayFrame {
+        checksum: canvas.checksum(),
+        written: path.is_file(),
+    })
+}
+
+fn emit_replay(config: &Config, report: &ScriptedReplayReport) {
+    emit(
+        "session.replay",
+        config,
+        &[
+            ("passed", FieldValue::Bool(report.passed())),
+            ("frame_count", FieldValue::U64(report.frame_count)),
+            ("frames_written", FieldValue::U64(report.frames_written)),
+            (
+                "distinct_checksums",
+                FieldValue::U64(report.distinct_checksums),
+            ),
+            ("initial_focus", FieldValue::U64(report.initial_focus)),
+            (
+                "focus_after_switcher",
+                FieldValue::U64(report.focus_after_switcher),
+            ),
+            (
+                "app_switcher_focus_changed",
+                FieldValue::Bool(report.app_switcher_focus_changed),
+            ),
+            (
+                "terminal_launch_resolved",
+                FieldValue::Bool(report.terminal_launch_resolved),
+            ),
+            ("launched_window", FieldValue::U64(report.launched_window)),
+            (
+                "windows_after_launch",
+                FieldValue::U64(report.windows_after_launch),
+            ),
+            ("move_begin", FieldValue::Bool(report.move_begin)),
+            (
+                "move_frame_changed",
+                FieldValue::Bool(report.move_frame_changed),
+            ),
+            ("move_grab_ended", FieldValue::Bool(report.move_grab_ended)),
+            ("moved_x", FieldValue::U64(report.moved_x)),
+            ("moved_y", FieldValue::U64(report.moved_y)),
+            ("resize_begin", FieldValue::Bool(report.resize_begin)),
+            (
+                "resize_frame_changed",
+                FieldValue::Bool(report.resize_frame_changed),
+            ),
+            (
+                "resize_grab_ended",
+                FieldValue::Bool(report.resize_grab_ended),
+            ),
+            ("resized_width", FieldValue::U64(report.resized_width)),
+            ("resized_height", FieldValue::U64(report.resized_height)),
+            ("snap_frame_ok", FieldValue::Bool(report.snap_frame_ok)),
+            (
+                "workspace_hidden",
+                FieldValue::Bool(report.workspace_hidden),
+            ),
+            (
+                "workspace_switch_ok",
+                FieldValue::Bool(report.workspace_switch_ok),
+            ),
+            (
+                "final_visible_windows",
+                FieldValue::U64(report.final_visible_windows),
+            ),
+        ],
+    );
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -1816,6 +2189,7 @@ struct Config {
     verify_systemd_units: bool,
     verify_systemd_activation: bool,
     activate_systemd: bool,
+    scripted_replay_dir: Option<String>,
     systemd_unit_dir: String,
     systemctl_program: String,
     preflight_only: bool,
@@ -1841,6 +2215,7 @@ impl Default for Config {
             verify_systemd_units: false,
             verify_systemd_activation: false,
             activate_systemd: false,
+            scripted_replay_dir: None,
             systemd_unit_dir: String::from("/usr/lib/systemd/user"),
             systemctl_program: String::from("systemctl"),
             preflight_only: false,
@@ -1877,6 +2252,13 @@ impl Config {
                 config.verify_systemd_activation = true;
             } else if arg == "--activate-systemd" {
                 config.activate_systemd = true;
+            } else if let Some(value) = arg.strip_prefix("--scripted-replay-dir=") {
+                config.scripted_replay_dir = Some(value.to_string());
+            } else if arg == "--scripted-replay-dir" {
+                config.scripted_replay_dir = Some(
+                    args.next()
+                        .ok_or_else(|| String::from("missing value for --scripted-replay-dir"))?,
+                );
             } else if let Some(value) = arg.strip_prefix("--systemd-unit-dir=") {
                 config.systemd_unit_dir = value.to_string();
             } else if arg == "--systemd-unit-dir" {
@@ -1980,7 +2362,7 @@ fn print_help() {
 backlit-session
 
 Usage:
-  backlit-session [--backend=headless|wayland|drm] [--socket=backlit-0] [--screenshot=target/backlit-session.ppm] [--verify] [--verify-services] [--verify-systemd-units] [--verify-systemd-activation] [--activate-systemd] [--verify-launch-spawn] [--verify-clean-exit] [--preflight-only]
+  backlit-session [--backend=headless|wayland|drm] [--socket=backlit-0] [--screenshot=target/backlit-session.ppm] [--verify] [--verify-services] [--verify-systemd-units] [--verify-systemd-activation] [--activate-systemd] [--verify-launch-spawn] [--verify-clean-exit] [--scripted-replay-dir=target/session-replay/frames] [--preflight-only]
 
 Flags:
   --backend      Select compositor backend. Defaults to headless.
@@ -1997,6 +2379,8 @@ Flags:
                  Spawn the terminal launch target resolved from Super+Enter.
   --verify-clean-exit
                  Verify session shutdown closes managed windows and clears focus.
+  --scripted-replay-dir
+                 Write and verify scripted interaction frames for focus, launch, move, resize, snap, and workspace switching.
   --verify-systemd-units
                  Verify installed user systemd units for the graphical session.
   --verify-systemd-activation
@@ -2038,6 +2422,8 @@ mod tests {
             "--verify-systemd-units",
             "--verify-systemd-activation",
             "--activate-systemd",
+            "--scripted-replay-dir",
+            "target/session-replay/frames",
             "--systemd-unit-dir",
             "packaging/systemd",
             "--systemctl-program",
@@ -2061,6 +2447,10 @@ mod tests {
         assert!(config.verify_systemd_units);
         assert!(config.verify_systemd_activation);
         assert!(config.activate_systemd);
+        assert_eq!(
+            config.scripted_replay_dir.as_deref(),
+            Some("target/session-replay/frames")
+        );
         assert_eq!(config.systemd_unit_dir, "packaging/systemd");
         assert_eq!(config.systemctl_program, "true");
         assert!(config.preflight_only);

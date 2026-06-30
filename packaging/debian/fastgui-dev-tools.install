@@ -7,5 +7,6 @@ usr/lib/backlit/dev-tools/verify-debian-system-install.sh
 usr/lib/backlit/dev-tools/verify-launch-performance.sh
 usr/lib/backlit/dev-tools/verify-launch-readiness.sh
 usr/lib/backlit/dev-tools/verify-session-launch.sh
+usr/lib/backlit/dev-tools/verify-session-replay.sh
 usr/lib/backlit/dev-tools/verify-drm-session-smoke.sh
 usr/lib/backlit/dev-tools/verify-linux-e2e.sh

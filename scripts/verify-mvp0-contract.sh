@@ -53,6 +53,7 @@ require_executable scripts/verify-debian-package-install.sh
 require_executable scripts/verify-debian-system-install.sh
 require_executable scripts/verify-staged-session-install.sh
 require_executable scripts/verify-nested-wayland-smoke.sh
+require_executable scripts/verify-session-replay.sh
 require_executable scripts/verify-session-clean-exit.sh
 
 require_contains Cargo.toml '"crates/compositor"'
@@ -126,6 +127,7 @@ require_contains scripts/verify-linux-e2e.sh './scripts/verify-debian-system-ins
 require_contains scripts/verify-linux-e2e.sh './scripts/verify-staged-session-install.sh'
 require_contains scripts/verify-linux-e2e.sh './scripts/verify-systemd-activation.sh'
 require_contains scripts/verify-linux-e2e.sh './scripts/verify-drm-session-smoke.sh'
+require_contains scripts/verify-linux-e2e.sh './scripts/verify-session-replay.sh'
 require_contains scripts/verify-linux-e2e.sh './scripts/verify-session-clean-exit.sh'
 require_contains scripts/verify-parallels-linux-e2e.sh '"name": "backlit-parallels-linux-e2e-export"'
 require_contains scripts/verify-parallels-linux-e2e.sh '"guest_e2e_passed": true'
@@ -140,6 +142,9 @@ require_contains scripts/verify-session-launch.sh 'XDG_RUNTIME_DIR XDG_SESSION_I
 require_contains scripts/verify-session-launch.sh '"session_systemd_units": true'
 require_contains scripts/verify-session-launch.sh '"session_systemd_target": true'
 require_contains scripts/verify-session-launch.sh '"session_systemd_launch_plan": true'
+require_contains scripts/verify-session-replay.sh '"session_replay_event": true'
+require_contains scripts/verify-session-replay.sh '"frame_count": $frame_count'
+require_contains scripts/verify-session-replay.sh '"workspace_switch": true'
 require_contains scripts/verify-staged-session-install.sh '--verify-systemd-units'
 require_contains scripts/verify-staged-session-install.sh 'XDG_RUNTIME_DIR XDG_SESSION_ID XDG_SEAT XDG_SESSION_TYPE WAYLAND_DISPLAY XDG_CURRENT_DESKTOP DESKTOP_SESSION'
 require_contains scripts/verify-staged-session-install.sh '"session_systemd_units": true'
@@ -387,6 +392,9 @@ if [ -n "$artifact_root" ] && [ -d "$artifact_root" ]; then
   require_contains "$artifact_root/session-launch/manifest.json" '"session_systemd_units": true'
   require_contains "$artifact_root/session-launch/manifest.json" '"session_systemd_target": true'
   require_contains "$artifact_root/session-launch/manifest.json" '"session_systemd_launch_plan": true'
+  require_contains "$artifact_root/session-replay/manifest.json" '"session_replay_event": true'
+  require_contains "$artifact_root/session-replay/manifest.json" '"frame_count": 8'
+  require_contains "$artifact_root/session-replay/manifest.json" '"workspace_switch": true'
   require_contains "$artifact_root/session-clean-exit/manifest.json" '"clean_exit_event": true'
   require_contains "$artifact_root/session-clean-exit/manifest.json" '"windows_after_shutdown": 0'
   require_contains "$artifact_root/session-clean-exit/manifest.json" '"focus_cleared": true'

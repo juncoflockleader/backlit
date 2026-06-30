@@ -213,6 +213,7 @@ cargo run -p backlit-session -- --backend=headless --screenshot target/backlit-s
 ./scripts/verify-crash-logs.sh
 ./scripts/verify-launch-readiness.sh
 ./scripts/verify-session-launch.sh
+./scripts/verify-session-replay.sh
 ./scripts/verify-session-clean-exit.sh
 ./scripts/verify-drm-session-smoke.sh
 ./scripts/verify-mvp0-contract.sh
@@ -330,6 +331,8 @@ Surface lifecycle is verified by `backlit-surface --verify`, which proves the xd
 
 The session smoke path consumes those routes too: `Alt+Tab` cycles focus and `Super+Enter` resolves the terminal launch path, pointer input verifies focus/move/resize routing, surface lifecycle verifies map/configure/close behavior, spawns the terminal launch target with `WAYLAND_DISPLAY` set when `--verify-launch-spawn` is enabled, renders the preview from `WindowPolicy`, then records the resulting window-policy state in `session.jsonl`.
 
+`./scripts/verify-session-replay.sh` runs `backlit-session --scripted-replay-dir` and writes eight deterministic frames for initial focus, app switcher, terminal launch, window move, window resize, snap, hidden workspace, and switched workspace states.
+
 With `--verify-services`, `backlit-session` also resolves sibling `backlit-compositor`, `backlit-shell`, `backlit-notification-daemon`, and `backlit-settings-daemon` binaries, runs their readiness probes, captures their logs, and emits `session.services_verified`.
 
 With `--verify-clean-exit`, `backlit-session` also requests shutdown, closes all managed windows, clears focus, and emits `session.clean_exit`.
@@ -363,12 +366,13 @@ To capture the current host's launch readiness:
 ```bash
 ./scripts/verify-launch-readiness.sh
 ./scripts/verify-session-launch.sh
+./scripts/verify-session-replay.sh
 ./scripts/verify-session-clean-exit.sh
 ./scripts/verify-drm-session-smoke.sh
 ./scripts/verify-systemd-activation.sh
 ```
 
-These write `target/launch-readiness/manifest.json`, `target/session-launch/manifest.json`, `target/session-clean-exit/manifest.json`, `target/drm-session-smoke/manifest.json`, and `target/systemd-activation/manifest.json`. On macOS or headless CI they can pass with DRM expected-blocked; inside the Parallels Ubuntu GUI VM the wrapper maps the active `parallels` logind session before running E2E, so the manifests should report a user-owned runtime, active local session, accessible DRM card, `input_broker_ready: true`, DRM expected-ready, and ready. Direct `/dev/input/event*` access is recorded separately; when it is unavailable, the manifest should report `input_broker_mode: "logind-libseat"`. The session launch verifier also checks that `packaging/sessions/backlit.desktop` resolves to `backlit-session --backend=drm --activate-systemd`, that `backlit-session --preflight-only` exits cleanly for launchable backends, and that `backlit-session --verify-systemd-units` accepts the `backlit-session.target` user target plus the dry-run `systemctl --user import-environment/start/stop` launch plan for compositor, shell, notification, and settings services. The packaged service units run those services with unbounded `--serve`; bounded `--serve-for-ms` is reserved for automation. The import plan must carry `XDG_RUNTIME_DIR`, `XDG_SESSION_ID`, `XDG_SEAT`, `XDG_SESSION_TYPE`, `WAYLAND_DISPLAY`, `XDG_CURRENT_DESKTOP`, and `DESKTOP_SESSION` into the user manager so DRM/logind preflight sees the same launch context as the session entrypoint. The systemd activation verifier executes that import/start/stop sequence through a fake `systemctl` without mutating the host user manager. The session clean-exit verifier checks requested shutdown from the headless session path. The DRM session smoke verifier runs the full `backlit-session --backend=drm` path with GUI verification, terminal spawn verification, compositor/shell/settings service probes, and clean shutdown when the host is launch-ready.
+These write `target/launch-readiness/manifest.json`, `target/session-launch/manifest.json`, `target/session-replay/manifest.json`, `target/session-clean-exit/manifest.json`, `target/drm-session-smoke/manifest.json`, and `target/systemd-activation/manifest.json`. On macOS or headless CI they can pass with DRM expected-blocked; inside the Parallels Ubuntu GUI VM the wrapper maps the active `parallels` logind session before running E2E, so the manifests should report a user-owned runtime, active local session, accessible DRM card, `input_broker_ready: true`, DRM expected-ready, and ready. Direct `/dev/input/event*` access is recorded separately; when it is unavailable, the manifest should report `input_broker_mode: "logind-libseat"`. The session launch verifier also checks that `packaging/sessions/backlit.desktop` resolves to `backlit-session --backend=drm --activate-systemd`, that `backlit-session --preflight-only` exits cleanly for launchable backends, and that `backlit-session --verify-systemd-units` accepts the `backlit-session.target` user target plus the dry-run `systemctl --user import-environment/start/stop` launch plan for compositor, shell, notification, and settings services. The packaged service units run those services with unbounded `--serve`; bounded `--serve-for-ms` is reserved for automation. The import plan must carry `XDG_RUNTIME_DIR`, `XDG_SESSION_ID`, `XDG_SEAT`, `XDG_SESSION_TYPE`, `WAYLAND_DISPLAY`, `XDG_CURRENT_DESKTOP`, and `DESKTOP_SESSION` into the user manager so DRM/logind preflight sees the same launch context as the session entrypoint. The systemd activation verifier executes that import/start/stop sequence through a fake `systemctl` without mutating the host user manager. The session replay verifier captures deterministic frames for visible focus/launch/move/resize/snap/workspace state changes. The session clean-exit verifier checks requested shutdown from the headless session path. The DRM session smoke verifier runs the full `backlit-session --backend=drm` path with GUI verification, terminal spawn verification, compositor/shell/settings service probes, and clean shutdown when the host is launch-ready.
 
 ## Packaging Contract Verification
 

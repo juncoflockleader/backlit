@@ -116,6 +116,7 @@ uploaded_launch_performance_verifier="/tmp/backlit-verify-launch-performance.sh"
 uploaded_ci_contract_verifier="/tmp/backlit-verify-ci-contract.sh"
 uploaded_launch_readiness_verifier="/tmp/backlit-verify-launch-readiness.sh"
 uploaded_session_launch_verifier="/tmp/backlit-verify-session-launch.sh"
+uploaded_session_replay_verifier="/tmp/backlit-verify-session-replay.sh"
 uploaded_drm_session_smoke_verifier="/tmp/backlit-verify-drm-session-smoke.sh"
 uploaded_service_lifecycle_verifier="/tmp/backlit-verify-service-lifecycle.sh"
 uploaded_mvp0_contract_verifier="/tmp/backlit-verify-mvp0-contract.sh"
@@ -214,6 +215,7 @@ install -m 0755 -o "\$guest_user" -g "\$guest_user" "\$uploaded_launch_performan
 install -m 0755 -o "\$guest_user" -g "\$guest_user" "\$uploaded_ci_contract_verifier" "\$repo_dir/scripts/verify-ci-contract.sh"
 install -m 0755 -o "\$guest_user" -g "\$guest_user" "\$uploaded_launch_readiness_verifier" "\$repo_dir/scripts/verify-launch-readiness.sh"
 install -m 0755 -o "\$guest_user" -g "\$guest_user" "\$uploaded_session_launch_verifier" "\$repo_dir/scripts/verify-session-launch.sh"
+install -m 0755 -o "\$guest_user" -g "\$guest_user" "\$uploaded_session_replay_verifier" "\$repo_dir/scripts/verify-session-replay.sh"
 install -m 0755 -o "\$guest_user" -g "\$guest_user" "\$uploaded_drm_session_smoke_verifier" "\$repo_dir/scripts/verify-drm-session-smoke.sh"
 install -m 0755 -o "\$guest_user" -g "\$guest_user" "\$uploaded_service_lifecycle_verifier" "\$repo_dir/scripts/verify-service-lifecycle.sh"
 install -m 0755 -o "\$guest_user" -g "\$guest_user" "\$uploaded_mvp0_contract_verifier" "\$repo_dir/scripts/verify-mvp0-contract.sh"
@@ -252,6 +254,7 @@ upload_script "$repo_root/scripts/verify-launch-performance.sh" "/tmp/backlit-ve
 upload_script "$repo_root/scripts/verify-ci-contract.sh" "/tmp/backlit-verify-ci-contract.sh"
 upload_script "$repo_root/scripts/verify-launch-readiness.sh" "/tmp/backlit-verify-launch-readiness.sh"
 upload_script "$repo_root/scripts/verify-session-launch.sh" "/tmp/backlit-verify-session-launch.sh"
+upload_script "$repo_root/scripts/verify-session-replay.sh" "/tmp/backlit-verify-session-replay.sh"
 upload_script "$repo_root/scripts/verify-drm-session-smoke.sh" "/tmp/backlit-verify-drm-session-smoke.sh"
 upload_script "$repo_root/scripts/verify-service-lifecycle.sh" "/tmp/backlit-verify-service-lifecycle.sh"
 upload_script "$repo_root/scripts/verify-mvp0-contract.sh" "/tmp/backlit-verify-mvp0-contract.sh"
@@ -274,6 +277,7 @@ host_guest_manifest="$host_out_dir/guest-manifest.json"
 host_gui_smoke_manifest="$host_out_dir/gui-smoke-manifest.json"
 host_gui_preview_manifest="$host_out_dir/gui-preview-manifest.json"
 host_launch_readiness_manifest="$host_out_dir/launch-readiness-manifest.json"
+host_session_replay_manifest="$host_out_dir/session-replay-manifest.json"
 host_drm_session_smoke_manifest="$host_out_dir/drm-session-smoke-manifest.json"
 host_debian_package_build_manifest="$host_out_dir/debian-package-build-manifest.json"
 host_debian_package_install_manifest="$host_out_dir/debian-package-install-manifest.json"
@@ -289,6 +293,7 @@ rm -f \
   "$host_gui_smoke_manifest" \
   "$host_gui_preview_manifest" \
   "$host_launch_readiness_manifest" \
+  "$host_session_replay_manifest" \
   "$host_drm_session_smoke_manifest" \
   "$host_debian_package_build_manifest" \
   "$host_debian_package_install_manifest" \
@@ -303,6 +308,7 @@ download_file "$guest_e2e_dir/manifest.json" "$host_guest_manifest"
 download_file "$guest_e2e_dir/gui-smoke/manifest.json" "$host_gui_smoke_manifest"
 download_file "$guest_e2e_dir/gui-preview/manifest.json" "$host_gui_preview_manifest"
 download_file "$guest_e2e_dir/launch-readiness/manifest.json" "$host_launch_readiness_manifest"
+download_file "$guest_e2e_dir/session-replay/manifest.json" "$host_session_replay_manifest"
 download_file "$guest_e2e_dir/drm-session-smoke/manifest.json" "$host_drm_session_smoke_manifest"
 download_file "$guest_e2e_dir/debian-package-build/manifest.json" "$host_debian_package_build_manifest"
 download_file "$guest_e2e_dir/debian-package-install/manifest.json" "$host_debian_package_install_manifest"
@@ -359,6 +365,9 @@ require_contains "$host_guest_manifest" '"nested_wayland": true'
 require_contains "$host_gui_smoke_manifest" '"golden_checksum": true'
 require_contains "$host_gui_preview_manifest" '"session_verified": true'
 require_contains "$host_gui_preview_manifest" '"session_services": true'
+require_contains "$host_session_replay_manifest" '"session_replay_event": true'
+require_contains "$host_session_replay_manifest" '"frame_count": 8'
+require_contains "$host_session_replay_manifest" '"workspace_switch": true'
 require_contains "$host_launch_readiness_manifest" '"drm_expected_ready": true'
 require_contains "$host_launch_readiness_manifest" '"drm_ready": true'
 require_contains "$host_launch_readiness_manifest" '"xdg_runtime_dir_owned_by_user": true'
@@ -397,6 +406,7 @@ cat > "$host_out_dir/manifest.json" <<EOF
     "gui_smoke_manifest": "$host_gui_smoke_manifest",
     "gui_preview_manifest": "$host_gui_preview_manifest",
     "launch_readiness_manifest": "$host_launch_readiness_manifest",
+    "session_replay_manifest": "$host_session_replay_manifest",
     "drm_session_smoke_manifest": "$host_drm_session_smoke_manifest",
     "debian_package_build_manifest": "$host_debian_package_build_manifest",
     "debian_package_install_manifest": "$host_debian_package_install_manifest",
@@ -413,6 +423,7 @@ cat > "$host_out_dir/manifest.json" <<EOF
     "gui_smoke": true,
     "gui_preview": true,
     "launch_readiness": true,
+    "session_replay": true,
     "parallels_drm_launch_ready": true,
     "drm_session_smoke": true,
     "drm_session_clean_exit": true,

@@ -242,6 +242,7 @@ for verifier in \
   verify-launch-performance.sh \
   verify-launch-readiness.sh \
   verify-session-launch.sh \
+  verify-session-replay.sh \
   verify-drm-session-smoke.sh \
   verify-linux-e2e.sh
 do
@@ -284,6 +285,7 @@ require_deb_contains fastgui-dev-tools usr/lib/backlit/dev-tools/verify-linux-e2
 require_deb_contains fastgui-dev-tools usr/lib/backlit/dev-tools/verify-debian-package-build.sh
 require_deb_contains fastgui-dev-tools usr/lib/backlit/dev-tools/verify-debian-package-install.sh
 require_deb_contains fastgui-dev-tools usr/lib/backlit/dev-tools/verify-debian-system-install.sh
+require_deb_contains fastgui-dev-tools usr/lib/backlit/dev-tools/verify-session-replay.sh
 
 test "$(grep -c '^ Package: fastgui-core$' "$out_dir/fastgui-core.info")" = "1" || fail "fastgui-core info missing package field"
 test "$(grep -c '^ Package: fastgui-desktop$' "$out_dir/fastgui-desktop.info")" = "1" || fail "fastgui-desktop info missing package field"
