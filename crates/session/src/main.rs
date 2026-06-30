@@ -12,7 +12,8 @@ use backlit_compositor_backend::{
     BackendPreflightReport,
 };
 use backlit_demo_client::{
-    render_policy_gui, verify_policy_gui, DEFAULT_DEMO_HEIGHT, DEFAULT_DEMO_WIDTH,
+    render_policy_gui, render_policy_gui_with_overlay, verify_policy_gui, verify_session_overlay,
+    SessionOverlay, DEFAULT_DEMO_HEIGHT, DEFAULT_DEMO_WIDTH,
 };
 use backlit_input::{
     run_input_smoke, ButtonState, InputEvent, InputRouter, PointerButton, RoutedAction,
@@ -393,6 +394,7 @@ fn initial_session_policy(layout: OutputLayout) -> WindowPolicy {
 struct ReplayFrame {
     checksum: u64,
     written: bool,
+    overlay_verified: bool,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -404,6 +406,9 @@ struct ScriptedReplayReport {
     focus_after_switcher: u64,
     app_switcher_focus_changed: bool,
     terminal_launch_resolved: bool,
+    launcher_overlay_opened: bool,
+    launcher_overlay_frame: bool,
+    app_switcher_overlay_frame: bool,
     launched_window: u64,
     windows_after_launch: u64,
     move_begin: bool,
@@ -424,12 +429,15 @@ struct ScriptedReplayReport {
 
 impl ScriptedReplayReport {
     fn passed(&self) -> bool {
-        self.frame_count == 8
+        self.frame_count == 9
             && self.frames_written == self.frame_count
-            && self.distinct_checksums >= 7
+            && self.distinct_checksums >= 8
             && self.initial_focus != 0
             && self.app_switcher_focus_changed
             && self.terminal_launch_resolved
+            && self.launcher_overlay_opened
+            && self.launcher_overlay_frame
+            && self.app_switcher_overlay_frame
             && self.launched_window != 0
             && self.windows_after_launch == 4
             && self.move_begin
@@ -466,6 +474,7 @@ fn run_scripted_replay(
         "00-initial.ppm",
         router.policy(),
         layout,
+        None,
     )?);
     let initial_focus = router.policy().focused().map(|id| id.0).unwrap_or(0);
 
@@ -479,10 +488,34 @@ fn run_scripted_replay(
         "01-app-switcher.ppm",
         router.policy(),
         layout,
+        Some(SessionOverlay::AppSwitcher),
     )?);
     let focus_after_switcher_u64 = focus_after_switcher.map(|id| id.0).unwrap_or(0);
     let app_switcher_focus_changed =
         focus_after_switcher_u64 != 0 && focus_after_switcher_u64 != initial_focus;
+    let app_switcher_overlay_frame = frames
+        .last()
+        .map(|frame| frame.overlay_verified)
+        .unwrap_or(false);
+
+    let launcher_overlay_opened = matches!(
+        router.route(InputEvent::shortcut("Super+Space")),
+        RoutedAction::Shortcut {
+            action: ShortcutAction::OpenLauncher,
+        }
+    );
+    frames.push(write_replay_frame(
+        config,
+        replay_dir,
+        "02-launcher-open.ppm",
+        router.policy(),
+        layout,
+        Some(SessionOverlay::Launcher),
+    )?);
+    let launcher_overlay_frame = frames
+        .last()
+        .map(|frame| frame.overlay_verified)
+        .unwrap_or(false);
 
     let terminal_launch_resolved = matches!(
         router.route(InputEvent::shortcut("Super+Enter")),
@@ -498,9 +531,10 @@ fn run_scripted_replay(
     frames.push(write_replay_frame(
         config,
         replay_dir,
-        "02-terminal-launch.ppm",
+        "03-terminal-launch.ppm",
         router.policy(),
         layout,
+        None,
     )?);
     let windows_after_launch = router.policy().windows().len() as u64;
 
@@ -542,9 +576,10 @@ fn run_scripted_replay(
     frames.push(write_replay_frame(
         config,
         replay_dir,
-        "03-window-moved.ppm",
+        "04-window-moved.ppm",
         router.policy(),
         layout,
+        None,
     )?);
 
     let resized_from = router
@@ -587,9 +622,10 @@ fn run_scripted_replay(
     frames.push(write_replay_frame(
         config,
         replay_dir,
-        "04-window-resized.ppm",
+        "05-window-resized.ppm",
         router.policy(),
         layout,
+        None,
     )?);
 
     let snap_frame_ok =
@@ -599,9 +635,10 @@ fn run_scripted_replay(
     frames.push(write_replay_frame(
         config,
         replay_dir,
-        "05-window-snapped.ppm",
+        "06-window-snapped.ppm",
         router.policy(),
         layout,
+        None,
     )?);
 
     let moved_to_workspace = router
@@ -615,9 +652,10 @@ fn run_scripted_replay(
     frames.push(write_replay_frame(
         config,
         replay_dir,
-        "06-workspace-hidden.ppm",
+        "07-workspace-hidden.ppm",
         router.policy(),
         layout,
+        None,
     )?);
 
     let switched_workspace = router.policy_mut().switch_workspace(WorkspaceId(2));
@@ -627,9 +665,10 @@ fn run_scripted_replay(
     frames.push(write_replay_frame(
         config,
         replay_dir,
-        "07-workspace-switched.ppm",
+        "08-workspace-switched.ppm",
         router.policy(),
         layout,
+        None,
     )?);
 
     let frames_written = frames.iter().filter(|frame| frame.written).count() as u64;
@@ -645,6 +684,9 @@ fn run_scripted_replay(
         focus_after_switcher: focus_after_switcher_u64,
         app_switcher_focus_changed,
         terminal_launch_resolved,
+        launcher_overlay_opened,
+        launcher_overlay_frame,
+        app_switcher_overlay_frame,
         launched_window: launched_window.0,
         windows_after_launch,
         move_begin,
@@ -670,9 +712,11 @@ fn write_replay_frame(
     file_name: &str,
     policy: &WindowPolicy,
     layout: OutputLayout,
+    overlay: Option<SessionOverlay>,
 ) -> Result<ReplayFrame, String> {
     let path = replay_dir.join(file_name);
-    let canvas = render_policy_gui(config.width, config.height, policy, layout);
+    let canvas =
+        render_policy_gui_with_overlay(config.width, config.height, policy, layout, overlay);
     canvas
         .write_ppm(&path)
         .map_err(|error| format!("failed to write {}: {error}", path.display()))?;
@@ -680,6 +724,9 @@ fn write_replay_frame(
     Ok(ReplayFrame {
         checksum: canvas.checksum(),
         written: path.is_file(),
+        overlay_verified: overlay
+            .map(|overlay| verify_session_overlay(&canvas, overlay))
+            .unwrap_or(true),
     })
 }
 
@@ -707,6 +754,18 @@ fn emit_replay(config: &Config, report: &ScriptedReplayReport) {
             (
                 "terminal_launch_resolved",
                 FieldValue::Bool(report.terminal_launch_resolved),
+            ),
+            (
+                "launcher_overlay_opened",
+                FieldValue::Bool(report.launcher_overlay_opened),
+            ),
+            (
+                "launcher_overlay_frame",
+                FieldValue::Bool(report.launcher_overlay_frame),
+            ),
+            (
+                "app_switcher_overlay_frame",
+                FieldValue::Bool(report.app_switcher_overlay_frame),
             ),
             ("launched_window", FieldValue::U64(report.launched_window)),
             (

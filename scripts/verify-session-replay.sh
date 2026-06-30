@@ -11,7 +11,7 @@ session_log="$out_dir/session.jsonl"
 session_err="$out_dir/session.stderr"
 initial_screenshot="$out_dir/initial.ppm"
 frames_dir="$out_dir/frames"
-expected_frame_count="8"
+expected_frame_count="9"
 expected_ppm_bytes="1248015"
 
 fail() {
@@ -30,10 +30,13 @@ grep '"event":"session.gui_ready"' "$session_log" >/dev/null
 grep '"event":"session.verified"' "$session_log" >/dev/null
 grep '"event":"session.replay"' "$session_log" >/dev/null
 grep '"passed":true' "$session_log" >/dev/null
-grep '"frame_count":8' "$session_log" >/dev/null
-grep '"frames_written":8' "$session_log" >/dev/null
-grep '"distinct_checksums":7' "$session_log" >/dev/null
+grep '"frame_count":9' "$session_log" >/dev/null
+grep '"frames_written":9' "$session_log" >/dev/null
+grep '"distinct_checksums":8' "$session_log" >/dev/null
 grep '"app_switcher_focus_changed":true' "$session_log" >/dev/null
+grep '"app_switcher_overlay_frame":true' "$session_log" >/dev/null
+grep '"launcher_overlay_opened":true' "$session_log" >/dev/null
+grep '"launcher_overlay_frame":true' "$session_log" >/dev/null
 grep '"terminal_launch_resolved":true' "$session_log" >/dev/null
 grep '"windows_after_launch":4' "$session_log" >/dev/null
 grep '"move_begin":true' "$session_log" >/dev/null
@@ -50,12 +53,13 @@ grep '"final_visible_windows":1' "$session_log" >/dev/null
 for frame in \
   00-initial.ppm \
   01-app-switcher.ppm \
-  02-terminal-launch.ppm \
-  03-window-moved.ppm \
-  04-window-resized.ppm \
-  05-window-snapped.ppm \
-  06-workspace-hidden.ppm \
-  07-workspace-switched.ppm
+  02-launcher-open.ppm \
+  03-terminal-launch.ppm \
+  04-window-moved.ppm \
+  05-window-resized.ppm \
+  06-window-snapped.ppm \
+  07-workspace-hidden.ppm \
+  08-workspace-switched.ppm
 do
   frame_path="$frames_dir/$frame"
   test -s "$frame_path" || fail "missing replay frame $frame_path"
@@ -86,9 +90,12 @@ cat > "$out_dir/manifest.json" <<EOF
     "session_verified": true,
     "session_replay_event": true,
     "frame_count": $frame_count,
-    "frames_written": 8,
-    "distinct_checksums": 7,
+    "frames_written": 9,
+    "distinct_checksums": 8,
     "app_switcher_focus_changed": true,
+    "app_switcher_overlay_frame": true,
+    "launcher_overlay_opened": true,
+    "launcher_overlay_frame": true,
     "terminal_launch": true,
     "move_frame": true,
     "resize_frame": true,

@@ -331,7 +331,7 @@ Surface lifecycle is verified by `backlit-surface --verify`, which proves the xd
 
 The session smoke path consumes those routes too: `Alt+Tab` cycles focus and `Super+Enter` resolves the terminal launch path, pointer input verifies focus/move/resize routing, surface lifecycle verifies map/configure/close behavior, spawns the terminal launch target with `WAYLAND_DISPLAY` set when `--verify-launch-spawn` is enabled, renders the preview from `WindowPolicy`, then records the resulting window-policy state in `session.jsonl`.
 
-`./scripts/verify-session-replay.sh` runs `backlit-session --scripted-replay-dir` and writes eight deterministic frames for initial focus, app switcher, terminal launch, window move, window resize, snap, hidden workspace, and switched workspace states.
+`./scripts/verify-session-replay.sh` runs `backlit-session --scripted-replay-dir` and writes nine deterministic frames for initial focus, app switcher overlay, launcher overlay, terminal launch, window move, window resize, snap, hidden workspace, and switched workspace states.
 
 With `--verify-services`, `backlit-session` also resolves sibling `backlit-compositor`, `backlit-shell`, `backlit-notification-daemon`, and `backlit-settings-daemon` binaries, runs their readiness probes, captures their logs, and emits `session.services_verified`.
 

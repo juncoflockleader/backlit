@@ -31,11 +31,23 @@ const GRAPH: Color = Color::rgb(223, 148, 67);
 const POINTER: Color = Color::rgb(255, 255, 255);
 const WORKSPACE_ACTIVE: Color = Color::rgb(42, 129, 196);
 const WORKSPACE_INACTIVE: Color = Color::rgb(155, 166, 181);
+const OVERLAY_SURFACE: Color = Color::rgb(31, 39, 52);
+const OVERLAY_SHADOW: Color = Color::rgb(5, 7, 11);
+const OVERLAY_FIELD: Color = Color::rgb(237, 241, 244);
+const OVERLAY_ROW: Color = Color::rgb(49, 60, 77);
+const OVERLAY_SELECTED: Color = Color::rgb(43, 112, 153);
+const OVERLAY_TEXT: Color = Color::rgb(224, 232, 238);
 
 pub const DEFAULT_DEMO_WIDTH: u32 = 800;
 pub const DEFAULT_DEMO_HEIGHT: u32 = 520;
 pub const GOLDEN_DEMO_CHECKSUM: u64 = 5_635_038_614_353_063_225;
 pub const SESSION_PREVIEW_CHECKSUM: u64 = 15_888_844_850_457_870_477;
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum SessionOverlay {
+    Launcher,
+    AppSwitcher,
+}
 
 #[derive(Debug, Clone)]
 pub struct Canvas {
@@ -203,6 +215,16 @@ pub fn render_policy_gui(
     policy: &WindowPolicy,
     layout: OutputLayout,
 ) -> Canvas {
+    render_policy_gui_with_overlay(width, height, policy, layout, None)
+}
+
+pub fn render_policy_gui_with_overlay(
+    width: u32,
+    height: u32,
+    policy: &WindowPolicy,
+    layout: OutputLayout,
+    overlay: Option<SessionOverlay>,
+) -> Canvas {
     let width = width.max(320);
     let height = height.max(220);
     let mut canvas = Canvas::new(width, height, BACKGROUND);
@@ -222,6 +244,12 @@ pub fn render_policy_gui(
             policy.focused() == Some(window.id),
             layout,
         );
+    }
+
+    match overlay {
+        Some(SessionOverlay::Launcher) => draw_launcher_overlay(&mut canvas),
+        Some(SessionOverlay::AppSwitcher) => draw_app_switcher_overlay(&mut canvas, policy),
+        None => {}
     }
 
     draw_pointer(
@@ -313,6 +341,23 @@ pub fn verify_policy_gui(
     }
 }
 
+pub fn verify_session_overlay(canvas: &Canvas, overlay: SessionOverlay) -> bool {
+    match overlay {
+        SessionOverlay::Launcher => {
+            canvas.pixel(100, 68) == Some(OVERLAY_SURFACE)
+                && canvas.pixel(120, 144) == Some(OVERLAY_SELECTED)
+                && canvas.pixel(124, 88) == Some(OVERLAY_FIELD)
+        }
+        SessionOverlay::AppSwitcher => {
+            let x = centered_x(canvas, 360);
+            let y = 72;
+            canvas.pixel(x + 10, y + 10) == Some(OVERLAY_SURFACE)
+                && canvas.pixel(x + 28, y + 50) == Some(OVERLAY_SELECTED)
+                && canvas.pixel(x + 48, y + 64) == Some(OVERLAY_TEXT)
+        }
+    }
+}
+
 fn fnv1a(hash: u64, byte: u8) -> u64 {
     (hash ^ byte as u64).wrapping_mul(0x00000100000001b3)
 }
@@ -345,6 +390,69 @@ fn draw_launcher(canvas: &mut Canvas) {
         let y = 68 + index * 42;
         canvas.fill_rect(19, y, 36, 28, Color::rgb(88, 101, 124));
         canvas.fill_rect(26, y + 7, 22, 14, Color::rgb(236, 238, 241));
+    }
+}
+
+fn draw_launcher_overlay(canvas: &mut Canvas) {
+    let rect = Rect::new(96, 64, 304, 224);
+    fill_rect_i32(
+        canvas,
+        Rect::new(rect.x + 8, rect.y + 10, rect.width, rect.height),
+        OVERLAY_SHADOW,
+    );
+    fill_rect_i32(canvas, rect, OVERLAY_SURFACE);
+    fill_rect_i32(canvas, Rect::new(rect.x, rect.y, rect.width, 4), FOCUS_RING);
+    fill_rect_i32(
+        canvas,
+        Rect::new(rect.x + 24, rect.y + 20, rect.width - 48, 32),
+        OVERLAY_FIELD,
+    );
+    fill_rect_i32(
+        canvas,
+        Rect::new(rect.x + 40, rect.y + 33, rect.width - 112, 6),
+        Color::rgb(93, 106, 122),
+    );
+
+    for index in 0..3 {
+        let y = rect.y + 70 + index * 46;
+        let color = if index == 0 {
+            OVERLAY_SELECTED
+        } else {
+            OVERLAY_ROW
+        };
+        fill_rect_i32(
+            canvas,
+            Rect::new(rect.x + 18, y, rect.width - 36, 34),
+            color,
+        );
+        fill_rect_i32(canvas, Rect::new(rect.x + 34, y + 10, 18, 14), OVERLAY_TEXT);
+        draw_overlay_text_bars(canvas, rect.x + 68, y + 11, 8 + index as u32);
+    }
+}
+
+fn draw_app_switcher_overlay(canvas: &mut Canvas, policy: &WindowPolicy) {
+    let width = 360;
+    let rect = Rect::new(centered_x(canvas, width) as i32, 72, width as i32, 126);
+    fill_rect_i32(
+        canvas,
+        Rect::new(rect.x + 8, rect.y + 10, rect.width, rect.height),
+        OVERLAY_SHADOW,
+    );
+    fill_rect_i32(canvas, rect, OVERLAY_SURFACE);
+    fill_rect_i32(canvas, Rect::new(rect.x, rect.y, rect.width, 4), FOCUS_RING);
+    draw_overlay_text_bars(canvas, rect.x + 18, rect.y + 18, 10);
+
+    let focused = policy.focused();
+    for (index, window) in policy.visible_windows().take(3).enumerate() {
+        let x = rect.x + 18 + index as i32 * 108;
+        let color = if focused == Some(window.id) {
+            OVERLAY_SELECTED
+        } else {
+            OVERLAY_ROW
+        };
+        fill_rect_i32(canvas, Rect::new(x, rect.y + 48, 92, 58), color);
+        fill_rect_i32(canvas, Rect::new(x + 12, rect.y + 60, 24, 18), OVERLAY_TEXT);
+        draw_overlay_text_bars(canvas, x + 12, rect.y + 86, window.title.len() as u32);
     }
 }
 
@@ -610,6 +718,17 @@ fn draw_label_bars_i32(canvas: &mut Canvas, x: i32, y: i32, count: u32) {
     }
 }
 
+fn draw_overlay_text_bars(canvas: &mut Canvas, x: i32, y: i32, count: u32) {
+    for index in 0..count.min(12) {
+        let width = 6 + (index % 2) * 5;
+        fill_rect_i32(
+            canvas,
+            Rect::new(x + (index * 12) as i32, y, width as i32, 7),
+            OVERLAY_TEXT,
+        );
+    }
+}
+
 fn fill_rect_i32(canvas: &mut Canvas, rect: Rect, color: Color) {
     let Some((x, y, width, height)) = clip_rect(canvas, rect) else {
         return;
@@ -656,6 +775,10 @@ fn active_workspace_pixel(canvas: &Canvas, policy: &WindowPolicy) -> Option<Colo
     canvas.pixel(114 + workspace_index * 18, 18)
 }
 
+fn centered_x(canvas: &Canvas, width: u32) -> u32 {
+    canvas.width().saturating_sub(width) / 2
+}
+
 fn sample_rect_pixel(canvas: &Canvas, rect: Rect) -> Option<Color> {
     let (x, y, _, _) = clip_rect(canvas, rect)?;
     canvas.pixel(x, y)
@@ -667,6 +790,7 @@ mod tests {
         render_demo_gui, render_policy_gui, verify_demo_gui, verify_policy_gui, Color, BACKGROUND,
         FOCUSED_TITLE_BAR, GOLDEN_DEMO_CHECKSUM, SESSION_PREVIEW_CHECKSUM,
     };
+    use super::{render_policy_gui_with_overlay, verify_session_overlay, SessionOverlay};
     use backlit_window_policy::{OutputLayout, WindowPolicy, WorkspaceId};
 
     #[test]
@@ -722,5 +846,42 @@ mod tests {
 
         assert_eq!(policy.visible_windows().count(), 0);
         assert_eq!(canvas.pixel(528, 368), Some(BACKGROUND));
+    }
+
+    #[test]
+    fn renders_launcher_overlay() {
+        let layout = OutputLayout::new(800, 520, 42);
+        let mut policy = WindowPolicy::default();
+        policy.add_window("terminal", (310, 178));
+
+        let canvas = render_policy_gui_with_overlay(
+            800,
+            520,
+            &policy,
+            layout,
+            Some(SessionOverlay::Launcher),
+        );
+
+        assert!(verify_session_overlay(&canvas, SessionOverlay::Launcher));
+    }
+
+    #[test]
+    fn renders_app_switcher_overlay() {
+        let layout = OutputLayout::new(800, 520, 42);
+        let mut policy = WindowPolicy::default();
+        policy.add_window("terminal", (310, 178));
+        policy.add_window("settings", (280, 170));
+        policy.add_window("browser", (374, 188));
+        assert!(policy.focus(policy.windows()[0].id));
+
+        let canvas = render_policy_gui_with_overlay(
+            800,
+            520,
+            &policy,
+            layout,
+            Some(SessionOverlay::AppSwitcher),
+        );
+
+        assert!(verify_session_overlay(&canvas, SessionOverlay::AppSwitcher));
     }
 }
