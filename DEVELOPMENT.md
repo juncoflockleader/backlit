@@ -128,7 +128,7 @@ The Linux-side verifier can also be run directly inside any Ubuntu checkout:
 ./scripts/verify-linux-e2e.sh
 ```
 
-It runs `cargo fmt`, workspace tests, `cargo clippy`, the deterministic GUI smoke verifier, the preview renderer, launch-performance verifier, CI contract verifier, packaging contract verifier, staged session install verifier, launch-readiness verifier, session launch verifier, nested Wayland smoke verifier, and MVP 0 contract verifier, then writes `target/linux-e2e/manifest.json`.
+It runs `cargo fmt`, workspace tests, `cargo clippy`, the deterministic GUI smoke verifier, the preview renderer, launch-performance verifier, CI contract verifier, packaging contract verifier, staged session install verifier, launch-readiness verifier, session launch verifier, session clean-exit verifier, nested Wayland smoke verifier, and MVP 0 contract verifier, then writes `target/linux-e2e/manifest.json`.
 
 ## GUI Linux VM Workflow
 
@@ -190,13 +190,14 @@ cargo run -p backlit-input -- --verify
 cargo run -p backlit-surface -- --verify
 cargo run -p backlit-session-supervisor -- --verify
 cargo run -p backlit-clipboard -- --verify
-cargo run -p backlit-session -- --backend=headless --screenshot target/backlit-session.ppm --verify --verify-services
+cargo run -p backlit-session -- --backend=headless --screenshot target/backlit-session.ppm --verify --verify-services --verify-clean-exit
 ./scripts/render-gui-preview.sh
 ./scripts/render-parallels-gui-preview.sh
 ./scripts/verify-gui-smoke.sh
 ./scripts/verify-launch-performance.sh
 ./scripts/verify-launch-readiness.sh
 ./scripts/verify-session-launch.sh
+./scripts/verify-session-clean-exit.sh
 ./scripts/verify-drm-session-smoke.sh
 ./scripts/verify-mvp0-contract.sh
 ./scripts/verify-ci-contract.sh
@@ -280,6 +281,8 @@ The session smoke path consumes those routes too: `Alt+Tab` cycles focus and `Su
 
 With `--verify-services`, `backlit-session` also resolves sibling `backlit-compositor` and `backlit-shell` binaries, runs their readiness probes, captures their logs, and emits `session.services_verified`.
 
+With `--verify-clean-exit`, `backlit-session` also requests shutdown, closes all managed windows, clears focus, and emits `session.clean_exit`.
+
 Session verification also checks output-aware geometry: maximized windows use the panel-reserved work area, while fullscreen uses the whole output.
 
 Move and resize behavior is also verified through the session smoke path before maximize/fullscreen checks run.
@@ -307,10 +310,11 @@ To capture the current host's launch readiness:
 ```bash
 ./scripts/verify-launch-readiness.sh
 ./scripts/verify-session-launch.sh
+./scripts/verify-session-clean-exit.sh
 ./scripts/verify-drm-session-smoke.sh
 ```
 
-These write `target/launch-readiness/manifest.json`, `target/session-launch/manifest.json`, and `target/drm-session-smoke/manifest.json`. On macOS or headless CI they can pass with DRM expected-blocked; inside the Parallels Ubuntu GUI VM they should report DRM expected-ready and ready. The session launch verifier also checks that `packaging/sessions/backlit.desktop` resolves to `backlit-session` and that `backlit-session --preflight-only` exits cleanly for launchable backends. The DRM session smoke verifier runs the full `backlit-session --backend=drm` path with GUI verification, terminal spawn verification, and compositor/shell service probes when the host is launch-ready.
+These write `target/launch-readiness/manifest.json`, `target/session-launch/manifest.json`, `target/session-clean-exit/manifest.json`, and `target/drm-session-smoke/manifest.json`. On macOS or headless CI they can pass with DRM expected-blocked; inside the Parallels Ubuntu GUI VM they should report DRM expected-ready and ready. The session launch verifier also checks that `packaging/sessions/backlit.desktop` resolves to `backlit-session` and that `backlit-session --preflight-only` exits cleanly for launchable backends. The session clean-exit verifier checks requested shutdown from the headless session path. The DRM session smoke verifier runs the full `backlit-session --backend=drm` path with GUI verification, terminal spawn verification, and compositor/shell service probes when the host is launch-ready.
 
 ## Packaging Contract Verification
 

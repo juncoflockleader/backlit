@@ -25,7 +25,7 @@ cargo run -p backlit-surface -- --verify
 cargo run -p backlit-session-supervisor -- --verify
 cargo run -p backlit-clipboard -- --verify
 cargo run -p backlit-shell -- --component=all --verify
-cargo run -p backlit-session -- --backend=headless --screenshot target/backlit-session.ppm --verify --verify-services
+cargo run -p backlit-session -- --backend=headless --screenshot target/backlit-session.ppm --verify --verify-services --verify-clean-exit
 ./scripts/render-gui-preview.sh
 ./scripts/render-parallels-gui-preview.sh
 ./scripts/verify-gui-smoke.sh
@@ -33,6 +33,7 @@ cargo run -p backlit-session -- --backend=headless --screenshot target/backlit-s
 ./scripts/verify-ci-contract.sh
 ./scripts/verify-launch-readiness.sh
 ./scripts/verify-session-launch.sh
+./scripts/verify-session-clean-exit.sh
 ./scripts/verify-drm-session-smoke.sh
 ./scripts/verify-mvp0-contract.sh
 ./scripts/verify-packaging-contract.sh
@@ -40,7 +41,7 @@ cargo run -p backlit-session -- --backend=headless --screenshot target/backlit-s
 ./scripts/verify-linux-e2e.sh
 ```
 
-The preview renderer writes `target/gui-preview/backlit-session.ppm` and, on macOS, a PNG you can open. The Parallels preview renderer runs the same path in Ubuntu and copies the artifact back to `target/gui-preview-parallels/`. The smoke verifier writes a top-level artifact manifest to `target/gui-smoke/manifest.json`; the perf smoke checks render/present time, idle no-redraw behavior, and targeted surface damage; the launch-performance verifier enforces MVP startup, shell-ready, and terminal-hotkey budgets from built binaries; the launch-readiness verifier records whether the current host has the runtime, DRM, input, and session state needed for the future DRM backend; the session launch verifier checks the desktop session entry and `backlit-session --preflight-only`; the DRM session smoke verifier runs the full DRM session path on launch-ready Linux hosts; the MVP 0 contract verifier checks that the executable harness still covers the design deliverables. CI runs the same Linux E2E gate on GitHub Actions.
+The preview renderer writes `target/gui-preview/backlit-session.ppm` and, on macOS, a PNG you can open. The Parallels preview renderer runs the same path in Ubuntu and copies the artifact back to `target/gui-preview-parallels/`. The smoke verifier writes a top-level artifact manifest to `target/gui-smoke/manifest.json`; the perf smoke checks render/present time, idle no-redraw behavior, and targeted surface damage; the launch-performance verifier enforces MVP startup, shell-ready, and terminal-hotkey budgets from built binaries; the launch-readiness verifier records whether the current host has the runtime, DRM, input, and session state needed for the future DRM backend; the session launch verifier checks the desktop session entry and `backlit-session --preflight-only`; the session clean-exit verifier checks that requested shutdown closes managed windows and clears focus; the DRM session smoke verifier runs the full DRM session path on launch-ready Linux hosts; the MVP 0 contract verifier checks that the executable harness still covers the design deliverables. CI runs the same Linux E2E gate on GitHub Actions.
 
 When a Parallels Ubuntu VM is available, the full Linux guest verification can be run from macOS with:
 
@@ -49,6 +50,6 @@ When a Parallels Ubuntu VM is available, the full Linux guest verification can b
 ./scripts/render-parallels-gui-preview.sh
 ```
 
-The session smoke path also verifies input and toplevel lifecycle interactions: app switching, terminal launch resolution, pointer-driven focus, move/resize routing, xdg-shell-style map/configure/maximize/fullscreen/close behavior, and deterministic terminal spawn with `WAYLAND_DISPLAY` propagation.
+The session smoke path also verifies input and toplevel lifecycle interactions: app switching, terminal launch resolution, pointer-driven focus, move/resize routing, xdg-shell-style map/configure/maximize/fullscreen/close behavior, clean session shutdown, and deterministic terminal spawn with `WAYLAND_DISPLAY` propagation.
 
 See [DEVELOPMENT.md](DEVELOPMENT.md) for environment setup, VM workflow, project layout, and contribution rules.

@@ -41,6 +41,10 @@ fn run() -> Result<(), String> {
         &[
             ("verify", FieldValue::Bool(config.verify)),
             ("verify_services", FieldValue::Bool(config.verify_services)),
+            (
+                "verify_clean_exit",
+                FieldValue::Bool(config.verify_clean_exit),
+            ),
             ("preflight_only", FieldValue::Bool(config.preflight_only)),
         ],
     );
@@ -238,6 +242,15 @@ fn run() -> Result<(), String> {
 
         if !service_report.passed() {
             return Err(String::from("session service verification failed"));
+        }
+    }
+
+    if config.verify_clean_exit {
+        let clean_exit_report = verify_session_clean_exit(&mut policy);
+        emit_clean_exit(&config, &clean_exit_report);
+
+        if !clean_exit_report.passed() {
+            return Err(String::from("session clean exit verification failed"));
         }
     }
 
@@ -631,6 +644,60 @@ fn emit_launch_spawn(config: &Config, report: &LaunchSpawnReport) {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+struct CleanExitReport {
+    requested: bool,
+    windows_before_shutdown: u64,
+    windows_closed: u64,
+    windows_after_shutdown: u64,
+    focus_cleared: bool,
+}
+
+impl CleanExitReport {
+    fn passed(self) -> bool {
+        self.requested
+            && self.windows_before_shutdown > 0
+            && self.windows_closed == self.windows_before_shutdown
+            && self.windows_after_shutdown == 0
+            && self.focus_cleared
+    }
+}
+
+fn verify_session_clean_exit(policy: &mut WindowPolicy) -> CleanExitReport {
+    let windows_before_shutdown = policy.windows().len() as u64;
+    let windows_closed = policy.close_all_windows() as u64;
+    let windows_after_shutdown = policy.windows().len() as u64;
+
+    CleanExitReport {
+        requested: true,
+        windows_before_shutdown,
+        windows_closed,
+        windows_after_shutdown,
+        focus_cleared: policy.focused().is_none(),
+    }
+}
+
+fn emit_clean_exit(config: &Config, report: &CleanExitReport) {
+    emit(
+        "session.clean_exit",
+        config,
+        &[
+            ("passed", FieldValue::Bool(report.passed())),
+            ("requested", FieldValue::Bool(report.requested)),
+            (
+                "windows_before_shutdown",
+                FieldValue::U64(report.windows_before_shutdown),
+            ),
+            ("windows_closed", FieldValue::U64(report.windows_closed)),
+            (
+                "windows_after_shutdown",
+                FieldValue::U64(report.windows_after_shutdown),
+            ),
+            ("focus_cleared", FieldValue::Bool(report.focus_cleared)),
+        ],
+    );
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 struct InteractionReport {
     initial_focus: u64,
     focus_after_switcher: u64,
@@ -802,6 +869,7 @@ struct Config {
     height: u32,
     verify: bool,
     verify_services: bool,
+    verify_clean_exit: bool,
     preflight_only: bool,
     verify_launch_spawn: bool,
     launch_spawn_program: Option<String>,
@@ -821,6 +889,7 @@ impl Default for Config {
             height: DEFAULT_DEMO_HEIGHT,
             verify: false,
             verify_services: false,
+            verify_clean_exit: false,
             preflight_only: false,
             verify_launch_spawn: false,
             launch_spawn_program: None,
@@ -847,6 +916,8 @@ impl Config {
                 config.verify = true;
             } else if arg == "--verify-services" {
                 config.verify_services = true;
+            } else if arg == "--verify-clean-exit" {
+                config.verify_clean_exit = true;
             } else if arg == "--preflight-only" {
                 config.preflight_only = true;
             } else if arg == "--verify-launch-spawn" {
@@ -938,7 +1009,7 @@ fn print_help() {
 backlit-session
 
 Usage:
-  backlit-session [--backend=headless|wayland|drm] [--socket=backlit-0] [--screenshot=target/backlit-session.ppm] [--verify] [--verify-services] [--verify-launch-spawn] [--preflight-only]
+  backlit-session [--backend=headless|wayland|drm] [--socket=backlit-0] [--screenshot=target/backlit-session.ppm] [--verify] [--verify-services] [--verify-launch-spawn] [--verify-clean-exit] [--preflight-only]
 
 Flags:
   --backend      Select compositor backend. Defaults to headless.
@@ -953,6 +1024,8 @@ Flags:
                  Fail if sibling compositor and shell probes cannot launch.
   --verify-launch-spawn
                  Spawn the terminal launch target resolved from Super+Enter.
+  --verify-clean-exit
+                 Verify session shutdown closes managed windows and clears focus.
   --launch-spawn-program
                  Override terminal program for deterministic spawn verification.
   --launch-spawn-arg
@@ -974,6 +1047,7 @@ mod tests {
         let config = Config::parse([
             "--verify",
             "--verify-services",
+            "--verify-clean-exit",
             "--preflight-only",
             "--verify-launch-spawn",
             "--launch-spawn-program",
@@ -989,6 +1063,7 @@ mod tests {
 
         assert!(config.verify);
         assert!(config.verify_services);
+        assert!(config.verify_clean_exit);
         assert!(config.preflight_only);
         assert!(config.verify_launch_spawn);
         assert_eq!(config.launch_spawn_program.as_deref(), Some("true"));

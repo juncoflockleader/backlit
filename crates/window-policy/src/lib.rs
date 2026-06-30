@@ -115,6 +115,13 @@ impl WindowPolicy {
         self.remove_window(id)
     }
 
+    pub fn close_all_windows(&mut self) -> usize {
+        let closed = self.windows.len();
+        self.windows.clear();
+        self.focused = None;
+        closed
+    }
+
     pub fn focus(&mut self, id: WindowId) -> bool {
         if self.windows.iter().any(|window| window.id == id) {
             self.focused = Some(id);
@@ -294,6 +301,17 @@ mod tests {
 
         assert_eq!(policy.remove_window(second).unwrap().title, "browser");
         assert_eq!(policy.focused(), Some(first));
+    }
+
+    #[test]
+    fn closing_all_windows_clears_focus() {
+        let mut policy = WindowPolicy::default();
+        policy.add_window("terminal", (800, 600));
+        policy.add_window("browser", (1200, 800));
+
+        assert_eq!(policy.close_all_windows(), 2);
+        assert!(policy.windows().is_empty());
+        assert_eq!(policy.focused(), None);
     }
 
     #[test]

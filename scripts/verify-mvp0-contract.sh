@@ -38,6 +38,7 @@ require_executable scripts/verify-ci-contract.sh
 require_executable scripts/verify-packaging-contract.sh
 require_executable scripts/verify-staged-session-install.sh
 require_executable scripts/verify-nested-wayland-smoke.sh
+require_executable scripts/verify-session-clean-exit.sh
 
 require_contains Cargo.toml '"crates/compositor"'
 require_contains Cargo.toml '"crates/compositor-backend"'
@@ -67,6 +68,7 @@ require_contains scripts/verify-linux-e2e.sh './scripts/verify-ci-contract.sh'
 require_contains scripts/verify-linux-e2e.sh './scripts/verify-packaging-contract.sh'
 require_contains scripts/verify-linux-e2e.sh './scripts/verify-staged-session-install.sh'
 require_contains scripts/verify-linux-e2e.sh './scripts/verify-drm-session-smoke.sh'
+require_contains scripts/verify-linux-e2e.sh './scripts/verify-session-clean-exit.sh'
 
 require_contains packaging/sessions/backlit.desktop 'Exec=backlit-session'
 require_contains packaging/systemd/backlit-compositor.service 'ExecStart=/usr/bin/backlit-compositor'
@@ -83,6 +85,7 @@ if [ -n "$artifact_root" ] && [ -d "$artifact_root" ]; then
   require_file "$artifact_root/ci-contract/manifest.json"
   require_file "$artifact_root/packaging-contract/manifest.json"
   require_file "$artifact_root/staged-session-install/manifest.json"
+  require_file "$artifact_root/session-clean-exit/manifest.json"
   require_file "$artifact_root/drm-session-smoke/manifest.json"
 
   require_contains "$artifact_root/gui-smoke/manifest.json" '"protocol_required_count": 7'
@@ -110,6 +113,9 @@ if [ -n "$artifact_root" ] && [ -d "$artifact_root" ]; then
   require_contains "$artifact_root/staged-session-install/manifest.json" '"desktop_exec_resolves": true'
   require_contains "$artifact_root/staged-session-install/manifest.json" '"staged_session_gui": true'
   require_contains "$artifact_root/staged-session-install/manifest.json" '"staged_session_services": true'
+  require_contains "$artifact_root/session-clean-exit/manifest.json" '"clean_exit_event": true'
+  require_contains "$artifact_root/session-clean-exit/manifest.json" '"windows_after_shutdown": 0'
+  require_contains "$artifact_root/session-clean-exit/manifest.json" '"focus_cleared": true'
   require_contains "$artifact_root/drm-session-smoke/manifest.json" '"name": "backlit-drm-session-smoke"'
 
   if [ -f "$artifact_root/nested-wayland/manifest.json" ]; then
@@ -147,6 +153,7 @@ cat > "$out_dir/manifest.json" <<EOF
     "golden_gui": true,
     "viewable_preview": true,
     "session_services": true,
+    "session_clean_exit": true,
     "packaging_skeleton": true,
     "staged_session_install": true,
     "drm_session_smoke": true,

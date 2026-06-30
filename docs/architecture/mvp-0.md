@@ -19,6 +19,7 @@ MVP 0 is the development harness:
 - Session move/resize smoke through pure window policy.
 - Minimized-window focus skipping in session smoke.
 - Focus fallback after closing a window.
+- Clean session shutdown smoke for closing managed windows and clearing focus.
 - Output work-area policy for panel-aware maximize and fullscreen geometry.
 - Session supervisor crash isolation smoke.
 - Clipboard state smoke for text owner, replacement, and clearing.
@@ -31,7 +32,7 @@ MVP 0 is the development harness:
 - Headless frame damage smoke for no idle redraws and targeted surface damage.
 - Launch performance budget verifier for session GUI readiness, shell readiness, and terminal hotkey spawn.
 - JSON metrics.
-- Linux E2E verifier for fmt, tests, clippy, GUI smoke, launch performance, packaging contract, and nested Wayland smoke inside an Ubuntu guest.
+- Linux E2E verifier for fmt, tests, clippy, GUI smoke, launch performance, packaging contract, session clean exit, and nested Wayland smoke inside an Ubuntu guest.
 - GitHub Actions Linux E2E workflow with artifact upload and local contract verification.
 - MVP 0 contract verifier that checks the executable harness still covers the design deliverables and, inside E2E, validates the generated artifact manifests.
 - Parallels runner for repeatable macOS-to-Ubuntu guest verification.

@@ -35,6 +35,7 @@ cargo run -p backlit-session -- \
   --launch-spawn-program=true \
   --wayland-display=backlit-0 \
   --verify-services \
+  --verify-clean-exit \
   --service-log-dir="$out_dir/session-services" > "$out_dir/session.jsonl"
 cargo run -p backlit-demo-client -- \
   --output="$out_dir/demo-client.ppm" \
@@ -50,6 +51,7 @@ grep '"event":"session.verified"' "$out_dir/session.jsonl" >/dev/null
 grep '"event":"session.interactions"' "$out_dir/session.jsonl" >/dev/null
 grep '"event":"session.launch_spawn"' "$out_dir/session.jsonl" >/dev/null
 grep '"event":"session.services_verified"' "$out_dir/session.jsonl" >/dev/null
+grep '"event":"session.clean_exit"' "$out_dir/session.jsonl" >/dev/null
 grep '"windows_after_launch":4' "$out_dir/session.jsonl" >/dev/null
 grep '"terminal_launch_resolved":true' "$out_dir/session.jsonl" >/dev/null
 grep '"shortcut_resolved":true' "$out_dir/session.jsonl" >/dev/null
@@ -75,6 +77,10 @@ grep '"compositor_ready":true' "$out_dir/session.jsonl" >/dev/null
 grep '"shell_ready":true' "$out_dir/session.jsonl" >/dev/null
 grep '"children_exited_cleanly":true' "$out_dir/session.jsonl" >/dev/null
 grep '"logs_written":true' "$out_dir/session.jsonl" >/dev/null
+grep '"windows_before_shutdown":3' "$out_dir/session.jsonl" >/dev/null
+grep '"windows_closed":3' "$out_dir/session.jsonl" >/dev/null
+grep '"windows_after_shutdown":0' "$out_dir/session.jsonl" >/dev/null
+grep '"focus_cleared":true' "$out_dir/session.jsonl" >/dev/null
 grep "\"checksum\":$expected_checksum" "$out_dir/session.jsonl" >/dev/null
 grep '"event":"backend.preflight"' "$out_dir/backend-preflight.jsonl" >/dev/null
 grep '"ready":true' "$out_dir/backend-preflight.jsonl" >/dev/null
@@ -177,6 +183,7 @@ cat > "$out_dir/manifest.json" <<EOF
     "session_windows_after_launch": 4,
     "session_launch_spawn": true,
     "session_services": true,
+    "session_clean_exit": true,
     "session_move_resize": true,
     "session_minimize_skips_focus": true,
     "session_close_fallback_focus": true,
