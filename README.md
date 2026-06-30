@@ -25,4 +25,6 @@ cargo run -p backlit-shell -- --component=all --verify
 
 The smoke verifier writes a top-level artifact manifest to `target/gui-smoke/manifest.json`.
 
+The session smoke path also verifies dry-run shortcut interactions: app switching and terminal launch resolution.
+
 See [DEVELOPMENT.md](DEVELOPMENT.md) for environment setup, VM workflow, project layout, and contribution rules.

@@ -11,5 +11,6 @@ publish = false
 backlit-common = { path = "../common" }
 backlit-compositor-backend = { path = "../compositor-backend" }
 backlit-demo-client = { path = "../demo-client" }
+backlit-launcher = { path = "../launcher" }
+backlit-shortcuts = { path = "../shortcuts" }
 backlit-window-policy = { path = "../window-policy" }
-

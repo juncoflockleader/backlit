@@ -8,6 +8,8 @@ use backlit_compositor_backend::BackendKind;
 use backlit_demo_client::{
     render_demo_gui, verify_demo_gui, DEFAULT_DEMO_HEIGHT, DEFAULT_DEMO_WIDTH,
 };
+use backlit_launcher::{default_catalog, LaunchTarget};
+use backlit_shortcuts::{resolve_shortcut, ShortcutAction};
 use backlit_window_policy::WindowPolicy;
 
 fn main() {
@@ -66,6 +68,32 @@ fn run() -> Result<(), String> {
 
     if config.verify {
         let report = verify_demo_gui(&canvas);
+        let interaction_report = verify_session_interactions(&policy);
+
+        emit(
+            "session.interactions",
+            &config,
+            &[
+                ("passed", FieldValue::Bool(interaction_report.passed())),
+                (
+                    "initial_focus",
+                    FieldValue::U64(interaction_report.initial_focus),
+                ),
+                (
+                    "focus_after_switcher",
+                    FieldValue::U64(interaction_report.focus_after_switcher),
+                ),
+                (
+                    "windows_after_launch",
+                    FieldValue::U64(interaction_report.windows_after_launch),
+                ),
+                (
+                    "terminal_launch_resolved",
+                    FieldValue::Bool(interaction_report.terminal_launch_resolved),
+                ),
+            ],
+        );
+
         emit(
             "session.verified",
             &config,
@@ -84,7 +112,7 @@ fn run() -> Result<(), String> {
             ],
         );
 
-        if !report.passed() {
+        if !report.passed() || !interaction_report.passed() {
             return Err(String::from("headless GUI verification failed"));
         }
     }
@@ -99,6 +127,53 @@ fn run() -> Result<(), String> {
     );
 
     Ok(())
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+struct InteractionReport {
+    initial_focus: u64,
+    focus_after_switcher: u64,
+    windows_after_launch: u64,
+    terminal_launch_resolved: bool,
+}
+
+impl InteractionReport {
+    fn passed(self) -> bool {
+        self.initial_focus != 0
+            && self.focus_after_switcher != 0
+            && self.focus_after_switcher != self.initial_focus
+            && self.windows_after_launch == 4
+            && self.terminal_launch_resolved
+    }
+}
+
+fn verify_session_interactions(policy: &WindowPolicy) -> InteractionReport {
+    let mut policy = policy.clone();
+    let initial_focus = policy.focused().map(|id| id.0).unwrap_or(0);
+
+    let focus_after_switcher = match resolve_shortcut("Alt+Tab") {
+        Some(ShortcutAction::AppSwitcherNext) => policy.cycle_focus_forward().map(|id| id.0),
+        _ => None,
+    }
+    .unwrap_or(0);
+
+    let terminal_launch_resolved = match resolve_shortcut("Super+Enter") {
+        Some(ShortcutAction::Launch(LaunchTarget::Terminal)) => default_catalog()
+            .iter()
+            .any(|command| command.target == LaunchTarget::Terminal),
+        _ => false,
+    };
+
+    if terminal_launch_resolved {
+        policy.add_window("terminal-2", (800, 600));
+    }
+
+    InteractionReport {
+        initial_focus,
+        focus_after_switcher,
+        windows_after_launch: policy.windows().len() as u64,
+        terminal_launch_resolved,
+    }
 }
 
 fn emit(event: &str, config: &Config, fields: &[(&str, FieldValue<'_>)]) {

@@ -177,6 +177,8 @@ The launcher catalog is verified in dry-run mode for the first required targets:
 
 Keyboard shortcut routing is also verified in dry-run mode for launcher, terminal, browser, settings, and app-switcher actions.
 
+The session smoke path consumes those dry-run routes too: `Alt+Tab` cycles focus and `Super+Enter` resolves the terminal launch path, then records the resulting window-policy state in `session.jsonl`.
+
 Backend preflight can be run directly:
 
 ```bash

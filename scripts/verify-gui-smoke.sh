@@ -26,6 +26,9 @@ cargo run -p backlit-demo-client -- \
   --verify > "$out_dir/demo-client.jsonl"
 
 grep '"event":"session.verified"' "$out_dir/session.jsonl" >/dev/null
+grep '"event":"session.interactions"' "$out_dir/session.jsonl" >/dev/null
+grep '"windows_after_launch":4' "$out_dir/session.jsonl" >/dev/null
+grep '"terminal_launch_resolved":true' "$out_dir/session.jsonl" >/dev/null
 grep '"passed":true' "$out_dir/session.jsonl" >/dev/null
 grep '"golden_ok":true' "$out_dir/session.jsonl" >/dev/null
 grep "\"checksum\":$expected_checksum" "$out_dir/session.jsonl" >/dev/null
@@ -83,6 +86,7 @@ cat > "$out_dir/manifest.json" <<EOF
     "shell_required_components": 4,
     "launcher_required_targets": 3,
     "shortcut_required_bindings": 6,
+    "session_windows_after_launch": 4,
     "session_ppm_bytes": $session_ppm_bytes,
     "demo_ppm_bytes": $demo_ppm_bytes,
     "golden_checksum": true

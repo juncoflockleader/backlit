@@ -67,6 +67,8 @@ dependencies = [
  "backlit-common",
  "backlit-compositor-backend",
  "backlit-demo-client",
+ "backlit-launcher",
+ "backlit-shortcuts",
  "backlit-window-policy",
 ]
 
