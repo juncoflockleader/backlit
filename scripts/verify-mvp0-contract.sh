@@ -316,6 +316,7 @@ if [ -n "$artifact_root" ] && [ -d "$artifact_root" ]; then
   fi
   require_contains "$artifact_root/debian-package-install/manifest.json" '"package_install_checked": true'
   if grep '"debs_extracted": true' "$artifact_root/debian-package-install/manifest.json" >/dev/null; then
+    require_contains "$artifact_root/debian-package-install/manifest.json" '"dpkg_root_install": true'
     require_contains "$artifact_root/debian-package-install/manifest.json" '"fastgui_core_closure": true'
     require_contains "$artifact_root/debian-package-install/manifest.json" '"session_exec_from_extracted_debs": true'
     require_contains "$artifact_root/debian-package-install/manifest.json" '"session_systemd_units_from_extracted_debs": true'

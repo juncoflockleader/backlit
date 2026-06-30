@@ -52,7 +52,7 @@ MVP 0 is the development harness:
 - Packaging contract verifier for session desktop entry, Backlit user target, systemd units, and Debian package split.
 - Package manifest verifier for the `fastgui-core` bare-session meta package and Debian `.install` file ownership split.
 - Debian package-build verifier that assembles and inspects real `fastgui-*` `.deb` artifacts on Linux.
-- Debian package-install verifier that extracts the `fastgui-core` package closure and launches the GUI/session verifier from the extracted install tree.
+- Debian package-install verifier that installs the `fastgui-core` package closure into a disposable dpkg root and launches the GUI/session verifier from the installed tree.
 - Staged session install verifier for fake `/usr` layout, systemd launch-plan resolution, launch command resolution, and headless GUI verification from staged binaries.
 - CI.
 - Packaging skeleton.

@@ -7,6 +7,8 @@ cd "$repo_root"
 out_dir="${1:-target/debian-package-install}"
 package_build_dir="$out_dir/package-build"
 install_root="$out_dir/install-root"
+dpkg_status_file="$install_root/var/lib/dpkg/status"
+dpkg_install_log="$out_dir/dpkg-install.log"
 session_log="$out_dir/session.jsonl"
 systemd_units_log="$out_dir/systemd-units.jsonl"
 settings_app_log="$out_dir/settings-app.jsonl"
@@ -42,6 +44,7 @@ write_skipped_manifest() {
   "passed": true,
   "package_install_checked": true,
   "debs_extracted": false,
+  "debs_installed": false,
   "install_blocked_expected": true,
   "install_blocked_reason": "$reason",
   "artifacts": {
@@ -50,6 +53,7 @@ write_skipped_manifest() {
   "checks": {
     "package_install_checked": true,
     "install_blocked_expected": true,
+    "dpkg_root_install": false,
     "fastgui_core_closure": false,
     "session_exec_from_extracted_debs": false,
     "session_systemd_units_from_extracted_debs": false,
@@ -68,8 +72,8 @@ if [ "$(uname -s)" != "Linux" ]; then
   exit 0
 fi
 
-if ! command -v dpkg-deb >/dev/null 2>&1; then
-  write_skipped_manifest "missing-dpkg-deb"
+if ! command -v dpkg-deb >/dev/null 2>&1 || ! command -v dpkg >/dev/null 2>&1; then
+  write_skipped_manifest "missing-dpkg-tools"
   exit 0
 fi
 
@@ -92,8 +96,13 @@ deb_for() {
 }
 
 rm -rf "$install_root"
-mkdir -p "$install_root"
+mkdir -p "$install_root/var/lib/dpkg" \
+  "$install_root/var/lib/dpkg/info" \
+  "$install_root/var/lib/dpkg/updates" \
+  "$install_root/var/lib/dpkg/triggers"
+touch "$dpkg_status_file"
 
+install_debs=""
 for package in \
   fastgui-compositor \
   fastgui-shell \
@@ -102,8 +111,47 @@ for package in \
   fastgui-core
 do
   deb="$(deb_for "$package")"
-  dpkg-deb -x "$deb" "$install_root"
   dpkg-deb -f "$deb" > "$out_dir/$package.fields"
+  install_debs="$install_debs $deb"
+done
+
+dpkg --force-not-root --root="$install_root" --install $install_debs > "$dpkg_install_log" 2>&1
+
+require_status_installed() {
+  package="$1"
+  awk -v package="$package" '
+    /^Package: / {
+      in_package = ($2 == package)
+      status_ok = 0
+      next
+    }
+    in_package && /^Status: install ok installed$/ {
+      status_ok = 1
+      next
+    }
+    in_package && NF == 0 {
+      if (status_ok) {
+        found = 1
+      }
+      in_package = 0
+    }
+    END {
+      if (in_package && status_ok) {
+        found = 1
+      }
+      exit(found ? 0 : 1)
+    }
+  ' "$dpkg_status_file" || fail "dpkg status missing installed package $package"
+}
+
+for package in \
+  fastgui-compositor \
+  fastgui-shell \
+  fastgui-settings \
+  fastgui-session \
+  fastgui-core
+do
+  require_status_installed "$package"
 done
 
 bin_dir="$install_root/usr/bin"
@@ -191,10 +239,13 @@ cat > "$manifest" <<EOF
   "passed": true,
   "package_install_checked": true,
   "debs_extracted": true,
+  "debs_installed": true,
   "install_blocked_expected": false,
   "install_root": "$install_root",
   "artifacts": {
     "package_build_manifest": "$build_manifest",
+    "dpkg_install_log": "$dpkg_install_log",
+    "dpkg_status_file": "$dpkg_status_file",
     "session_desktop": "$session_desktop",
     "settings_desktop": "$settings_desktop",
     "systemd_units_log": "$systemd_units_log",
@@ -206,6 +257,7 @@ cat > "$manifest" <<EOF
   "checks": {
     "package_install_checked": true,
     "install_blocked_expected": false,
+    "dpkg_root_install": true,
     "fastgui_core_closure": true,
     "session_exec_from_extracted_debs": true,
     "session_systemd_units_from_extracted_debs": true,

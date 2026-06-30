@@ -29,7 +29,7 @@ Current launch-readiness checks:
 - `scripts/verify-compositor-runtime.sh` runs `backlit-compositor --scripted-client --serve --serve-for-ms=25`, proving the service runtime can map app-like surfaces, avoid idle redraws, process targeted damage, damage the output on surface close, and cleanly remove client surfaces on disconnect.
 - `scripts/verify-package-manifests.sh` verifies the `fastgui-core` bare-session package contract and Debian `.install` file ownership for runtime binaries, session units, desktop entries, portal backend, and development verifiers.
 - `scripts/verify-debian-package-build.sh` builds and inspects real `fastgui-*` `.deb` artifacts on Linux so `fastgui-core` is no longer only a control-file promise.
-- `scripts/verify-debian-package-install.sh` extracts the `fastgui-core` package closure and runs `backlit-session` from the extracted `/usr/bin` tree, proving the package output still launches and verifies the GUI/session path.
+- `scripts/verify-debian-package-install.sh` installs the `fastgui-core` package closure into a disposable dpkg root and runs `backlit-session` from the installed `/usr/bin` tree, proving the package output still launches and verifies the GUI/session path.
 - `backlit-perf --verify` verifies a deterministic 60-frame drag pacing smoke with zero dropped frames and pointer-to-frame p99 under 16 ms.
 - `backlit-compositor -- --smoke-test` verifies direct-scanout eligibility policy for opaque fullscreen dmabuf surfaces, including overlay and SHM blockers.
 - `backlit-notification-daemon --verify` verifies notification service behavior that the session launches with shell services.

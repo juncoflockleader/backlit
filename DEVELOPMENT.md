@@ -380,7 +380,7 @@ It writes `target/packaging-contract/manifest.json` by default.
 
 ## Staged Session Install Verification
 
-The Debian package-build verifier assembles the `fastgui-*` package roots from `packaging/debian/*.install`, builds `.deb` artifacts with `dpkg-deb` on Linux, and inspects `fastgui-core`, runtime package contents, and package dependencies. The Debian package-install verifier extracts the `fastgui-core` dependency closure from those `.deb`s, then runs `backlit-session --backend=headless --verify --verify-services --verify-clean-exit` from the extracted `/usr/bin` tree. On non-Debian hosts both write expected-blocked manifests so the same E2E script remains usable from macOS.
+The Debian package-build verifier assembles the `fastgui-*` package roots from `packaging/debian/*.install`, builds `.deb` artifacts with `dpkg-deb` on Linux, and inspects `fastgui-core`, runtime package contents, and package dependencies. The Debian package-install verifier installs the `fastgui-core` dependency closure into a disposable `dpkg --root` tree, checks dpkg status, then runs `backlit-session --backend=headless --verify --verify-services --verify-clean-exit` from the installed `/usr/bin` tree. On non-Debian hosts both write expected-blocked manifests so the same E2E script remains usable from macOS.
 
 The staged install verifier builds the session, compositor, shell, and settings daemon binaries, lays them out under a fake `/usr`, installs the session desktop entry, `backlit-session.target`, and user systemd units, and verifies that all launch commands resolve to staged executables. The systemd activation verifier separately proves the session launcher can execute the target import/start/stop command sequence:
 
