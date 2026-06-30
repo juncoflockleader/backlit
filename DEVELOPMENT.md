@@ -146,7 +146,7 @@ The nested Wayland path can be checked without a visible VM desktop by running W
 ./scripts/verify-nested-wayland-smoke.sh
 ```
 
-This starts a temporary parent Weston compositor, verifies the parent socket with `wayland-info` or `weston-info`, then runs Backlit's Wayland backend preflight and compositor smoke path against that socket.
+This starts a temporary parent Weston compositor, verifies the parent socket with `wayland-info` or `weston-info`, then runs Backlit's Wayland backend preflight, compositor smoke path, and `backlit-session --backend=wayland --verify-services` path against that socket.
 
 When the real compositor loop lands, launch clients into Backlit with:
 

@@ -5,7 +5,7 @@ MVP 0 is the development harness:
 - Cargo workspace.
 - Headless compositor entrypoint and backend state model.
 - Backend preflight checks for headless, nested Wayland, and DRM launch paths.
-- Nested Wayland backend flag and Weston-backed smoke verifier.
+- Nested Wayland backend flag and Weston-backed compositor/session smoke verifier.
 - Pure window-policy logic.
 - MVP shell role smoke checks.
 - Dry-run launcher catalog for terminal, browser, and settings.

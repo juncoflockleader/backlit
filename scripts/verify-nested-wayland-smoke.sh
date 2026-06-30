@@ -61,12 +61,26 @@ test -S "$XDG_RUNTIME_DIR/$socket_name"
 WAYLAND_DISPLAY="$socket_name" timeout 5s "$info_tool" > "$out_dir/wayland-info.txt"
 WAYLAND_DISPLAY="$socket_name" cargo run -p backlit-compositor-backend -- --backend=wayland --verify > "$out_dir/backend-preflight.jsonl"
 WAYLAND_DISPLAY="$socket_name" cargo run -p backlit-compositor -- --backend=wayland --socket=backlit-0 --smoke-test > "$out_dir/compositor.jsonl"
+cargo build -p backlit-session -p backlit-compositor -p backlit-shell
+WAYLAND_DISPLAY="$socket_name" cargo run -p backlit-session -- \
+  --backend=wayland \
+  --socket=backlit-0 \
+  --screenshot="$out_dir/session.ppm" \
+  --verify \
+  --verify-services \
+  --service-log-dir="$out_dir/session-services" > "$out_dir/session.jsonl"
 
 grep '"event":"backend.preflight"' "$out_dir/backend-preflight.jsonl" >/dev/null
 grep '"backend":"wayland"' "$out_dir/backend-preflight.jsonl" >/dev/null
 grep '"ready":true' "$out_dir/backend-preflight.jsonl" >/dev/null
 grep '"event":"compositor.smoke_test"' "$out_dir/compositor.jsonl" >/dev/null
 grep '"backend":"wayland"' "$out_dir/compositor.jsonl" >/dev/null
+grep '"event":"session.services_verified"' "$out_dir/session.jsonl" >/dev/null
+grep '"backend":"wayland"' "$out_dir/session.jsonl" >/dev/null
+grep '"compositor_ready":true' "$out_dir/session.jsonl" >/dev/null
+grep '"shell_ready":true' "$out_dir/session.jsonl" >/dev/null
+grep '"children_exited_cleanly":true' "$out_dir/session.jsonl" >/dev/null
+test -s "$out_dir/session.ppm"
 
 cat > "$out_dir/manifest.json" <<EOF
 {
@@ -80,12 +94,16 @@ cat > "$out_dir/manifest.json" <<EOF
     "weston_log": "$out_dir/weston.log",
     "wayland_info": "$out_dir/wayland-info.txt",
     "backend_preflight_log": "$out_dir/backend-preflight.jsonl",
-    "compositor_log": "$out_dir/compositor.jsonl"
+    "compositor_log": "$out_dir/compositor.jsonl",
+    "session_log": "$out_dir/session.jsonl",
+    "session_screenshot": "$out_dir/session.ppm",
+    "session_services_dir": "$out_dir/session-services"
   },
   "checks": {
     "parent_socket_ready": true,
     "wayland_preflight_ready": true,
-    "compositor_wayland_smoke": true
+    "compositor_wayland_smoke": true,
+    "session_wayland_services": true
   }
 }
 EOF
