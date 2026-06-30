@@ -217,6 +217,10 @@ grep -F '"entry_resolved":true' "$session_log" >/dev/null || fail "session deskt
 grep -F '"entry_program":"backlit-settings"' "$session_log" >/dev/null || fail "session desktop launch did not parse Settings program"
 grep -F '"program_resolved":true' "$session_log" >/dev/null || fail "session desktop launch program did not resolve"
 grep -F '"exit_success":true' "$session_log" >/dev/null || fail "session desktop launch did not exit successfully"
+grep -F '"managed_window_mapped":true' "$session_log" >/dev/null || fail "session desktop launch did not map a managed Settings window"
+grep -F '"managed_window_app_id":"org.backlit.Settings.desktop"' "$session_log" >/dev/null || fail "session desktop launch did not preserve Settings app id"
+grep -F '"managed_windows_after_launch":4' "$session_log" >/dev/null || fail "session desktop launch did not add a managed window"
+grep -F '"focused_launched_window":true' "$session_log" >/dev/null || fail "session desktop launch did not focus launched Settings window"
 grep -F '"compositor_resolved":true' "$session_log" >/dev/null || fail "session compositor binary did not resolve from /usr/bin"
 grep -F '"compositor_ready":true' "$session_log" >/dev/null || fail "session compositor service did not become ready"
 grep -F '"compositor_demo_client_resolved":true' "$session_log" >/dev/null || fail "session demo client binary did not resolve from /usr/bin"
@@ -284,6 +288,7 @@ cat > "$manifest" <<EOF
     "session_services_from_system_install": true,
     "session_compositor_demo_client_from_system_install": true,
     "session_desktop_launch_from_system_install": true,
+    "session_desktop_managed_window_from_system_install": true,
     "session_replay_from_system_install": true,
     "session_clean_exit_from_system_install": true,
     "settings_app_from_system_install": true,

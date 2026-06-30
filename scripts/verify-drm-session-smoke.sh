@@ -228,6 +228,10 @@ if [ "$drm_expected_ready" = true ]; then
   grep '"entry_program":"sh"' "$session_log" >/dev/null
   grep '"entry_arg_count":2' "$session_log" >/dev/null
   grep '"program_resolved":true' "$session_log" >/dev/null
+  grep '"managed_window_mapped":true' "$session_log" >/dev/null
+  grep '"managed_window_app_id":"org.backlit.SpawnProbe.desktop"' "$session_log" >/dev/null
+  grep '"managed_windows_after_launch":4' "$session_log" >/dev/null
+  grep '"focused_launched_window":true' "$session_log" >/dev/null
   grep '"compositor_ready":true' "$session_log" >/dev/null
   grep '"compositor_service_socket_bound":true' "$session_log" >/dev/null
   grep '"compositor_demo_client_resolved":true' "$session_log" >/dev/null
@@ -291,6 +295,7 @@ cat > "$out_dir/manifest.json" <<EOF
     "settings_service": $drm_session_smoke_ready,
     "session_compositor_demo_client": $drm_session_smoke_ready,
     "session_desktop_launch": $drm_session_smoke_ready,
+    "session_desktop_managed_window": $drm_session_smoke_ready,
     "notification_service": $drm_session_smoke_ready,
     "workspace_switch": $drm_session_smoke_ready,
     "snap": $drm_session_smoke_ready,

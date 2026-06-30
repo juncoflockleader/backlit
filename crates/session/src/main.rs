@@ -343,7 +343,7 @@ fn run() -> Result<(), String> {
     }
 
     if config.verify_desktop_launch {
-        let desktop_launch_report = verify_desktop_launch(&config)?;
+        let desktop_launch_report = verify_desktop_launch(&config, &policy)?;
         emit_desktop_launch(&config, &desktop_launch_report);
 
         if !desktop_launch_report.passed() {
@@ -2301,6 +2301,12 @@ struct DesktopLaunchReport {
     exit_success: bool,
     status_code: u64,
     wayland_display_set: bool,
+    managed_window_mapped: bool,
+    managed_window_id: u64,
+    managed_window_title: String,
+    managed_window_app_id: String,
+    managed_windows_after_launch: u64,
+    focused_launched_window: bool,
     elapsed_ms: u64,
 }
 
@@ -2311,10 +2317,15 @@ impl DesktopLaunchReport {
             && self.spawned
             && self.exit_success
             && self.wayland_display_set
+            && self.managed_window_mapped
+            && self.focused_launched_window
     }
 }
 
-fn verify_desktop_launch(config: &Config) -> Result<DesktopLaunchReport, String> {
+fn verify_desktop_launch(
+    config: &Config,
+    policy: &WindowPolicy,
+) -> Result<DesktopLaunchReport, String> {
     let started = Instant::now();
     let selector = config.desktop_entry.clone().unwrap_or_default();
     let directories = desktop_launch_dirs(config);
@@ -2342,6 +2353,12 @@ fn verify_desktop_launch(config: &Config) -> Result<DesktopLaunchReport, String>
             exit_success: false,
             status_code: 255,
             wayland_display_set: wayland_display.is_some(),
+            managed_window_mapped: false,
+            managed_window_id: 0,
+            managed_window_title: String::new(),
+            managed_window_app_id: String::new(),
+            managed_windows_after_launch: policy.windows().len() as u64,
+            focused_launched_window: false,
             elapsed_ms: started.elapsed().as_millis() as u64,
         });
     };
@@ -2365,6 +2382,12 @@ fn verify_desktop_launch(config: &Config) -> Result<DesktopLaunchReport, String>
             exit_success: false,
             status_code: 255,
             wayland_display_set: wayland_display.is_some(),
+            managed_window_mapped: false,
+            managed_window_id: 0,
+            managed_window_title: String::new(),
+            managed_window_app_id: String::new(),
+            managed_windows_after_launch: policy.windows().len() as u64,
+            focused_launched_window: false,
             elapsed_ms: started.elapsed().as_millis() as u64,
         });
     }
@@ -2378,6 +2401,11 @@ fn verify_desktop_launch(config: &Config) -> Result<DesktopLaunchReport, String>
     let (spawned, exit_success, status_code) = match child.status() {
         Ok(status) => (true, status.success(), status.code().unwrap_or(255) as u64),
         Err(_) => (false, false, 255),
+    };
+    let managed = if spawned && exit_success {
+        map_desktop_entry_window(policy, entry)
+    } else {
+        ManagedDesktopWindow::default_with_count(policy.windows().len() as u64)
     };
 
     Ok(DesktopLaunchReport {
@@ -2395,8 +2423,58 @@ fn verify_desktop_launch(config: &Config) -> Result<DesktopLaunchReport, String>
         exit_success,
         status_code,
         wayland_display_set: wayland_display.is_some(),
+        managed_window_mapped: managed.mapped,
+        managed_window_id: managed.window_id,
+        managed_window_title: managed.title,
+        managed_window_app_id: managed.app_id,
+        managed_windows_after_launch: managed.windows_after_launch,
+        focused_launched_window: managed.focused,
         elapsed_ms: started.elapsed().as_millis() as u64,
     })
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct ManagedDesktopWindow {
+    mapped: bool,
+    window_id: u64,
+    title: String,
+    app_id: String,
+    windows_after_launch: u64,
+    focused: bool,
+}
+
+impl ManagedDesktopWindow {
+    fn default_with_count(windows_after_launch: u64) -> Self {
+        Self {
+            mapped: false,
+            window_id: 0,
+            title: String::new(),
+            app_id: String::new(),
+            windows_after_launch,
+            focused: false,
+        }
+    }
+}
+
+fn map_desktop_entry_window(policy: &WindowPolicy, entry: &DesktopEntry) -> ManagedDesktopWindow {
+    let mut policy = policy.clone();
+    let title = entry.name.clone();
+    let app_id = entry.id.clone();
+    let window = policy.add_app_window(title.clone(), Some(app_id.clone()), (640, 480));
+    let mapped = policy
+        .window(window)
+        .map(|window| window.app_id.as_deref() == Some(app_id.as_str()) && window.title == title)
+        .unwrap_or(false);
+    let focused = policy.focused() == Some(window);
+
+    ManagedDesktopWindow {
+        mapped,
+        window_id: window.0,
+        title,
+        app_id,
+        windows_after_launch: policy.windows().len() as u64,
+        focused,
+    }
 }
 
 fn desktop_launch_dirs(config: &Config) -> Vec<PathBuf> {
@@ -2474,6 +2552,30 @@ fn emit_desktop_launch(config: &Config, report: &DesktopLaunchReport) {
             (
                 "wayland_display_set",
                 FieldValue::Bool(report.wayland_display_set),
+            ),
+            (
+                "managed_window_mapped",
+                FieldValue::Bool(report.managed_window_mapped),
+            ),
+            (
+                "managed_window_id",
+                FieldValue::U64(report.managed_window_id),
+            ),
+            (
+                "managed_window_title",
+                FieldValue::Str(report.managed_window_title.as_str()),
+            ),
+            (
+                "managed_window_app_id",
+                FieldValue::Str(report.managed_window_app_id.as_str()),
+            ),
+            (
+                "managed_windows_after_launch",
+                FieldValue::U64(report.managed_windows_after_launch),
+            ),
+            (
+                "focused_launched_window",
+                FieldValue::Bool(report.focused_launched_window),
             ),
             ("elapsed_ms", FieldValue::U64(report.elapsed_ms)),
         ],

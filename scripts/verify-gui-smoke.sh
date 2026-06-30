@@ -104,6 +104,10 @@ grep '"entry_resolved":true' "$out_dir/session.jsonl" >/dev/null
 grep '"entry_program":"sh"' "$out_dir/session.jsonl" >/dev/null
 grep '"entry_arg_count":2' "$out_dir/session.jsonl" >/dev/null
 grep '"program_resolved":true' "$out_dir/session.jsonl" >/dev/null
+grep '"managed_window_mapped":true' "$out_dir/session.jsonl" >/dev/null
+grep '"managed_window_app_id":"org.backlit.SpawnProbe.desktop"' "$out_dir/session.jsonl" >/dev/null
+grep '"managed_windows_after_launch":4' "$out_dir/session.jsonl" >/dev/null
+grep '"focused_launched_window":true' "$out_dir/session.jsonl" >/dev/null
 grep '"move_resize_ok":true' "$out_dir/session.jsonl" >/dev/null
 grep '"minimize_skips_focus":true' "$out_dir/session.jsonl" >/dev/null
 grep '"resized_width":920' "$out_dir/session.jsonl" >/dev/null
@@ -421,6 +425,7 @@ cat > "$out_dir/manifest.json" <<EOF
     "session_launch_spawn": true,
     "session_desktop_launch": true,
     "session_desktop_launch_entry": "org.backlit.SpawnProbe.desktop",
+    "session_desktop_managed_window": true,
     "session_services": true,
     "session_compositor_demo_client": $session_compositor_demo_client,
     "session_compositor_client_blocked_expected": $session_compositor_client_blocked_expected,

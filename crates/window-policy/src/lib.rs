@@ -68,6 +68,7 @@ pub enum SnapTarget {
 pub struct Window {
     pub id: WindowId,
     pub title: String,
+    pub app_id: Option<String>,
     pub geometry: Rect,
     pub state: WindowState,
     pub workspace: WorkspaceId,
@@ -99,6 +100,15 @@ impl Default for WindowPolicy {
 
 impl WindowPolicy {
     pub fn add_window(&mut self, title: impl Into<String>, size: (i32, i32)) -> WindowId {
+        self.add_app_window(title, None::<String>, size)
+    }
+
+    pub fn add_app_window(
+        &mut self,
+        title: impl Into<String>,
+        app_id: Option<impl Into<String>>,
+        size: (i32, i32),
+    ) -> WindowId {
         let id = WindowId(self.next_id);
         self.next_id += 1;
 
@@ -108,6 +118,7 @@ impl WindowPolicy {
         self.windows.push(Window {
             id,
             title: title.into(),
+            app_id: app_id.map(Into::into),
             geometry,
             state: WindowState::Normal,
             workspace: self.active_workspace,
@@ -397,10 +408,15 @@ mod tests {
     fn new_windows_take_focus() {
         let mut policy = WindowPolicy::default();
         let first = policy.add_window("terminal", (800, 600));
-        let second = policy.add_window("browser", (1200, 800));
+        let second =
+            policy.add_app_window("browser", Some("org.mozilla.firefox.desktop"), (1200, 800));
 
         assert_eq!(policy.focused(), Some(second));
         assert_ne!(first, second);
+        assert_eq!(
+            policy.window(second).unwrap().app_id.as_deref(),
+            Some("org.mozilla.firefox.desktop")
+        );
     }
 
     #[test]

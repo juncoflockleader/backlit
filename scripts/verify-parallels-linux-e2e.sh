@@ -436,6 +436,7 @@ require_contains "$host_guest_manifest" '"mvp1_contract": true'
 require_contains "$host_gui_smoke_manifest" '"golden_checksum": true'
 require_contains "$host_gui_smoke_manifest" '"session_compositor_demo_client": true'
 require_contains "$host_gui_smoke_manifest" '"session_desktop_launch": true'
+require_contains "$host_gui_smoke_manifest" '"session_desktop_managed_window": true'
 require_contains "$host_gui_preview_manifest" '"session_verified": true'
 require_contains "$host_gui_preview_manifest" '"session_services": true'
 require_contains "$host_compositor_runtime_manifest" '"scripted_client_runtime": true'
@@ -463,6 +464,7 @@ require_contains "$host_drm_session_smoke_manifest" '"drm_session_smoke_ready": 
 require_contains "$host_drm_session_smoke_manifest" '"drm_session_clean_exit": true'
 require_contains "$host_drm_session_smoke_manifest" '"session_compositor_demo_client": true'
 require_contains "$host_drm_session_smoke_manifest" '"session_desktop_launch": true'
+require_contains "$host_drm_session_smoke_manifest" '"session_desktop_managed_window": true'
 require_contains "$host_drm_session_smoke_manifest" '"settings_service": true'
 require_contains "$host_drm_session_smoke_manifest" '"notification_service": true'
 require_contains "$host_debian_package_build_manifest" '"debs_built": true'
@@ -473,6 +475,7 @@ require_contains "$host_debian_package_install_manifest" '"session_gui_from_extr
 require_contains "$host_debian_package_install_manifest" '"session_services_from_extracted_debs": true'
 require_contains "$host_debian_package_install_manifest" '"session_compositor_demo_client_from_extracted_debs": true'
 require_contains "$host_debian_package_install_manifest" '"session_desktop_launch_from_extracted_debs": true'
+require_contains "$host_debian_package_install_manifest" '"session_desktop_managed_window_from_extracted_debs": true'
 require_contains "$host_debian_package_install_manifest" '"session_replay_from_extracted_debs": true'
 require_contains "$host_debian_package_install_manifest" '"session_clean_exit_from_extracted_debs": true'
 require_contains "$host_debian_package_install_replay_manifest" '"frame_count": 9'
@@ -484,6 +487,7 @@ require_contains "$host_debian_system_install_manifest" '"usr_bin_session_launch
 require_contains "$host_debian_system_install_manifest" '"session_services_from_system_install": true'
 require_contains "$host_debian_system_install_manifest" '"session_compositor_demo_client_from_system_install": true'
 require_contains "$host_debian_system_install_manifest" '"session_desktop_launch_from_system_install": true'
+require_contains "$host_debian_system_install_manifest" '"session_desktop_managed_window_from_system_install": true'
 require_contains "$host_debian_system_install_manifest" '"session_replay_from_system_install": true'
 require_contains "$host_debian_system_install_manifest" '"packages_purged_after_verification": true'
 require_contains "$host_debian_system_install_replay_manifest" '"frame_count": 9'
@@ -532,6 +536,7 @@ cat > "$host_out_dir/manifest.json" <<EOF
     "guest_commit_matches_manifest": true,
     "guest_artifacts_exported": true,
     "gui_smoke": true,
+    "gui_smoke_session_desktop_managed_window": true,
     "gui_preview": true,
     "compositor_runtime": true,
     "compositor_runtime_policy_preview": true,
@@ -541,11 +546,14 @@ cat > "$host_out_dir/manifest.json" <<EOF
     "parallels_drm_launch_ready": true,
     "drm_session_smoke": true,
     "drm_session_clean_exit": true,
+    "drm_session_desktop_managed_window": true,
     "debian_package_build": true,
     "debian_package_install": true,
+    "debian_package_install_desktop_managed_window": true,
     "debian_package_install_replay": true,
     "dpkg_root_install": true,
     "debian_system_install": true,
+    "debian_system_install_desktop_managed_window": true,
     "debian_system_install_replay": true,
     "actual_system_dpkg_install": true,
     "nested_wayland": true,

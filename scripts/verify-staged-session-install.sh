@@ -201,6 +201,10 @@ grep -F '"entry_selector":"org.backlit.Settings.desktop"' "$session_log" >/dev/n
 grep -F '"entry_resolved":true' "$session_log" >/dev/null || fail "session desktop launch did not resolve Settings entry"
 grep -F '"entry_program":"backlit-settings"' "$session_log" >/dev/null || fail "session desktop launch did not parse Settings program"
 grep -F '"program_resolved":true' "$session_log" >/dev/null || fail "session desktop launch program did not resolve"
+grep -F '"managed_window_mapped":true' "$session_log" >/dev/null || fail "session desktop launch did not map a managed Settings window"
+grep -F '"managed_window_app_id":"org.backlit.Settings.desktop"' "$session_log" >/dev/null || fail "session desktop launch did not preserve Settings app id"
+grep -F '"managed_windows_after_launch":4' "$session_log" >/dev/null || fail "session desktop launch did not add a managed window"
+grep -F '"focused_launched_window":true' "$session_log" >/dev/null || fail "session desktop launch did not focus launched Settings window"
 grep -F '"compositor_ready":true' "$session_log" >/dev/null || fail "session compositor service did not become ready"
 grep -F '"shell_ready":true' "$session_log" >/dev/null || fail "session shell service did not become ready"
 grep -F '"notification_ready":true' "$session_log" >/dev/null || fail "session notification service did not become ready"
@@ -276,6 +280,7 @@ cat > "$out_dir/manifest.json" <<EOF
     "staged_session_gui": true,
     "staged_session_launch_spawn": true,
     "staged_session_desktop_launch": true,
+    "staged_session_desktop_managed_window": true,
     "staged_session_services": true,
     "staged_compositor_smoke": true,
     "staged_compositor_surface_lifecycle": true,
