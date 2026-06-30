@@ -184,6 +184,8 @@ Session verification also checks output-aware geometry: maximized windows use th
 
 Move and resize behavior is also verified through the session smoke path before maximize/fullscreen checks run.
 
+Minimized windows are kept in policy state but skipped by focus cycling; this is verified in the session smoke path.
+
 Crash isolation is covered by `backlit-session-supervisor --verify`: shell crashes restart without killing the compositor, while compositor crashes end the session.
 
 Backend preflight can be run directly:

@@ -101,6 +101,14 @@ fn run() -> Result<(), String> {
                     "move_resize_ok",
                     FieldValue::Bool(interaction_report.move_resize_ok),
                 ),
+                (
+                    "minimize_skips_focus",
+                    FieldValue::Bool(interaction_report.minimize_skips_focus),
+                ),
+                (
+                    "focus_after_minimize",
+                    FieldValue::U64(interaction_report.focus_after_minimize),
+                ),
                 ("moved_x", FieldValue::U64(interaction_report.moved_x)),
                 (
                     "resized_width",
@@ -159,6 +167,8 @@ struct InteractionReport {
     windows_after_launch: u64,
     terminal_launch_resolved: bool,
     move_resize_ok: bool,
+    minimize_skips_focus: bool,
+    focus_after_minimize: u64,
     moved_x: u64,
     resized_width: u64,
     maximize_uses_work_area: bool,
@@ -173,6 +183,7 @@ impl InteractionReport {
             && self.windows_after_launch == 4
             && self.terminal_launch_resolved
             && self.move_resize_ok
+            && self.minimize_skips_focus
             && self.maximize_uses_work_area
             && self.fullscreen_uses_output
     }
@@ -198,6 +209,21 @@ fn verify_session_interactions(policy: &WindowPolicy, layout: OutputLayout) -> I
     if terminal_launch_resolved {
         policy.add_window("terminal-2", (800, 600));
     }
+
+    let minimized_window = policy.focused();
+    let focus_after_minimize = minimized_window
+        .and_then(|id| {
+            if policy.minimize_window(id) {
+                policy.focused()
+            } else {
+                None
+            }
+        })
+        .map(|id| id.0)
+        .unwrap_or(0);
+    let minimize_skips_focus = minimized_window
+        .map(|id| focus_after_minimize != 0 && focus_after_minimize != id.0)
+        .unwrap_or(false);
 
     let focused = policy.focused();
     let (move_resize_ok, moved_x, resized_width) = focused
@@ -235,6 +261,8 @@ fn verify_session_interactions(policy: &WindowPolicy, layout: OutputLayout) -> I
         windows_after_launch: policy.windows().len() as u64,
         terminal_launch_resolved,
         move_resize_ok,
+        minimize_skips_focus,
+        focus_after_minimize,
         moved_x,
         resized_width,
         maximize_uses_work_area,

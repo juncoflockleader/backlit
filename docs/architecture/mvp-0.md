@@ -12,6 +12,7 @@ MVP 0 is the development harness:
 - Keyboard shortcut routing for launcher, app switcher, and core launch targets.
 - Session interaction smoke for app switching and terminal launch resolution.
 - Session move/resize smoke through pure window policy.
+- Minimized-window focus skipping in session smoke.
 - Output work-area policy for panel-aware maximize and fullscreen geometry.
 - Session supervisor crash isolation smoke.
 - Deterministic demo GUI renderer.

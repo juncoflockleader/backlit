@@ -31,6 +31,7 @@ grep '"event":"session.interactions"' "$out_dir/session.jsonl" >/dev/null
 grep '"windows_after_launch":4' "$out_dir/session.jsonl" >/dev/null
 grep '"terminal_launch_resolved":true' "$out_dir/session.jsonl" >/dev/null
 grep '"move_resize_ok":true' "$out_dir/session.jsonl" >/dev/null
+grep '"minimize_skips_focus":true' "$out_dir/session.jsonl" >/dev/null
 grep '"resized_width":920' "$out_dir/session.jsonl" >/dev/null
 grep '"maximize_uses_work_area":true' "$out_dir/session.jsonl" >/dev/null
 grep '"fullscreen_uses_output":true' "$out_dir/session.jsonl" >/dev/null
@@ -98,6 +99,7 @@ cat > "$out_dir/manifest.json" <<EOF
     "shell_crash_isolated": true,
     "session_windows_after_launch": 4,
     "session_move_resize": true,
+    "session_minimize_skips_focus": true,
     "work_area_y": 42,
     "session_ppm_bytes": $session_ppm_bytes,
     "demo_ppm_bytes": $demo_ppm_bytes,

@@ -120,24 +120,42 @@ impl WindowPolicy {
     }
 
     pub fn cycle_focus_forward(&mut self) -> Option<WindowId> {
+        self.cycle_focus(1)
+    }
+
+    pub fn cycle_focus_backward(&mut self) -> Option<WindowId> {
+        self.cycle_focus(-1)
+    }
+
+    fn cycle_focus(&mut self, direction: i32) -> Option<WindowId> {
         if self.windows.is_empty() {
             self.focused = None;
             return None;
         }
 
-        let next_index = match self.focused {
-            Some(id) => self
-                .windows
-                .iter()
-                .position(|window| window.id == id)
-                .map(|index| (index + 1) % self.windows.len())
-                .unwrap_or(0),
-            None => 0,
-        };
+        let len = self.windows.len();
+        let forward = direction >= 0;
+        let start_index = self
+            .focused
+            .and_then(|id| self.windows.iter().position(|window| window.id == id))
+            .unwrap_or(if forward { len - 1 } else { 0 });
 
-        let id = self.windows[next_index].id;
-        self.focused = Some(id);
-        Some(id)
+        for offset in 1..=len {
+            let next_index = if forward {
+                (start_index + offset) % len
+            } else {
+                (start_index + len - offset) % len
+            };
+
+            if self.windows[next_index].state != WindowState::Minimized {
+                let id = self.windows[next_index].id;
+                self.focused = Some(id);
+                return Some(id);
+            }
+        }
+
+        self.focused = None;
+        None
     }
 
     pub fn set_state(&mut self, id: WindowId, state: WindowState) -> bool {
@@ -182,6 +200,19 @@ impl WindowPolicy {
 
     pub fn fullscreen_window(&mut self, id: WindowId, output_area: Rect) -> bool {
         self.place_window_in_state(id, output_area, WindowState::Fullscreen)
+    }
+
+    pub fn minimize_window(&mut self, id: WindowId) -> bool {
+        match self.window_mut(id) {
+            Some(window) => {
+                window.state = WindowState::Minimized;
+                if self.focused == Some(id) {
+                    self.cycle_focus_forward();
+                }
+                true
+            }
+            None => false,
+        }
     }
 
     pub fn restore_window(&mut self, id: WindowId) -> bool {
@@ -260,6 +291,7 @@ mod tests {
 
         assert_eq!(policy.cycle_focus_forward(), Some(first));
         assert_eq!(policy.cycle_focus_forward(), Some(second));
+        assert_eq!(policy.cycle_focus_backward(), Some(first));
     }
 
     #[test]
@@ -319,5 +351,22 @@ mod tests {
 
         assert_eq!(layout.output, super::Rect::new(0, 0, 1920, 1080));
         assert_eq!(layout.work_area(), super::Rect::new(0, 42, 1920, 1038));
+    }
+
+    #[test]
+    fn minimized_windows_are_skipped_by_focus_cycle() {
+        let mut policy = WindowPolicy::default();
+        let first = policy.add_window("terminal", (800, 600));
+        let second = policy.add_window("settings", (720, 560));
+        let third = policy.add_window("browser", (1200, 800));
+
+        assert!(policy.minimize_window(third));
+        assert_eq!(policy.focused(), Some(first));
+        assert!(policy.minimize_window(second));
+        assert_eq!(policy.cycle_focus_forward(), Some(first));
+
+        assert!(policy.restore_window(second));
+        assert!(policy.focus(second));
+        assert_eq!(policy.window(second).unwrap().state, WindowState::Normal);
     }
 }
