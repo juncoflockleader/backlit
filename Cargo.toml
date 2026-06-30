@@ -10,6 +10,7 @@ members = [
   "crates/perf",
   "crates/protocols",
   "crates/demo-client",
+  "crates/input",
   "crates/session",
   "crates/session-supervisor",
   "crates/settings-daemon",

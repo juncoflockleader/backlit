@@ -37,6 +37,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "backlit-input"
+version = "0.1.0"
+dependencies = [
+ "backlit-common",
+ "backlit-launcher",
+ "backlit-shortcuts",
+ "backlit-window-policy",
+]
+
+[[package]]
 name = "backlit-launcher"
 version = "0.1.0"
 dependencies = [
@@ -74,6 +84,7 @@ dependencies = [
  "backlit-common",
  "backlit-compositor-backend",
  "backlit-demo-client",
+ "backlit-input",
  "backlit-launcher",
  "backlit-shortcuts",
  "backlit-window-policy",

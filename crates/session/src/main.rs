@@ -13,6 +13,7 @@ use backlit_compositor_backend::{
 use backlit_demo_client::{
     render_demo_gui, verify_demo_gui, DEFAULT_DEMO_HEIGHT, DEFAULT_DEMO_WIDTH,
 };
+use backlit_input::run_input_smoke;
 use backlit_launcher::{default_catalog, resolve_command, LaunchTarget};
 use backlit_shortcuts::{resolve_shortcut, ShortcutAction};
 use backlit_window_policy::{OutputLayout, WindowPolicy, WindowState};
@@ -158,6 +159,26 @@ fn run() -> Result<(), String> {
                 (
                     "close_fallback_focus_ok",
                     FieldValue::Bool(interaction_report.close_fallback_focus_ok),
+                ),
+                (
+                    "keyboard_input_ok",
+                    FieldValue::Bool(interaction_report.keyboard_input_ok),
+                ),
+                (
+                    "pointer_input_ok",
+                    FieldValue::Bool(interaction_report.pointer_input_ok),
+                ),
+                (
+                    "input_windows_after_terminal_launch",
+                    FieldValue::U64(interaction_report.input_windows_after_terminal_launch),
+                ),
+                (
+                    "input_final_width",
+                    FieldValue::U64(interaction_report.input_final_width),
+                ),
+                (
+                    "input_final_height",
+                    FieldValue::U64(interaction_report.input_final_height),
                 ),
                 (
                     "windows_after_close",
@@ -615,6 +636,11 @@ struct InteractionReport {
     fullscreen_uses_output: bool,
     close_fallback_focus_ok: bool,
     windows_after_close: u64,
+    keyboard_input_ok: bool,
+    pointer_input_ok: bool,
+    input_windows_after_terminal_launch: u64,
+    input_final_width: u64,
+    input_final_height: u64,
 }
 
 impl InteractionReport {
@@ -630,6 +656,9 @@ impl InteractionReport {
             && self.fullscreen_uses_output
             && self.close_fallback_focus_ok
             && self.windows_after_close == 3
+            && self.keyboard_input_ok
+            && self.pointer_input_ok
+            && self.input_windows_after_terminal_launch == 4
     }
 }
 
@@ -708,6 +737,14 @@ fn verify_session_interactions(policy: &WindowPolicy, layout: OutputLayout) -> I
             .map(|window| window.state != WindowState::Minimized)
             .unwrap_or(false);
     let windows_after_close = policy.windows().len() as u64;
+    let input_report = run_input_smoke();
+    let keyboard_input_ok = input_report.terminal_launch_resolved
+        && input_report.app_switcher_changed_focus
+        && input_report.windows_after_terminal_launch == 4;
+    let pointer_input_ok = input_report.pointer_focus_window
+        && input_report.pointer_move_window
+        && input_report.pointer_resize_window
+        && input_report.pointer_grab_ended;
 
     InteractionReport {
         initial_focus,
@@ -723,6 +760,11 @@ fn verify_session_interactions(policy: &WindowPolicy, layout: OutputLayout) -> I
         fullscreen_uses_output,
         close_fallback_focus_ok,
         windows_after_close,
+        keyboard_input_ok,
+        pointer_input_ok,
+        input_windows_after_terminal_launch: input_report.windows_after_terminal_launch,
+        input_final_width: input_report.final_width,
+        input_final_height: input_report.final_height,
     }
 }
 

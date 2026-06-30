@@ -42,6 +42,7 @@ require_executable scripts/verify-nested-wayland-smoke.sh
 require_contains Cargo.toml '"crates/compositor"'
 require_contains Cargo.toml '"crates/compositor-backend"'
 require_contains Cargo.toml '"crates/demo-client"'
+require_contains Cargo.toml '"crates/input"'
 require_contains Cargo.toml '"crates/protocols"'
 require_contains Cargo.toml '"crates/perf"'
 require_contains Cargo.toml '"crates/session"'
@@ -53,6 +54,7 @@ require_contains scripts/verify-gui-smoke.sh 'cargo run -p backlit-compositor --
 require_contains scripts/verify-gui-smoke.sh 'cargo run -p backlit-compositor-backend -- --backend=headless --verify'
 require_contains scripts/verify-gui-smoke.sh 'cargo run -p backlit-protocols -- --verify --list'
 require_contains scripts/verify-gui-smoke.sh 'cargo run -p backlit-perf -- --verify'
+require_contains scripts/verify-gui-smoke.sh 'cargo run -p backlit-input -- --verify'
 require_contains scripts/verify-gui-smoke.sh 'cargo run -p backlit-demo-client --'
 require_contains scripts/verify-gui-smoke.sh '"golden_checksum": true'
 require_contains scripts/verify-launch-performance.sh '"name": "backlit-launch-performance"'
@@ -84,6 +86,9 @@ if [ -n "$artifact_root" ] && [ -d "$artifact_root" ]; then
   require_contains "$artifact_root/gui-smoke/manifest.json" '"protocol_required_count": 7'
   require_contains "$artifact_root/gui-smoke/manifest.json" '"launcher_required_targets": 3'
   require_contains "$artifact_root/gui-smoke/manifest.json" '"shortcut_required_bindings": 6'
+  require_contains "$artifact_root/gui-smoke/manifest.json" '"keyboard_input": true'
+  require_contains "$artifact_root/gui-smoke/manifest.json" '"pointer_input": true'
+  require_contains "$artifact_root/gui-smoke/manifest.json" '"session_input": true'
   require_contains "$artifact_root/gui-smoke/manifest.json" '"session_services": true'
   require_contains "$artifact_root/gui-smoke/manifest.json" '"session_launch_spawn": true'
   require_contains "$artifact_root/gui-smoke/manifest.json" '"session_move_resize": true'
@@ -129,6 +134,7 @@ cat > "$out_dir/manifest.json" <<EOF
     "demo_client": true,
     "performance_smoke": true,
     "launch_performance": true,
+    "input_smoke": true,
     "protocol_smoke": true,
     "golden_gui": true,
     "viewable_preview": true,

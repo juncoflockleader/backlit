@@ -19,6 +19,7 @@ crates/
   common/              Shared config, logging, metrics helpers.
   compositor/          Compositor binary entrypoint.
   compositor-backend/  Backend selection and runtime config.
+  input/               Keyboard and pointer event routing smoke checks.
   window-policy/       Focus, placement, workspaces, snapping; pure logic.
   shell-protocol/      Private shell/compositor protocol model.
   shell/               Shell host stub for panel/launcher/wallpaper work.
@@ -184,6 +185,7 @@ cargo run -p backlit-perf -- --verify
 cargo run -p backlit-launcher -- --verify --list --target=terminal --desktop-dir=crates/launcher/fixtures
 cargo run -p backlit-launcher -- --verify --target=terminal --spawn-smoke --spawn-program=true --wayland-display=backlit-0
 cargo run -p backlit-shortcuts -- --verify --list --resolve=Super+Enter
+cargo run -p backlit-input -- --verify
 cargo run -p backlit-session-supervisor -- --verify
 cargo run -p backlit-clipboard -- --verify
 cargo run -p backlit-session -- --backend=headless --screenshot target/backlit-session.ppm --verify --verify-services
@@ -268,7 +270,9 @@ Launcher spawn verification proves the selected target can start a process with 
 
 Keyboard shortcut routing is also verified in dry-run mode for launcher, terminal, browser, settings, and app-switcher actions.
 
-The session smoke path consumes those routes too: `Alt+Tab` cycles focus and `Super+Enter` resolves the terminal launch path, spawns the terminal launch target with `WAYLAND_DISPLAY` set when `--verify-launch-spawn` is enabled, then records the resulting window-policy state in `session.jsonl`.
+Input routing is verified by `backlit-input --verify`, which feeds deterministic keyboard and pointer events into the same policy layer the compositor will use for libinput events. It proves that `Super+Enter` routes to terminal launch, `Alt+Tab` changes focus, title-bar drags move windows, resize-grip drags resize windows, and pointer grabs end cleanly.
+
+The session smoke path consumes those routes too: `Alt+Tab` cycles focus and `Super+Enter` resolves the terminal launch path, pointer input verifies focus/move/resize routing, spawns the terminal launch target with `WAYLAND_DISPLAY` set when `--verify-launch-spawn` is enabled, then records the resulting window-policy state in `session.jsonl`.
 
 With `--verify-services`, `backlit-session` also resolves sibling `backlit-compositor` and `backlit-shell` binaries, runs their readiness probes, captures their logs, and emits `session.services_verified`.
 
