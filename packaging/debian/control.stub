@@ -20,7 +20,7 @@ Description: Backlit shell clients
 
 Package: fastgui-session
 Architecture: any
-Depends: ${misc:Depends}, fastgui-compositor, fastgui-shell
+Depends: ${misc:Depends}, fastgui-compositor, fastgui-shell, fastgui-settings
 Description: Backlit desktop session
  Session entry, launcher wiring, and service integration for Backlit.
 
@@ -32,18 +32,24 @@ Description: Backlit desktop portal backend
 
 Package: fastgui-settings
 Architecture: any
-Depends: ${shlibs:Depends}, ${misc:Depends}, fastgui-session
+Depends: ${shlibs:Depends}, ${misc:Depends}
 Description: Backlit settings surfaces
  Settings daemon and future display, input, appearance, and power UI.
 
+Package: fastgui-core
+Architecture: any
+Depends: ${misc:Depends}, fastgui-session
+Description: Backlit bare graphical session
+ Minimal Backlit compositor, shell, settings daemon, and session integration.
+
 Package: fastgui-desktop
 Architecture: any
-Depends: ${misc:Depends}, fastgui-session, fastgui-portal, fastgui-settings
+Depends: ${misc:Depends}, fastgui-core, fastgui-portal
 Description: Backlit desktop environment meta-package
  Installs the Backlit desktop session on Ubuntu Server/headless Ubuntu.
 
 Package: fastgui-dev-tools
 Architecture: any
-Depends: ${misc:Depends}, fastgui-desktop
+Depends: ${misc:Depends}, fastgui-core
 Description: Backlit development and verification tools
  Smoke verifiers, protocol checks, and development harness utilities.

@@ -110,13 +110,17 @@ for package in \
   fastgui-session \
   fastgui-portal \
   fastgui-settings \
+  fastgui-core \
   fastgui-desktop \
   fastgui-dev-tools
 do
   require_package "$package"
 done
 
-require_contains packaging/debian/control.stub "fastgui-session, fastgui-portal, fastgui-settings"
+require_contains packaging/debian/control.stub "Depends: \${misc:Depends}, fastgui-compositor, fastgui-shell, fastgui-settings"
+require_contains packaging/debian/control.stub "Depends: \${misc:Depends}, fastgui-session"
+require_contains packaging/debian/control.stub "Depends: \${misc:Depends}, fastgui-core, fastgui-portal"
+require_contains packaging/debian/control.stub "Depends: \${misc:Depends}, fastgui-core"
 require_contains Cargo.toml "\"crates/compositor\""
 require_contains Cargo.toml "\"crates/notification-daemon\""
 require_contains Cargo.toml "\"crates/session\""
@@ -148,6 +152,7 @@ cat > "$out_dir/manifest.json" <<EOF
     "systemd_services": true,
     "journal_logging": true,
     "package_split": true,
+    "bare_session_meta_package": true,
     "workspace_binaries": true
   }
 }

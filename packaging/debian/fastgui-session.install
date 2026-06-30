@@ -1,0 +1,7 @@
+usr/bin/backlit-session
+usr/share/wayland-sessions/backlit.desktop
+usr/lib/systemd/user/backlit-session.target
+usr/lib/systemd/user/backlit-compositor.service
+usr/lib/systemd/user/backlit-shell.service
+usr/lib/systemd/user/backlit-notification-daemon.service
+usr/lib/systemd/user/backlit-settings-daemon.service

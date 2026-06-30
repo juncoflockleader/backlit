@@ -19,6 +19,7 @@ portal_security_dir="$out_dir/portal-security"
 crash_logs_dir="$out_dir/crash-logs"
 ci_contract_dir="$out_dir/ci-contract"
 packaging_dir="$out_dir/packaging-contract"
+package_manifests_dir="$out_dir/package-manifests"
 staged_install_dir="$out_dir/staged-session-install"
 systemd_activation_dir="$out_dir/systemd-activation"
 launch_readiness_dir="$out_dir/launch-readiness"
@@ -50,6 +51,7 @@ cargo clippy --workspace --all-targets -- -D warnings
 ./scripts/verify-crash-logs.sh "$crash_logs_dir"
 ./scripts/verify-ci-contract.sh "$ci_contract_dir"
 ./scripts/verify-packaging-contract.sh "$packaging_dir"
+./scripts/verify-package-manifests.sh "$package_manifests_dir"
 ./scripts/verify-staged-session-install.sh "$staged_install_dir"
 ./scripts/verify-systemd-activation.sh "$systemd_activation_dir"
 ./scripts/verify-launch-readiness.sh "$launch_readiness_dir"
@@ -90,6 +92,7 @@ cat > "$out_dir/manifest.json" <<EOF
     "crash_logs_manifest": "$crash_logs_dir/manifest.json",
     "ci_contract_manifest": "$ci_contract_dir/manifest.json",
     "packaging_contract_manifest": "$packaging_dir/manifest.json",
+    "package_manifests_manifest": "$package_manifests_dir/manifest.json",
     "staged_session_install_manifest": "$staged_install_dir/manifest.json",
     "systemd_activation_manifest": "$systemd_activation_dir/manifest.json",
     "launch_readiness_manifest": "$launch_readiness_dir/manifest.json",
@@ -117,6 +120,7 @@ cat > "$out_dir/manifest.json" <<EOF
     "crash_logs": true,
     "ci_contract": true,
     "packaging_contract": true,
+    "package_manifests": true,
     "staged_session_install": true,
     "systemd_activation": true,
     "launch_readiness": true,

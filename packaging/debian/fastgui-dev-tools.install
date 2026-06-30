@@ -1,0 +1,8 @@
+usr/lib/backlit/dev-tools/verify-gui-smoke.sh
+usr/lib/backlit/dev-tools/verify-compositor-runtime.sh
+usr/lib/backlit/dev-tools/verify-package-manifests.sh
+usr/lib/backlit/dev-tools/verify-launch-performance.sh
+usr/lib/backlit/dev-tools/verify-launch-readiness.sh
+usr/lib/backlit/dev-tools/verify-session-launch.sh
+usr/lib/backlit/dev-tools/verify-drm-session-smoke.sh
+usr/lib/backlit/dev-tools/verify-linux-e2e.sh

@@ -50,6 +50,7 @@ MVP 0 is the development harness:
 - MVP 0 contract verifier that checks the executable harness still covers the design deliverables and, inside E2E, validates the generated artifact manifests.
 - Parallels runner for repeatable macOS-to-Ubuntu guest verification with the active guest user's logind session and runtime directory.
 - Packaging contract verifier for session desktop entry, Backlit user target, systemd units, and Debian package split.
+- Package manifest verifier for the `fastgui-core` bare-session meta package and Debian `.install` file ownership split.
 - Staged session install verifier for fake `/usr` layout, systemd launch-plan resolution, launch command resolution, and headless GUI verification from staged binaries.
 - CI.
 - Packaging skeleton.
