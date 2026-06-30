@@ -171,7 +171,7 @@ fn run_drag_pacing_smoke(pointer_frame_budget_us: u64) -> DragPacingReport {
 
     frame_times.sort_unstable();
     let max_frame_us = frame_times.last().copied().unwrap_or(0);
-    let p99_index = ((frame_times.len() * 99) + 99) / 100;
+    let p99_index = (frame_times.len() * 99).div_ceil(100);
     let pointer_frame_p99_us = frame_times
         .get(p99_index.saturating_sub(1))
         .copied()
