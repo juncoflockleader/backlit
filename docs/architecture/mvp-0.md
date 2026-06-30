@@ -23,6 +23,8 @@ MVP 0 is the development harness:
 - Basic MVP protocol smoke registry.
 - Headless performance smoke checks.
 - JSON metrics.
+- Linux E2E verifier for fmt, tests, clippy, and GUI smoke inside an Ubuntu guest.
+- Parallels runner for repeatable macOS-to-Ubuntu guest verification.
 - CI.
 - Packaging skeleton.
 

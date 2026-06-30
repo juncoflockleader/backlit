@@ -91,6 +91,40 @@ cargo test --workspace
 
 Do not treat VM graphics performance as real product performance. Use it for build checks, protocol smoke tests, nested Wayland behavior, and CI reproduction.
 
+## macOS + Parallels Linux E2E
+
+The Parallels runner bootstraps an Ubuntu guest, updates a clean checkout from `https://github.com/juncoflockleader/backlit.git`, installs a current Rust toolchain with `rustfmt` and `clippy`, and runs the Linux E2E gate:
+
+```bash
+./scripts/verify-parallels-linux-e2e.sh
+```
+
+The runner reads a local credential file that is ignored by Git:
+
+```bash
+mkdir -p .local
+cat > .local/parallels-ubuntu.env <<'EOF'
+BACKLIT_PARALLELS_UBUNTU_USER=<guest-admin-user>
+BACKLIT_PARALLELS_UBUNTU_PASSWORD=<guest-password>
+EOF
+chmod 600 .local/parallels-ubuntu.env
+```
+
+Useful overrides:
+
+```bash
+BACKLIT_PARALLELS_VM="Ubuntu 22.04.2 ARM64" ./scripts/verify-parallels-linux-e2e.sh
+BACKLIT_E2E_BRANCH=main BACKLIT_E2E_OUT_DIR=target/linux-e2e-parallels ./scripts/verify-parallels-linux-e2e.sh
+```
+
+The Linux-side verifier can also be run directly inside any Ubuntu checkout:
+
+```bash
+./scripts/verify-linux-e2e.sh
+```
+
+It runs `cargo fmt`, workspace tests, `cargo clippy`, and the deterministic GUI smoke verifier, then writes `target/linux-e2e/manifest.json`.
+
 ## GUI Linux VM Workflow
 
 Inside a GUI Linux VM, start a parent Wayland session:
@@ -142,6 +176,7 @@ cargo run -p backlit-session-supervisor -- --verify
 cargo run -p backlit-clipboard -- --verify
 cargo run -p backlit-session -- --backend=headless --screenshot target/backlit-session.ppm --verify
 ./scripts/verify-gui-smoke.sh
+./scripts/verify-linux-e2e.sh
 cargo run -p backlit-shell -- --component=all --socket=backlit-0 --verify
 ```
 

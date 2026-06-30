@@ -23,9 +23,16 @@ cargo run -p backlit-session-supervisor -- --verify
 cargo run -p backlit-clipboard -- --verify
 cargo run -p backlit-shell -- --component=all --verify
 ./scripts/verify-gui-smoke.sh
+./scripts/verify-linux-e2e.sh
 ```
 
 The smoke verifier writes a top-level artifact manifest to `target/gui-smoke/manifest.json`.
+
+When a Parallels Ubuntu VM is available, the full Linux guest verification can be run from macOS with:
+
+```bash
+./scripts/verify-parallels-linux-e2e.sh
+```
 
 The session smoke path also verifies dry-run shortcut interactions: app switching and terminal launch resolution.
 
