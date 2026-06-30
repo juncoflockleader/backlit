@@ -106,8 +106,43 @@ uploaded_nested_verifier="/tmp/backlit-verify-nested-wayland-smoke.sh"
 
 export DEBIAN_FRONTEND=noninteractive
 
+guest_uid="\$(id -u "\$guest_user")"
+guest_runtime_dir="/run/user/\$guest_uid"
+guest_session_id="\$(loginctl list-sessions --no-legend 2>/dev/null | awk -v user="\$guest_user" '\$3 == user { print \$1; exit }' || true)"
+guest_seat=""
+guest_session_type=""
+if [ -n "\$guest_session_id" ]; then
+  guest_seat="\$(loginctl show-session "\$guest_session_id" -p Seat --value 2>/dev/null || true)"
+  guest_session_type="\$(loginctl show-session "\$guest_session_id" -p Type --value 2>/dev/null || true)"
+fi
+
 apt-get update
 apt-get install -y git ca-certificates build-essential pkg-config curl python3
+
+if [ -d "\$guest_runtime_dir" ]; then
+  export XDG_RUNTIME_DIR="\$guest_runtime_dir"
+else
+  unset XDG_RUNTIME_DIR
+fi
+if [ -n "\$guest_session_id" ]; then
+  export XDG_SESSION_ID="\$guest_session_id"
+else
+  unset XDG_SESSION_ID
+fi
+if [ -n "\$guest_seat" ]; then
+  export XDG_SEAT="\$guest_seat"
+else
+  unset XDG_SEAT
+fi
+if [ -n "\$guest_session_type" ]; then
+  export XDG_SESSION_TYPE="\$guest_session_type"
+else
+  unset XDG_SESSION_TYPE
+fi
+
+printf 'Using guest session: user=%s uid=%s session=%s seat=%s type=%s runtime=%s\n' \
+  "\$guest_user" "\$guest_uid" "\${guest_session_id:-none}" "\${guest_seat:-none}" \
+  "\${guest_session_type:-none}" "\${XDG_RUNTIME_DIR:-none}"
 
 if [ -e "\$repo_dir" ] && [ ! -d "\$repo_dir/.git" ]; then
   echo "Refusing to use non-Git path: \$repo_dir" >&2

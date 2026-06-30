@@ -92,6 +92,8 @@ require_contains scripts/verify-linux-e2e.sh './scripts/verify-packaging-contrac
 require_contains scripts/verify-linux-e2e.sh './scripts/verify-staged-session-install.sh'
 require_contains scripts/verify-linux-e2e.sh './scripts/verify-drm-session-smoke.sh'
 require_contains scripts/verify-linux-e2e.sh './scripts/verify-session-clean-exit.sh'
+require_contains scripts/verify-launch-readiness.sh '"xdg_runtime_dir_owned_by_user"'
+require_contains scripts/verify-drm-session-smoke.sh '"xdg_runtime_dir_owned_by_user"'
 
 require_contains packaging/sessions/backlit.desktop 'Exec=backlit-session'
 require_contains packaging/systemd/backlit-compositor.service 'ExecStart=/usr/bin/backlit-compositor'
@@ -115,6 +117,7 @@ if [ -n "$artifact_root" ] && [ -d "$artifact_root" ]; then
   require_file "$artifact_root/ci-contract/manifest.json"
   require_file "$artifact_root/packaging-contract/manifest.json"
   require_file "$artifact_root/staged-session-install/manifest.json"
+  require_file "$artifact_root/launch-readiness/manifest.json"
   require_file "$artifact_root/session-clean-exit/manifest.json"
   require_file "$artifact_root/drm-session-smoke/manifest.json"
 
@@ -191,10 +194,12 @@ if [ -n "$artifact_root" ] && [ -d "$artifact_root" ]; then
   require_contains "$artifact_root/staged-session-install/manifest.json" '"staged_session_services": true'
   require_contains "$artifact_root/staged-session-install/manifest.json" '"staged_notification_daemon_verify": true'
   require_contains "$artifact_root/staged-session-install/manifest.json" '"staged_settings_daemon_verify": true'
+  require_contains "$artifact_root/launch-readiness/manifest.json" '"xdg_runtime_dir_owned_by_user":'
   require_contains "$artifact_root/session-clean-exit/manifest.json" '"clean_exit_event": true'
   require_contains "$artifact_root/session-clean-exit/manifest.json" '"windows_after_shutdown": 0'
   require_contains "$artifact_root/session-clean-exit/manifest.json" '"focus_cleared": true'
   require_contains "$artifact_root/drm-session-smoke/manifest.json" '"name": "backlit-drm-session-smoke"'
+  require_contains "$artifact_root/drm-session-smoke/manifest.json" '"xdg_runtime_dir_owned_by_user":'
   if grep '"drm_session_smoke_ready": true' "$artifact_root/drm-session-smoke/manifest.json" >/dev/null; then
     require_contains "$artifact_root/drm-session-smoke/manifest.json" '"drm_session_clean_exit": true'
     require_contains "$artifact_root/drm-session-smoke/manifest.json" '"notification_service": true'

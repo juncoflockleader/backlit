@@ -41,6 +41,15 @@ if [ -n "${XDG_SESSION_ID:-}" ]; then
   session_present=true
 fi
 
+runtime_owned_by_user=false
+if [ "$(uname -s)" = "Linux" ] && [ "$runtime_present" = true ]; then
+  runtime_owner_uid="$(stat -c '%u' "$XDG_RUNTIME_DIR" 2>/dev/null || printf unknown)"
+  current_uid="$(id -u)"
+  if [ "$runtime_owner_uid" = "$current_uid" ]; then
+    runtime_owned_by_user=true
+  fi
+fi
+
 drm_card_nodes="$(count_matching /dev/dri 'card*')"
 drm_render_nodes="$(count_matching /dev/dri 'renderD*')"
 input_event_nodes="$(count_matching /dev/input 'event*')"
@@ -49,6 +58,7 @@ drm_node_count=$((drm_card_nodes + drm_render_nodes))
 drm_expected_ready=false
 if [ "$(uname -s)" = "Linux" ] \
   && [ "$runtime_present" = true ] \
+  && [ "$runtime_owned_by_user" = true ] \
   && [ "$session_present" = true ] \
   && [ "$drm_node_count" -gt 0 ] \
   && [ "$input_event_nodes" -gt 0 ]; then
@@ -81,6 +91,7 @@ if [ "$drm_expected_ready" = true ]; then
   grep '"event":"session.backend_preflight"' "$session_log" >/dev/null
   grep '"backend":"drm"' "$session_log" >/dev/null
   grep '"ready":true' "$session_log" >/dev/null
+  grep '"xdg_runtime_dir_owned_by_user":true' "$session_log" >/dev/null
   grep '"event":"session.gui_ready"' "$session_log" >/dev/null
   grep '"event":"session.verified"' "$session_log" >/dev/null
   grep '"event":"session.launch_spawn"' "$session_log" >/dev/null
@@ -150,6 +161,7 @@ cat > "$out_dir/manifest.json" <<EOF
     "workspace_switch": $drm_session_smoke_ready,
     "snap": $drm_session_smoke_ready,
     "xdg_runtime_dir_present": $runtime_present,
+    "xdg_runtime_dir_owned_by_user": $runtime_owned_by_user,
     "session_present": $session_present,
     "drm_card_nodes": $drm_card_nodes,
     "drm_render_nodes": $drm_render_nodes,

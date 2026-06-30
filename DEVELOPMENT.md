@@ -339,7 +339,7 @@ cargo run -p backlit-compositor-backend -- --backend=wayland --verify
 cargo run -p backlit-compositor-backend -- --backend=drm --verify
 ```
 
-The Wayland preflight expects `WAYLAND_DISPLAY` and `XDG_RUNTIME_DIR`; the DRM preflight expects Linux, `XDG_RUNTIME_DIR`, `/dev/dri` nodes, `/dev/input/event*` devices, and `XDG_SESSION_ID` so the real backend can later ask logind/libseat for device access.
+The Wayland preflight expects `WAYLAND_DISPLAY` plus an `XDG_RUNTIME_DIR` owned by the launching user. The DRM preflight expects Linux, a user-owned `XDG_RUNTIME_DIR`, `/dev/dri` nodes, `/dev/input/event*` devices, and `XDG_SESSION_ID` so the real backend can later ask logind/libseat for device access.
 
 To capture the current host's launch readiness:
 
@@ -350,7 +350,7 @@ To capture the current host's launch readiness:
 ./scripts/verify-drm-session-smoke.sh
 ```
 
-These write `target/launch-readiness/manifest.json`, `target/session-launch/manifest.json`, `target/session-clean-exit/manifest.json`, and `target/drm-session-smoke/manifest.json`. On macOS or headless CI they can pass with DRM expected-blocked; inside the Parallels Ubuntu GUI VM they should report DRM expected-ready and ready. The session launch verifier also checks that `packaging/sessions/backlit.desktop` resolves to `backlit-session` and that `backlit-session --preflight-only` exits cleanly for launchable backends. The session clean-exit verifier checks requested shutdown from the headless session path. The DRM session smoke verifier runs the full `backlit-session --backend=drm` path with GUI verification, terminal spawn verification, compositor/shell/settings service probes, and clean shutdown when the host is launch-ready.
+These write `target/launch-readiness/manifest.json`, `target/session-launch/manifest.json`, `target/session-clean-exit/manifest.json`, and `target/drm-session-smoke/manifest.json`. On macOS or headless CI they can pass with DRM expected-blocked; inside the Parallels Ubuntu GUI VM the wrapper maps the active `parallels` logind session before running E2E, so the manifests should report a user-owned runtime, DRM expected-ready, and ready. The session launch verifier also checks that `packaging/sessions/backlit.desktop` resolves to `backlit-session` and that `backlit-session --preflight-only` exits cleanly for launchable backends. The session clean-exit verifier checks requested shutdown from the headless session path. The DRM session smoke verifier runs the full `backlit-session --backend=drm` path with GUI verification, terminal spawn verification, compositor/shell/settings service probes, and clean shutdown when the host is launch-ready.
 
 ## Packaging Contract Verification
 

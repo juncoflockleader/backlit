@@ -1,5 +1,7 @@
 use std::fmt;
 use std::fs;
+#[cfg(target_os = "linux")]
+use std::os::unix::fs::MetadataExt;
 use std::str::FromStr;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -35,6 +37,8 @@ pub struct BackendPreflightReport {
 pub struct BackendPreflightEnvironment {
     pub wayland_display: Option<String>,
     pub xdg_runtime_dir: Option<String>,
+    pub xdg_runtime_dir_present: bool,
+    pub xdg_runtime_dir_owned_by_user: bool,
     pub target_os: String,
     pub drm_card_nodes: u64,
     pub drm_render_nodes: u64,
@@ -49,6 +53,8 @@ impl BackendPreflightEnvironment {
         Self {
             wayland_display: None,
             xdg_runtime_dir: None,
+            xdg_runtime_dir_present: false,
+            xdg_runtime_dir_owned_by_user: false,
             target_os: target_os.into(),
             drm_card_nodes: 0,
             drm_render_nodes: 0,
@@ -63,6 +69,12 @@ impl BackendPreflightEnvironment {
         let mut environment = Self::for_target(std::env::consts::OS);
         environment.wayland_display = std::env::var("WAYLAND_DISPLAY").ok();
         environment.xdg_runtime_dir = std::env::var("XDG_RUNTIME_DIR").ok();
+        let runtime_status = runtime_dir_status(
+            environment.xdg_runtime_dir.as_deref(),
+            &environment.target_os,
+        );
+        environment.xdg_runtime_dir_present = runtime_status.present;
+        environment.xdg_runtime_dir_owned_by_user = runtime_status.owned_by_user;
         environment.session_id = std::env::var("XDG_SESSION_ID").ok();
         environment.seat = std::env::var("XDG_SEAT").ok();
         environment.session_type = std::env::var("XDG_SESSION_TYPE").ok();
@@ -79,6 +91,8 @@ impl BackendPreflightEnvironment {
 
     pub fn with_xdg_runtime_dir(mut self, value: impl Into<String>) -> Self {
         self.xdg_runtime_dir = Some(value.into());
+        self.xdg_runtime_dir_present = true;
+        self.xdg_runtime_dir_owned_by_user = true;
         self
     }
 
@@ -131,7 +145,9 @@ pub fn preflight_backend(
 ) -> BackendPreflightReport {
     let mut environment = BackendPreflightEnvironment::for_target(target_os);
     environment.wayland_display = wayland_display.map(str::to_string);
-    environment.xdg_runtime_dir = xdg_runtime_dir.map(str::to_string);
+    if let Some(xdg_runtime_dir) = xdg_runtime_dir {
+        environment = environment.with_xdg_runtime_dir(xdg_runtime_dir);
+    }
 
     preflight_backend_with_environment(backend, &environment)
 }
@@ -146,19 +162,13 @@ pub fn preflight_backend_with_environment(
             "ready",
             "headless backend does not require host display state",
         ),
-        BackendKind::Wayland => preflight_wayland(
-            environment.wayland_display.as_deref(),
-            environment.xdg_runtime_dir.as_deref(),
-        ),
+        BackendKind::Wayland => preflight_wayland(environment),
         BackendKind::Drm => preflight_drm(environment),
     }
 }
 
-fn preflight_wayland(
-    wayland_display: Option<&str>,
-    xdg_runtime_dir: Option<&str>,
-) -> BackendPreflightReport {
-    if missing(wayland_display) {
+fn preflight_wayland(environment: &BackendPreflightEnvironment) -> BackendPreflightReport {
+    if missing(environment.wayland_display.as_deref()) {
         return BackendPreflightReport::blocked(
             BackendKind::Wayland,
             "missing-wayland-display",
@@ -166,11 +176,19 @@ fn preflight_wayland(
         );
     }
 
-    if missing(xdg_runtime_dir) {
+    if missing(environment.xdg_runtime_dir.as_deref()) || !environment.xdg_runtime_dir_present {
         return BackendPreflightReport::blocked(
             BackendKind::Wayland,
             "missing-xdg-runtime-dir",
             "nested Wayland backend requires XDG_RUNTIME_DIR for socket discovery",
+        );
+    }
+
+    if !environment.xdg_runtime_dir_owned_by_user {
+        return BackendPreflightReport::blocked(
+            BackendKind::Wayland,
+            "wrong-xdg-runtime-dir-owner",
+            "nested Wayland backend requires XDG_RUNTIME_DIR owned by the launching user",
         );
     }
 
@@ -190,11 +208,19 @@ fn preflight_drm(environment: &BackendPreflightEnvironment) -> BackendPreflightR
         );
     }
 
-    if missing(environment.xdg_runtime_dir.as_deref()) {
+    if missing(environment.xdg_runtime_dir.as_deref()) || !environment.xdg_runtime_dir_present {
         return BackendPreflightReport::blocked(
             BackendKind::Drm,
             "missing-xdg-runtime-dir",
             "DRM/KMS backend expects XDG_RUNTIME_DIR from the session environment",
+        );
+    }
+
+    if !environment.xdg_runtime_dir_owned_by_user {
+        return BackendPreflightReport::blocked(
+            BackendKind::Drm,
+            "wrong-xdg-runtime-dir-owner",
+            "DRM/KMS backend requires XDG_RUNTIME_DIR owned by the launching user",
         );
     }
 
@@ -257,6 +283,65 @@ fn missing(value: Option<&str>) -> bool {
         Some(value) => value.trim().is_empty(),
         None => true,
     }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+struct RuntimeDirStatus {
+    present: bool,
+    owned_by_user: bool,
+}
+
+fn runtime_dir_status(path: Option<&str>, target_os: &str) -> RuntimeDirStatus {
+    let Some(path) = path else {
+        return RuntimeDirStatus {
+            present: false,
+            owned_by_user: false,
+        };
+    };
+
+    let Ok(metadata) = fs::metadata(path) else {
+        return RuntimeDirStatus {
+            present: false,
+            owned_by_user: false,
+        };
+    };
+
+    if !metadata.is_dir() {
+        return RuntimeDirStatus {
+            present: false,
+            owned_by_user: false,
+        };
+    }
+
+    RuntimeDirStatus {
+        present: true,
+        owned_by_user: runtime_dir_owned_by_user(&metadata, target_os),
+    }
+}
+
+#[cfg(target_os = "linux")]
+fn runtime_dir_owned_by_user(metadata: &fs::Metadata, target_os: &str) -> bool {
+    if target_os != "linux" {
+        return true;
+    }
+
+    current_effective_uid()
+        .map(|uid| metadata.uid() == uid)
+        .unwrap_or(false)
+}
+
+#[cfg(not(target_os = "linux"))]
+fn runtime_dir_owned_by_user(_metadata: &fs::Metadata, _target_os: &str) -> bool {
+    true
+}
+
+#[cfg(target_os = "linux")]
+fn current_effective_uid() -> Option<u32> {
+    let status = fs::read_to_string("/proc/self/status").ok()?;
+    status.lines().find_map(|line| {
+        let rest = line.strip_prefix("Uid:")?;
+        rest.split_whitespace().nth(1)?.parse().ok()
+    })
 }
 
 impl FromStr for BackendKind {
@@ -770,6 +855,19 @@ mod tests {
     }
 
     #[test]
+    fn wayland_preflight_rejects_runtime_dir_owned_by_another_user() {
+        let mut environment = BackendPreflightEnvironment::for_target("linux")
+            .with_wayland_display("wayland-0")
+            .with_xdg_runtime_dir("/run/user/0");
+        environment.xdg_runtime_dir_owned_by_user = false;
+
+        let report = super::preflight_backend_with_environment(BackendKind::Wayland, &environment);
+
+        assert!(!report.ready);
+        assert_eq!(report.code, "wrong-xdg-runtime-dir-owner");
+    }
+
+    #[test]
     fn drm_preflight_requires_linux() {
         let report =
             super::preflight_backend(BackendKind::Drm, None, Some("/run/user/1000"), "macos");
@@ -789,6 +887,21 @@ mod tests {
 
         assert!(!report.ready);
         assert_eq!(report.code, "missing-xdg-runtime-dir");
+    }
+
+    #[test]
+    fn drm_preflight_rejects_runtime_dir_owned_by_another_user() {
+        let mut environment = BackendPreflightEnvironment::for_target("linux")
+            .with_xdg_runtime_dir("/run/user/0")
+            .with_drm_nodes(1, 1)
+            .with_input_event_nodes(2)
+            .with_session_id("1");
+        environment.xdg_runtime_dir_owned_by_user = false;
+
+        let report = super::preflight_backend_with_environment(BackendKind::Drm, &environment);
+
+        assert!(!report.ready);
+        assert_eq!(report.code, "wrong-xdg-runtime-dir-owner");
     }
 
     #[test]

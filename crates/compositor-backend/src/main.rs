@@ -42,6 +42,14 @@ fn run() -> Result<(), String> {
                 ("wayland_display", FieldValue::Str(wayland_display)),
                 ("xdg_runtime_dir", FieldValue::Str(xdg_runtime_dir)),
                 (
+                    "xdg_runtime_dir_present",
+                    FieldValue::Bool(environment.xdg_runtime_dir_present),
+                ),
+                (
+                    "xdg_runtime_dir_owned_by_user",
+                    FieldValue::Bool(environment.xdg_runtime_dir_owned_by_user),
+                ),
+                (
                     "drm_card_nodes",
                     FieldValue::U64(environment.drm_card_nodes)
                 ),

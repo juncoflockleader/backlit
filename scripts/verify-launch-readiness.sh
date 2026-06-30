@@ -35,6 +35,7 @@ grep '"backend":"headless"' "$headless_log" >/dev/null
 grep '"ready":true' "$headless_log" >/dev/null
 grep '"event":"backend.preflight"' "$drm_log" >/dev/null
 grep '"backend":"drm"' "$drm_log" >/dev/null
+grep '"xdg_runtime_dir_owned_by_user":' "$drm_log" >/dev/null
 
 drm_ready=false
 if grep '"ready":true' "$drm_log" >/dev/null; then
@@ -53,6 +54,15 @@ if [ -n "${XDG_SESSION_ID:-}" ]; then
   session_present=true
 fi
 
+runtime_owned_by_user=false
+if [ "$(uname -s)" = "Linux" ] && [ "$runtime_present" = true ]; then
+  runtime_owner_uid="$(stat -c '%u' "$XDG_RUNTIME_DIR" 2>/dev/null || printf unknown)"
+  current_uid="$(id -u)"
+  if [ "$runtime_owner_uid" = "$current_uid" ]; then
+    runtime_owned_by_user=true
+  fi
+fi
+
 drm_card_nodes="$(count_matching /dev/dri 'card*')"
 drm_render_nodes="$(count_matching /dev/dri 'renderD*')"
 input_event_nodes="$(count_matching /dev/input 'event*')"
@@ -61,6 +71,7 @@ drm_node_count=$((drm_card_nodes + drm_render_nodes))
 drm_expected_ready=false
 if [ "$(uname -s)" = "Linux" ] \
   && [ "$runtime_present" = true ] \
+  && [ "$runtime_owned_by_user" = true ] \
   && [ "$session_present" = true ] \
   && [ "$drm_node_count" -gt 0 ] \
   && [ "$input_event_nodes" -gt 0 ]; then
@@ -95,6 +106,7 @@ cat > "$out_dir/manifest.json" <<EOF
     "drm_expected_ready": $drm_expected_ready,
     "drm_blocked_expected": $drm_blocked_expected,
     "xdg_runtime_dir_present": $runtime_present,
+    "xdg_runtime_dir_owned_by_user": $runtime_owned_by_user,
     "session_present": $session_present,
     "drm_card_nodes": $drm_card_nodes,
     "drm_render_nodes": $drm_render_nodes,
