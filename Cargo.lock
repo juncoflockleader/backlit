@@ -73,6 +73,13 @@ dependencies = [
 ]
 
 [[package]]
+name = "backlit-session-supervisor"
+version = "0.1.0"
+dependencies = [
+ "backlit-common",
+]
+
+[[package]]
 name = "backlit-settings-daemon"
 version = "0.1.0"
 dependencies = [

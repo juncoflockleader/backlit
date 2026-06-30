@@ -19,6 +19,7 @@ cargo run -p backlit-protocols -- --verify --list
 cargo run -p backlit-perf -- --verify
 cargo run -p backlit-launcher -- --verify --list --target=terminal
 cargo run -p backlit-shortcuts -- --verify --list --resolve=Super+Enter
+cargo run -p backlit-session-supervisor -- --verify
 cargo run -p backlit-shell -- --component=all --verify
 ./scripts/verify-gui-smoke.sh
 ```

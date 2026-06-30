@@ -138,6 +138,7 @@ cargo run -p backlit-protocols -- --verify --list
 cargo run -p backlit-perf -- --verify
 cargo run -p backlit-launcher -- --verify --list --target=terminal
 cargo run -p backlit-shortcuts -- --verify --list --resolve=Super+Enter
+cargo run -p backlit-session-supervisor -- --verify
 cargo run -p backlit-session -- --backend=headless --screenshot target/backlit-session.ppm --verify
 ./scripts/verify-gui-smoke.sh
 cargo run -p backlit-shell -- --component=all --socket=backlit-0 --verify
@@ -182,6 +183,8 @@ The session smoke path consumes those dry-run routes too: `Alt+Tab` cycles focus
 Session verification also checks output-aware geometry: maximized windows use the panel-reserved work area, while fullscreen uses the whole output.
 
 Move and resize behavior is also verified through the session smoke path before maximize/fullscreen checks run.
+
+Crash isolation is covered by `backlit-session-supervisor --verify`: shell crashes restart without killing the compositor, while compositor crashes end the session.
 
 Backend preflight can be run directly:
 
