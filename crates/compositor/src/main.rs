@@ -31,7 +31,10 @@ fn run() -> Result<(), String> {
     emit(
         "compositor.start",
         &config,
-        &[("smoke_test", FieldValue::Bool(config.smoke_test))],
+        &[
+            ("smoke_test", FieldValue::Bool(config.smoke_test)),
+            ("scripted_client", FieldValue::Bool(config.scripted_client)),
+        ],
     );
 
     let preflight_environment = BackendPreflightEnvironment::from_host();
@@ -45,6 +48,88 @@ fn run() -> Result<(), String> {
             preflight_report.backend.as_str(),
             preflight_report.code,
         ));
+    }
+
+    if config.scripted_client {
+        let runtime = run_scripted_client_runtime()?;
+        emit(
+            "compositor.scripted_client",
+            &config,
+            &[
+                ("passed", FieldValue::Bool(runtime.passed())),
+                (
+                    "client_connected",
+                    FieldValue::Bool(runtime.client_connected),
+                ),
+                (
+                    "surfaces_after_map",
+                    FieldValue::U64(runtime.surfaces_after_map),
+                ),
+                (
+                    "first_frame_damaged_surfaces",
+                    FieldValue::U64(runtime.first_frame_damaged_surfaces),
+                ),
+                (
+                    "idle_frame_damaged_surfaces",
+                    FieldValue::U64(runtime.idle_frame_damaged_surfaces),
+                ),
+                (
+                    "damage_frame_damaged_surfaces",
+                    FieldValue::U64(runtime.damage_frame_damaged_surfaces),
+                ),
+                (
+                    "post_damage_idle_surfaces",
+                    FieldValue::U64(runtime.post_damage_idle_surfaces),
+                ),
+                (
+                    "close_frame_damaged_surfaces",
+                    FieldValue::U64(runtime.close_frame_damaged_surfaces),
+                ),
+                (
+                    "disconnect_frame_damaged_surfaces",
+                    FieldValue::U64(runtime.disconnect_frame_damaged_surfaces),
+                ),
+                (
+                    "final_idle_damaged_surfaces",
+                    FieldValue::U64(runtime.final_idle_damaged_surfaces),
+                ),
+                (
+                    "surfaces_after_close",
+                    FieldValue::U64(runtime.surfaces_after_close),
+                ),
+                (
+                    "surfaces_after_disconnect",
+                    FieldValue::U64(runtime.surfaces_after_disconnect),
+                ),
+                (
+                    "clients_after_disconnect",
+                    FieldValue::U64(runtime.clients_after_disconnect),
+                ),
+                ("frames", FieldValue::U64(runtime.frames)),
+                (
+                    "presented_pixels",
+                    FieldValue::U64(runtime.presented_pixels),
+                ),
+                ("no_idle_redraw", FieldValue::Bool(runtime.no_idle_redraw)),
+                (
+                    "targeted_damage_ok",
+                    FieldValue::Bool(runtime.targeted_damage_ok),
+                ),
+                ("close_damage_ok", FieldValue::Bool(runtime.close_damage_ok)),
+                (
+                    "disconnect_damage_ok",
+                    FieldValue::Bool(runtime.disconnect_damage_ok),
+                ),
+                (
+                    "clean_disconnect",
+                    FieldValue::Bool(runtime.clean_disconnect),
+                ),
+            ],
+        );
+
+        if !runtime.passed() {
+            return Err(String::from("scripted compositor client runtime failed"));
+        }
     }
 
     if config.smoke_test {
@@ -141,6 +226,114 @@ fn run() -> Result<(), String> {
     );
 
     Ok(())
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+struct ScriptedClientRuntime {
+    client_connected: bool,
+    surfaces_after_map: u64,
+    first_frame_damaged_surfaces: u64,
+    idle_frame_damaged_surfaces: u64,
+    damage_frame_damaged_surfaces: u64,
+    post_damage_idle_surfaces: u64,
+    close_frame_damaged_surfaces: u64,
+    disconnect_frame_damaged_surfaces: u64,
+    final_idle_damaged_surfaces: u64,
+    surfaces_after_close: u64,
+    surfaces_after_disconnect: u64,
+    clients_after_disconnect: u64,
+    frames: u64,
+    presented_pixels: u64,
+    no_idle_redraw: bool,
+    targeted_damage_ok: bool,
+    close_damage_ok: bool,
+    disconnect_damage_ok: bool,
+    clean_disconnect: bool,
+}
+
+impl ScriptedClientRuntime {
+    fn passed(self) -> bool {
+        self.client_connected
+            && self.surfaces_after_map == 2
+            && self.first_frame_damaged_surfaces == 2
+            && self.idle_frame_damaged_surfaces == 0
+            && self.damage_frame_damaged_surfaces == 1
+            && self.post_damage_idle_surfaces == 0
+            && self.close_frame_damaged_surfaces == 1
+            && self.disconnect_frame_damaged_surfaces == 1
+            && self.final_idle_damaged_surfaces == 0
+            && self.surfaces_after_close == 1
+            && self.surfaces_after_disconnect == 0
+            && self.clients_after_disconnect == 0
+            && self.frames == 7
+            && self.presented_pixels == 800 * 600 + 1024 * 768
+            && self.no_idle_redraw
+            && self.targeted_damage_ok
+            && self.close_damage_ok
+            && self.disconnect_damage_ok
+            && self.clean_disconnect
+    }
+}
+
+fn run_scripted_client_runtime() -> Result<ScriptedClientRuntime, String> {
+    let mut backend = HeadlessCompositor::default();
+    let client = backend.connect_client("scripted-terminal-client");
+    let terminal = backend
+        .submit_surface(client, "scripted-terminal", 800, 600)
+        .map_err(|error| error.to_string())?;
+    let browser = backend
+        .submit_surface(client, "scripted-browser", 1024, 768)
+        .map_err(|error| error.to_string())?;
+    let first_frame = backend.present();
+    let idle_frame = backend.present();
+
+    backend
+        .mark_damaged(terminal)
+        .map_err(|error| error.to_string())?;
+    let damage_frame = backend.present();
+    let post_damage_idle_frame = backend.present();
+
+    backend
+        .close_surface(browser)
+        .map_err(|error| error.to_string())?;
+    let close_frame = backend.present();
+
+    backend
+        .disconnect_client(client)
+        .map_err(|error| error.to_string())?;
+    let disconnect_frame = backend.present();
+    let final_idle_frame = backend.present();
+
+    let no_idle_redraw = idle_frame.damaged_surfaces == 0
+        && post_damage_idle_frame.damaged_surfaces == 0
+        && final_idle_frame.damaged_surfaces == 0;
+    let targeted_damage_ok = damage_frame.damaged_surfaces == 1;
+    let close_damage_ok = close_frame.damaged_surfaces == 1;
+    let disconnect_damage_ok = disconnect_frame.damaged_surfaces == 1;
+    let clean_disconnect =
+        disconnect_frame.client_count == 0 && disconnect_frame.surface_count == 0;
+
+    Ok(ScriptedClientRuntime {
+        client_connected: first_frame.client_count == 1,
+        surfaces_after_map: first_frame.surface_count,
+        first_frame_damaged_surfaces: first_frame.damaged_surfaces,
+        idle_frame_damaged_surfaces: idle_frame.damaged_surfaces,
+        damage_frame_damaged_surfaces: damage_frame.damaged_surfaces,
+        post_damage_idle_surfaces: post_damage_idle_frame.damaged_surfaces,
+        close_frame_damaged_surfaces: close_frame.damaged_surfaces,
+        disconnect_frame_damaged_surfaces: disconnect_frame.damaged_surfaces,
+        final_idle_damaged_surfaces: final_idle_frame.damaged_surfaces,
+        surfaces_after_close: close_frame.surface_count,
+        surfaces_after_disconnect: disconnect_frame.surface_count,
+        clients_after_disconnect: disconnect_frame.client_count,
+        frames: final_idle_frame.frame,
+        presented_pixels: first_frame.total_pixels,
+        no_idle_redraw,
+        targeted_damage_ok,
+        close_damage_ok,
+        disconnect_damage_ok,
+        clean_disconnect,
+    })
 }
 
 fn run_smoke_test(config: &RunConfig) {
@@ -724,12 +917,14 @@ fn print_help() {
 backlit-compositor
 
 Usage:
-  backlit-compositor [--backend=headless|wayland|drm] [--socket=backlit-0] [--smoke-test] [--serve] [--serve-for-ms=1000] [--idle-probe-ms=1000]
+  backlit-compositor [--backend=headless|wayland|drm] [--socket=backlit-0] [--smoke-test] [--scripted-client] [--serve] [--serve-for-ms=1000] [--idle-probe-ms=1000]
 
 Flags:
   --backend      Select compositor backend. Defaults to headless.
   --socket       Wayland socket name to create or target. Defaults to backlit-0.
   --smoke-test   Run the current MVP 0 policy/metrics smoke test and exit.
+  --scripted-client
+                 Run a deterministic app-client lifecycle through the compositor runtime.
   --serve        Stay alive after readiness for systemd session service mode.
   --serve-for-ms Stay alive for a bounded service-lifecycle probe duration.
   --idle-probe-ms
@@ -743,7 +938,7 @@ Backend launch preflight runs before smoke or service readiness events.
 
 #[cfg(test)]
 mod tests {
-    use super::run_compositor_surface_smoke;
+    use super::{run_compositor_surface_smoke, run_scripted_client_runtime};
 
     #[test]
     fn compositor_surface_smoke_maps_xdg_toplevel_into_backend_frame() {
@@ -764,5 +959,15 @@ mod tests {
         assert_eq!(report.clients, 1);
         assert_eq!(report.surfaces, 1);
         assert_eq!(report.presented_pixels, 1);
+    }
+
+    #[test]
+    fn scripted_client_runtime_maps_damages_and_disconnects() {
+        let report = run_scripted_client_runtime().unwrap();
+
+        assert!(report.passed(), "{report:?}");
+        assert_eq!(report.surfaces_after_map, 2);
+        assert_eq!(report.surfaces_after_disconnect, 0);
+        assert_eq!(report.clients_after_disconnect, 0);
     }
 }

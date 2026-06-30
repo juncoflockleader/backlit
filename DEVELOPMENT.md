@@ -131,7 +131,7 @@ The Linux-side verifier can also be run directly inside any Ubuntu checkout:
 ./scripts/verify-linux-e2e.sh
 ```
 
-It runs `cargo fmt`, workspace tests, `cargo clippy`, the deterministic GUI smoke verifier, the preview renderer, launch-performance verifier, launcher desktop discovery verifier, resource-budget verifier, notification-daemon verifier, settings-daemon verifier, service-lifecycle verifier, settings-app verifier, portal-security verifier, crash-log verifier, CI contract verifier, packaging contract verifier, staged session install verifier, systemd activation verifier, launch-readiness verifier, session launch verifier, session clean-exit verifier, nested Wayland smoke verifier, and MVP 0 contract verifier, then writes `target/linux-e2e/manifest.json`.
+It runs `cargo fmt`, workspace tests, `cargo clippy`, the deterministic GUI smoke verifier, the preview renderer, compositor-runtime verifier, launch-performance verifier, launcher desktop discovery verifier, resource-budget verifier, notification-daemon verifier, settings-daemon verifier, service-lifecycle verifier, settings-app verifier, portal-security verifier, crash-log verifier, CI contract verifier, packaging contract verifier, staged session install verifier, systemd activation verifier, launch-readiness verifier, session launch verifier, session clean-exit verifier, nested Wayland smoke verifier, and MVP 0 contract verifier, then writes `target/linux-e2e/manifest.json`.
 
 ## GUI Linux VM Workflow
 
@@ -201,6 +201,7 @@ cargo run -p backlit-session -- --backend=headless --screenshot target/backlit-s
 ./scripts/render-gui-preview.sh
 ./scripts/render-parallels-gui-preview.sh
 ./scripts/verify-gui-smoke.sh
+./scripts/verify-compositor-runtime.sh
 ./scripts/verify-launch-performance.sh
 ./scripts/verify-resource-budget.sh
 ./scripts/verify-notification-daemon.sh
@@ -289,6 +290,8 @@ The shell smoke path runs `backlit-shell --component=all --verify` and checks th
 It also runs `backlit-perf --verify`, which measures the deterministic GUI render path, headless backend present path, idle no-redraw behavior, targeted surface damage path, and 60-frame drag pacing path against generous MVP 0 smoke budgets.
 
 The compositor smoke path also checks the headless direct-scanout policy: an opaque fullscreen dmabuf surface covering the output is eligible, while overlays and SHM buffers block scanout.
+
+The compositor-runtime verifier runs `backlit-compositor --scripted-client --serve --serve-for-ms=25`, maps two app-like surfaces, verifies targeted damage and idle no-redraw behavior, closes one surface, disconnects the client, and checks the cleanup frames. It is a bounded headless proof for the app-window lifecycle that the future Smithay runtime must preserve.
 
 The launch-performance verifier runs the built `backlit-session`, `backlit-compositor`, `backlit-shell`, `backlit-notification-daemon`, and `backlit-settings-daemon` binaries directly, then writes `target/launch-performance/manifest.json`. It enforces the current MVP budgets for session GUI readiness under 500 ms, service-ready probes under 2 seconds, and terminal hotkey spawn under 300 ms.
 

@@ -720,6 +720,7 @@ pub struct RunConfig {
     pub backend: BackendKind,
     pub socket: String,
     pub smoke_test: bool,
+    pub scripted_client: bool,
     pub serve: bool,
     pub serve_for_ms: Option<u64>,
     pub idle_probe_ms: Option<u64>,
@@ -732,6 +733,7 @@ impl Default for RunConfig {
             backend: BackendKind::Headless,
             socket: String::from("backlit-0"),
             smoke_test: false,
+            scripted_client: false,
             serve: false,
             serve_for_ms: None,
             idle_probe_ms: None,
@@ -772,6 +774,8 @@ where
             config.help = true;
         } else if arg == "--smoke-test" {
             config.smoke_test = true;
+        } else if arg == "--scripted-client" {
+            config.scripted_client = true;
         } else if arg == "--serve" {
             config.serve = true;
         } else if let Some(value) = arg.strip_prefix("--backend=") {
@@ -911,6 +915,7 @@ pub struct HeadlessCompositor {
     next_client_id: u64,
     next_surface_id: u64,
     frame: u64,
+    pending_damage_events: u64,
 }
 
 impl Default for HeadlessCompositor {
@@ -921,6 +926,7 @@ impl Default for HeadlessCompositor {
             next_client_id: 1,
             next_surface_id: 1,
             frame: 0,
+            pending_damage_events: 0,
         }
     }
 }
@@ -982,14 +988,38 @@ impl HeadlessCompositor {
         }
     }
 
+    pub fn close_surface(&mut self, surface: SurfaceId) -> Result<(), HeadlessError> {
+        let Some(index) = self.surfaces.iter().position(|known| known.id == surface) else {
+            return Err(HeadlessError::UnknownSurface(surface));
+        };
+
+        self.surfaces.remove(index);
+        self.pending_damage_events += 1;
+        Ok(())
+    }
+
+    pub fn disconnect_client(&mut self, client: ClientId) -> Result<u64, HeadlessError> {
+        if !self.clients.iter().any(|known| known.id == client) {
+            return Err(HeadlessError::UnknownClient(client));
+        }
+
+        self.clients.retain(|known| known.id != client);
+        let surface_count = self.surfaces.len();
+        self.surfaces.retain(|surface| surface.client != client);
+        let removed_surfaces = (surface_count - self.surfaces.len()) as u64;
+        self.pending_damage_events += removed_surfaces;
+        Ok(removed_surfaces)
+    }
+
     pub fn present(&mut self) -> FrameReport {
         self.frame += 1;
 
-        let damaged_surfaces = self
-            .surfaces
-            .iter()
-            .filter(|surface| surface.damaged)
-            .count() as u64;
+        let damaged_surfaces = self.pending_damage_events
+            + self
+                .surfaces
+                .iter()
+                .filter(|surface| surface.damaged)
+                .count() as u64;
         let total_pixels = self
             .surfaces
             .iter()
@@ -999,6 +1029,7 @@ impl HeadlessCompositor {
         for surface in &mut self.surfaces {
             surface.damaged = false;
         }
+        self.pending_damage_events = 0;
 
         FrameReport {
             frame: self.frame,
@@ -1095,6 +1126,7 @@ mod tests {
             "--socket",
             "backlit-test",
             "--smoke-test",
+            "--scripted-client",
             "--idle-probe-ms",
             "250",
             "--serve",
@@ -1105,6 +1137,7 @@ mod tests {
         assert_eq!(config.backend, BackendKind::Wayland);
         assert_eq!(config.socket, "backlit-test");
         assert!(config.smoke_test);
+        assert!(config.scripted_client);
         assert_eq!(config.idle_probe_ms, Some(250));
         assert!(config.serve);
         assert_eq!(config.serve_for_ms, Some(25));
@@ -1136,6 +1169,41 @@ mod tests {
 
         let second_frame = compositor.present();
         assert_eq!(second_frame.damaged_surfaces, 0);
+    }
+
+    #[test]
+    fn headless_backend_tracks_surface_close_and_client_disconnect_damage() {
+        let mut compositor = HeadlessCompositor::default();
+        let client = compositor.connect_client("scripted-client");
+        let terminal = compositor
+            .submit_surface(client, "terminal", 800, 600)
+            .unwrap();
+        let browser = compositor
+            .submit_surface(client, "browser", 1024, 768)
+            .unwrap();
+
+        let first_frame = compositor.present();
+        assert_eq!(first_frame.surface_count, 2);
+        assert_eq!(first_frame.damaged_surfaces, 2);
+        assert_eq!(compositor.present().damaged_surfaces, 0);
+
+        compositor.close_surface(browser).unwrap();
+        let close_frame = compositor.present();
+        assert_eq!(close_frame.surface_count, 1);
+        assert_eq!(close_frame.damaged_surfaces, 1);
+
+        let removed = compositor.disconnect_client(client).unwrap();
+        assert_eq!(removed, 1);
+        let disconnect_frame = compositor.present();
+        assert_eq!(disconnect_frame.client_count, 0);
+        assert_eq!(disconnect_frame.surface_count, 0);
+        assert_eq!(disconnect_frame.damaged_surfaces, 1);
+        assert_eq!(compositor.present().damaged_surfaces, 0);
+
+        assert_eq!(
+            compositor.mark_damaged(terminal).unwrap_err().to_string(),
+            "unknown headless surface 1"
+        );
     }
 
     #[test]

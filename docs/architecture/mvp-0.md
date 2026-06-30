@@ -15,6 +15,7 @@ MVP 0 is the development harness:
 - Input event routing smoke for keyboard shortcuts, pointer focus, window move, and resize.
 - xdg-shell-style toplevel and popup lifecycle smoke for configure/ack/map, focus, maximize, fullscreen, and close.
 - Compositor-owned xdg-toplevel and popup smoke that maps configured surfaces into a headless backend frame.
+- Scripted compositor runtime smoke that maps app-like surfaces, verifies targeted damage and idle no-redraw behavior, closes a surface, and disconnects the client in bounded service mode.
 - Session interaction smoke for app switching and terminal launch resolution.
 - Session service orchestration smoke for launching compositor, shell, and settings daemon probes from `backlit-session`.
 - Session move/resize smoke through pure window policy.

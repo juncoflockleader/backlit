@@ -33,6 +33,7 @@ require_file docs/architecture/mvp-0.md
 require_executable scripts/verify-gui-smoke.sh
 require_executable scripts/verify-launcher-desktop-discovery.sh
 require_executable scripts/render-gui-preview.sh
+require_executable scripts/verify-compositor-runtime.sh
 require_executable scripts/verify-launch-performance.sh
 require_executable scripts/verify-resource-budget.sh
 require_executable scripts/verify-notification-daemon.sh
@@ -97,6 +98,7 @@ require_contains scripts/verify-linux-e2e.sh './scripts/verify-nested-wayland-sm
 require_contains scripts/verify-nested-wayland-smoke.sh '"launcher_terminal_wayland_spawn": true'
 require_contains scripts/verify-nested-wayland-smoke.sh '"launcher_terminal_no_seat_expected":'
 require_contains scripts/verify-linux-e2e.sh './scripts/render-gui-preview.sh'
+require_contains scripts/verify-linux-e2e.sh './scripts/verify-compositor-runtime.sh'
 require_contains scripts/verify-linux-e2e.sh './scripts/verify-launch-performance.sh'
 require_contains scripts/verify-linux-e2e.sh './scripts/verify-launcher-desktop-discovery.sh'
 require_contains scripts/verify-linux-e2e.sh './scripts/verify-resource-budget.sh'
@@ -153,6 +155,7 @@ if [ -n "$artifact_root" ] && [ -d "$artifact_root" ]; then
   artifact_manifests_checked=true
   require_file "$artifact_root/gui-smoke/manifest.json"
   require_file "$artifact_root/gui-preview/manifest.json"
+  require_file "$artifact_root/compositor-runtime/manifest.json"
   require_file "$artifact_root/launch-performance/manifest.json"
   require_file "$artifact_root/launcher-desktop-discovery/manifest.json"
   require_file "$artifact_root/resource-budget/manifest.json"
@@ -219,6 +222,13 @@ if [ -n "$artifact_root" ] && [ -d "$artifact_root" ]; then
   require_contains "$artifact_root/gui-preview/manifest.json" '"session_services": true'
   require_contains "$artifact_root/gui-preview/manifest.json" '"notification_service": true'
   require_contains "$artifact_root/gui-preview/manifest.json" '"settings_service": true'
+  require_contains "$artifact_root/compositor-runtime/manifest.json" '"scripted_client_runtime": true'
+  require_contains "$artifact_root/compositor-runtime/manifest.json" '"app_surface_map": true'
+  require_contains "$artifact_root/compositor-runtime/manifest.json" '"targeted_surface_damage": true'
+  require_contains "$artifact_root/compositor-runtime/manifest.json" '"idle_no_redraw": true'
+  require_contains "$artifact_root/compositor-runtime/manifest.json" '"surface_close_damage": true'
+  require_contains "$artifact_root/compositor-runtime/manifest.json" '"client_disconnect_cleanup": true'
+  require_contains "$artifact_root/compositor-runtime/manifest.json" '"service_mode_runtime": true'
   require_contains "$artifact_root/launch-performance/manifest.json" '"startup_budget": true'
   require_contains "$artifact_root/launch-performance/manifest.json" '"terminal_launch_budget": true'
   require_contains "$artifact_root/launch-performance/manifest.json" '"shell_ready_budget": true'
@@ -352,6 +362,7 @@ cat > "$out_dir/manifest.json" <<EOF
     "launch_performance": true,
     "launcher_desktop_discovery": true,
     "resource_budget": true,
+    "compositor_runtime": true,
     "compositor_service_ready": true,
     "notification_daemon": true,
     "settings_daemon": true,

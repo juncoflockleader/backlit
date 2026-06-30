@@ -7,6 +7,7 @@ cd "$repo_root"
 out_dir="${1:-target/linux-e2e}"
 smoke_dir="$out_dir/gui-smoke"
 preview_dir="$out_dir/gui-preview"
+compositor_runtime_dir="$out_dir/compositor-runtime"
 launch_performance_dir="$out_dir/launch-performance"
 launcher_desktop_dir="$out_dir/launcher-desktop-discovery"
 resource_budget_dir="$out_dir/resource-budget"
@@ -37,6 +38,7 @@ cargo test --workspace --all-targets
 cargo clippy --workspace --all-targets -- -D warnings
 ./scripts/verify-gui-smoke.sh "$smoke_dir"
 ./scripts/render-gui-preview.sh "$preview_dir"
+./scripts/verify-compositor-runtime.sh "$compositor_runtime_dir"
 ./scripts/verify-launch-performance.sh "$launch_performance_dir"
 ./scripts/verify-launcher-desktop-discovery.sh "$launcher_desktop_dir"
 ./scripts/verify-resource-budget.sh "$resource_budget_dir"
@@ -76,6 +78,7 @@ cat > "$out_dir/manifest.json" <<EOF
   "artifacts": {
     "gui_smoke_manifest": "$smoke_dir/manifest.json",
     "gui_preview_manifest": "$preview_dir/manifest.json",
+    "compositor_runtime_manifest": "$compositor_runtime_dir/manifest.json",
     "launch_performance_manifest": "$launch_performance_dir/manifest.json",
     "launcher_desktop_discovery_manifest": "$launcher_desktop_dir/manifest.json",
     "resource_budget_manifest": "$resource_budget_dir/manifest.json",
@@ -102,6 +105,7 @@ cat > "$out_dir/manifest.json" <<EOF
     "clippy": true,
     "gui_smoke": true,
     "gui_preview": true,
+    "compositor_runtime": true,
     "launch_performance": true,
     "launcher_desktop_discovery": true,
     "resource_budget": true,
