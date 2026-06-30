@@ -1,0 +1,16 @@
+[package]
+name = "backlit-shortcuts"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+publish = false
+
+[dependencies]
+backlit-common = { path = "../common" }
+backlit-launcher = { path = "../launcher" }
+
+[lib]
+path = "src/lib.rs"
+

@@ -137,6 +137,7 @@ cargo run -p backlit-compositor-backend -- --backend=headless --verify
 cargo run -p backlit-protocols -- --verify --list
 cargo run -p backlit-perf -- --verify
 cargo run -p backlit-launcher -- --verify --list --target=terminal
+cargo run -p backlit-shortcuts -- --verify --list --resolve=Super+Enter
 cargo run -p backlit-session -- --backend=headless --screenshot target/backlit-session.ppm --verify
 ./scripts/verify-gui-smoke.sh
 cargo run -p backlit-shell -- --component=all --socket=backlit-0 --verify
@@ -173,6 +174,8 @@ It also runs `backlit-perf --verify`, which measures the deterministic GUI rende
 The default GUI render is guarded by checksum `5635038614353063225`; update it only when an intentional visual change is made.
 
 The launcher catalog is verified in dry-run mode for the first required targets: terminal, browser, and settings.
+
+Keyboard shortcut routing is also verified in dry-run mode for launcher, terminal, browser, settings, and app-switcher actions.
 
 Backend preflight can be run directly:
 

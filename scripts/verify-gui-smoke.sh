@@ -15,6 +15,7 @@ cargo run -p backlit-protocols -- --verify --list > "$out_dir/protocols.jsonl"
 cargo run -p backlit-perf -- --verify > "$out_dir/perf.jsonl"
 cargo run -p backlit-shell -- --component=all --socket=backlit-0 --verify > "$out_dir/shell.jsonl"
 cargo run -p backlit-launcher -- --verify --list --target=terminal > "$out_dir/launcher.jsonl"
+cargo run -p backlit-shortcuts -- --verify --list --resolve=Super+Enter > "$out_dir/shortcuts.jsonl"
 cargo run -p backlit-session -- \
   --backend=headless \
   --socket=backlit-0 \
@@ -40,6 +41,9 @@ grep '"required_components":4' "$out_dir/shell.jsonl" >/dev/null
 grep '"event":"launcher.verified"' "$out_dir/launcher.jsonl" >/dev/null
 grep '"required_targets":3' "$out_dir/launcher.jsonl" >/dev/null
 grep '"target":"terminal"' "$out_dir/launcher.jsonl" >/dev/null
+grep '"event":"shortcut.verified"' "$out_dir/shortcuts.jsonl" >/dev/null
+grep '"required_bindings":6' "$out_dir/shortcuts.jsonl" >/dev/null
+grep '"action":"launch-terminal"' "$out_dir/shortcuts.jsonl" >/dev/null
 grep '"event":"demo_client.verified"' "$out_dir/demo-client.jsonl" >/dev/null
 grep '"passed":true' "$out_dir/demo-client.jsonl" >/dev/null
 grep '"golden_ok":true' "$out_dir/demo-client.jsonl" >/dev/null
@@ -68,6 +72,7 @@ cat > "$out_dir/manifest.json" <<EOF
     "perf_log": "$out_dir/perf.jsonl",
     "shell_log": "$out_dir/shell.jsonl",
     "launcher_log": "$out_dir/launcher.jsonl",
+    "shortcuts_log": "$out_dir/shortcuts.jsonl",
     "session_log": "$out_dir/session.jsonl",
     "demo_client_log": "$out_dir/demo-client.jsonl",
     "session_screenshot": "$out_dir/backlit-session.ppm",
@@ -77,6 +82,7 @@ cat > "$out_dir/manifest.json" <<EOF
     "protocol_required_count": 7,
     "shell_required_components": 4,
     "launcher_required_targets": 3,
+    "shortcut_required_bindings": 6,
     "session_ppm_bytes": $session_ppm_bytes,
     "demo_ppm_bytes": $demo_ppm_bytes,
     "golden_checksum": true

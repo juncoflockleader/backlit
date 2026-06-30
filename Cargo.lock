@@ -90,5 +90,13 @@ name = "backlit-shell-protocol"
 version = "0.1.0"
 
 [[package]]
+name = "backlit-shortcuts"
+version = "0.1.0"
+dependencies = [
+ "backlit-common",
+ "backlit-launcher",
+]
+
+[[package]]
 name = "backlit-window-policy"
 version = "0.1.0"
