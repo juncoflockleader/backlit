@@ -10,6 +10,7 @@ preview_dir="$out_dir/gui-preview"
 ci_contract_dir="$out_dir/ci-contract"
 packaging_dir="$out_dir/packaging-contract"
 staged_install_dir="$out_dir/staged-session-install"
+mvp0_contract_dir="$out_dir/mvp0-contract"
 mkdir -p "$out_dir"
 
 commit="$(git rev-parse --short HEAD 2>/dev/null || printf unknown)"
@@ -34,6 +35,8 @@ if [ "$(uname -s)" = "Linux" ]; then
   nested_wayland_manifest="$out_dir/nested-wayland/manifest.json"
 fi
 
+./scripts/verify-mvp0-contract.sh "$mvp0_contract_dir" "$out_dir"
+
 cat > "$out_dir/manifest.json" <<EOF
 {
   "name": "backlit-linux-e2e",
@@ -48,6 +51,7 @@ cat > "$out_dir/manifest.json" <<EOF
     "ci_contract_manifest": "$ci_contract_dir/manifest.json",
     "packaging_contract_manifest": "$packaging_dir/manifest.json",
     "staged_session_install_manifest": "$staged_install_dir/manifest.json",
+    "mvp0_contract_manifest": "$mvp0_contract_dir/manifest.json",
     "nested_wayland_manifest": "$nested_wayland_manifest"
   },
   "checks": {
@@ -59,6 +63,7 @@ cat > "$out_dir/manifest.json" <<EOF
     "ci_contract": true,
     "packaging_contract": true,
     "staged_session_install": true,
+    "mvp0_contract": true,
     "nested_wayland": $nested_wayland
   }
 }

@@ -28,12 +28,13 @@ cargo run -p backlit-session -- --backend=headless --screenshot target/backlit-s
 ./scripts/render-parallels-gui-preview.sh
 ./scripts/verify-gui-smoke.sh
 ./scripts/verify-ci-contract.sh
+./scripts/verify-mvp0-contract.sh
 ./scripts/verify-packaging-contract.sh
 ./scripts/verify-staged-session-install.sh
 ./scripts/verify-linux-e2e.sh
 ```
 
-The preview renderer writes `target/gui-preview/backlit-session.ppm` and, on macOS, a PNG you can open. The Parallels preview renderer runs the same path in Ubuntu and copies the artifact back to `target/gui-preview-parallels/`. The smoke verifier writes a top-level artifact manifest to `target/gui-smoke/manifest.json`; CI runs the same Linux E2E gate on GitHub Actions.
+The preview renderer writes `target/gui-preview/backlit-session.ppm` and, on macOS, a PNG you can open. The Parallels preview renderer runs the same path in Ubuntu and copies the artifact back to `target/gui-preview-parallels/`. The smoke verifier writes a top-level artifact manifest to `target/gui-smoke/manifest.json`; the MVP 0 contract verifier checks that the executable harness still covers the design deliverables. CI runs the same Linux E2E gate on GitHub Actions.
 
 When a Parallels Ubuntu VM is available, the full Linux guest verification can be run from macOS with:
 

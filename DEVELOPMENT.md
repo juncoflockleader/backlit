@@ -126,7 +126,7 @@ The Linux-side verifier can also be run directly inside any Ubuntu checkout:
 ./scripts/verify-linux-e2e.sh
 ```
 
-It runs `cargo fmt`, workspace tests, `cargo clippy`, the deterministic GUI smoke verifier, the packaging contract verifier, the staged session install verifier, and the nested Wayland smoke verifier, then writes `target/linux-e2e/manifest.json`.
+It runs `cargo fmt`, workspace tests, `cargo clippy`, the deterministic GUI smoke verifier, the preview renderer, CI contract verifier, packaging contract verifier, staged session install verifier, nested Wayland smoke verifier, and MVP 0 contract verifier, then writes `target/linux-e2e/manifest.json`.
 
 ## GUI Linux VM Workflow
 
@@ -190,6 +190,7 @@ cargo run -p backlit-session -- --backend=headless --screenshot target/backlit-s
 ./scripts/render-gui-preview.sh
 ./scripts/render-parallels-gui-preview.sh
 ./scripts/verify-gui-smoke.sh
+./scripts/verify-mvp0-contract.sh
 ./scripts/verify-ci-contract.sh
 ./scripts/verify-packaging-contract.sh
 ./scripts/verify-staged-session-install.sh
