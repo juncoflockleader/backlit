@@ -116,16 +116,24 @@ grep '"drag_dropped_frame_budget":0' "$out_dir/perf.jsonl" >/dev/null
 grep '"drag_damage_ok":true' "$out_dir/perf.jsonl" >/dev/null
 grep '"drag_frame_pacing_ok":true' "$out_dir/perf.jsonl" >/dev/null
 grep '"event":"shell.verified"' "$out_dir/shell.jsonl" >/dev/null
-grep '"required_components":4' "$out_dir/shell.jsonl" >/dev/null
-grep '"required_roles":4' "$out_dir/shell.jsonl" >/dev/null
+grep '"required_components":5' "$out_dir/shell.jsonl" >/dev/null
+grep '"required_roles":5' "$out_dir/shell.jsonl" >/dev/null
 grep '"wallpaper_ready":true' "$out_dir/shell.jsonl" >/dev/null
 grep '"panel_ready":true' "$out_dir/shell.jsonl" >/dev/null
 grep '"launcher_ready":true' "$out_dir/shell.jsonl" >/dev/null
 grep '"app_switcher_ready":true' "$out_dir/shell.jsonl" >/dev/null
+grep '"lock_screen_ready":true' "$out_dir/shell.jsonl" >/dev/null
 grep '"clock_visible":true' "$out_dir/shell.jsonl" >/dev/null
 grep '"battery_visible":true' "$out_dir/shell.jsonl" >/dev/null
 grep '"network_visible":true' "$out_dir/shell.jsonl" >/dev/null
 grep '"volume_visible":true' "$out_dir/shell.jsonl" >/dev/null
+grep '"power_menu_ready":true' "$out_dir/shell.jsonl" >/dev/null
+grep '"power_menu_visible":true' "$out_dir/shell.jsonl" >/dev/null
+grep '"power_menu_actions":4' "$out_dir/shell.jsonl" >/dev/null
+grep '"power_menu_lock":true' "$out_dir/shell.jsonl" >/dev/null
+grep '"power_menu_logout":true' "$out_dir/shell.jsonl" >/dev/null
+grep '"power_menu_reboot":true' "$out_dir/shell.jsonl" >/dev/null
+grep '"power_menu_shutdown":true' "$out_dir/shell.jsonl" >/dev/null
 grep '"network_status_ready":true' "$out_dir/shell.jsonl" >/dev/null
 grep '"network_backend":"NetworkManager"' "$out_dir/shell.jsonl" >/dev/null
 grep '"network_control_tool":"nmcli"' "$out_dir/shell.jsonl" >/dev/null
@@ -144,6 +152,9 @@ grep '"terminal_target":true' "$out_dir/shell.jsonl" >/dev/null
 grep '"browser_target":true' "$out_dir/shell.jsonl" >/dev/null
 grep '"settings_target":true' "$out_dir/shell.jsonl" >/dev/null
 grep '"app_switcher_entries":3' "$out_dir/shell.jsonl" >/dev/null
+grep '"lock_screen_covers_output":true' "$out_dir/shell.jsonl" >/dev/null
+grep '"lock_screen_unlock_prompt_visible":true' "$out_dir/shell.jsonl" >/dev/null
+grep '"lock_screen_password_field_focused":true' "$out_dir/shell.jsonl" >/dev/null
 grep '"event":"launcher.verified"' "$out_dir/launcher.jsonl" >/dev/null
 grep '"required_targets":3' "$out_dir/launcher.jsonl" >/dev/null
 grep '"desktop_entries":3' "$out_dir/launcher.jsonl" >/dev/null
@@ -260,15 +271,17 @@ cat > "$out_dir/manifest.json" <<EOF
   },
   "checks": {
     "protocol_required_count": 7,
-    "shell_required_components": 4,
-    "shell_required_roles": 4,
+    "shell_required_components": 5,
+    "shell_required_roles": 5,
     "shell_wallpaper": true,
     "shell_panel_status": true,
+    "shell_power_menu": true,
     "shell_network_status": true,
     "shell_audio_status": true,
     "shell_workspace_indicator": true,
     "shell_launcher_targets": 3,
     "shell_app_switcher": true,
+    "shell_lock_screen": true,
     "launcher_required_targets": 3,
     "desktop_entries": 3,
     "launcher_spawn": true,

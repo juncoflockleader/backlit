@@ -433,7 +433,8 @@ fn run_shell_probe(path: &Path, config: &Config) -> Result<ServiceProbe, String>
         &[
             String::from("\"event\":\"shell.verified\""),
             String::from("\"passed\":true"),
-            String::from("\"required_components\":4"),
+            String::from("\"required_components\":5"),
+            String::from("\"lock_screen_ready\":true"),
         ],
     )
 }

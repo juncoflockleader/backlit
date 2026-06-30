@@ -1,6 +1,7 @@
 use backlit_launcher::{
     default_catalog, resolve_command, verify_catalog, LaunchCommand, LaunchTarget,
 };
+use backlit_settings_daemon::{power_action_command, PowerAction, DEFAULT_POWER_MENU};
 use backlit_shell_protocol::{ShellSurfaceRole, MVP_SHELL_ROLES};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -75,6 +76,7 @@ pub struct PanelState {
     pub battery_visible: bool,
     pub network_visible: bool,
     pub volume_visible: bool,
+    pub power_menu: PowerMenuState,
     pub network: NetworkStatus,
     pub audio: AudioStatus,
     pub workspace: WorkspaceIndicator,
@@ -88,9 +90,38 @@ impl PanelState {
             && self.battery_visible
             && self.network_visible
             && self.volume_visible
+            && self.power_menu.ready()
             && self.network.ready()
             && self.audio.ready()
             && self.workspace.ready()
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct PowerMenuState {
+    pub visible: bool,
+    pub opens_lock_screen: bool,
+    pub actions: Vec<PowerAction>,
+}
+
+impl PowerMenuState {
+    pub fn ready(&self) -> bool {
+        self.visible
+            && self.opens_lock_screen
+            && self.actions.as_slice() == DEFAULT_POWER_MENU
+            && self
+                .actions
+                .iter()
+                .copied()
+                .all(|action| power_action_command(action).is_some())
+    }
+
+    pub fn action_count(&self) -> u64 {
+        self.actions.len() as u64
+    }
+
+    pub fn has_action(&self, action: PowerAction) -> bool {
+        self.actions.contains(&action)
     }
 }
 
@@ -130,12 +161,30 @@ impl AppSwitcherState {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
+pub struct LockScreenState {
+    pub output: &'static str,
+    pub covers_output: bool,
+    pub unlock_prompt_visible: bool,
+    pub password_field_focused: bool,
+}
+
+impl LockScreenState {
+    pub fn ready(&self) -> bool {
+        !self.output.is_empty()
+            && self.covers_output
+            && self.unlock_prompt_visible
+            && self.password_field_focused
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ShellChromeReport {
     pub required_roles: u64,
     pub wallpaper: WallpaperState,
     pub panel: PanelState,
     pub launcher: LauncherState,
     pub app_switcher: AppSwitcherState,
+    pub lock_screen: LockScreenState,
 }
 
 impl ShellChromeReport {
@@ -145,6 +194,7 @@ impl ShellChromeReport {
             && self.panel.ready()
             && self.launcher.ready()
             && self.app_switcher.ready()
+            && self.lock_screen.ready()
     }
 
     pub fn role_ready(&self, role: ShellSurfaceRole) -> bool {
@@ -153,7 +203,8 @@ impl ShellChromeReport {
             ShellSurfaceRole::Panel => self.panel.ready(),
             ShellSurfaceRole::Launcher => self.launcher.ready(),
             ShellSurfaceRole::AppSwitcher => self.app_switcher.ready(),
-            ShellSurfaceRole::NotificationHost | ShellSurfaceRole::LockScreen => false,
+            ShellSurfaceRole::LockScreen => self.lock_screen.ready(),
+            ShellSurfaceRole::NotificationHost => false,
         }
     }
 }
@@ -172,6 +223,11 @@ pub fn run_shell_chrome_smoke() -> ShellChromeReport {
             battery_visible: true,
             network_visible: true,
             volume_visible: true,
+            power_menu: PowerMenuState {
+                visible: true,
+                opens_lock_screen: true,
+                actions: DEFAULT_POWER_MENU.to_vec(),
+            },
             network: NetworkStatus {
                 backend: "NetworkManager",
                 control_tool: "nmcli",
@@ -200,6 +256,12 @@ pub fn run_shell_chrome_smoke() -> ShellChromeReport {
             entries: vec!["Terminal", "Browser", "Settings"],
             selected_index: 0,
         },
+        lock_screen: LockScreenState {
+            output: "Virtual-1",
+            covers_output: true,
+            unlock_prompt_visible: true,
+            password_field_focused: true,
+        },
     }
 }
 
@@ -207,6 +269,7 @@ pub fn run_shell_chrome_smoke() -> ShellChromeReport {
 mod tests {
     use super::run_shell_chrome_smoke;
     use backlit_launcher::LaunchTarget;
+    use backlit_settings_daemon::PowerAction;
     use backlit_shell_protocol::ShellSurfaceRole;
 
     #[test]
@@ -218,6 +281,7 @@ mod tests {
         assert!(report.role_ready(ShellSurfaceRole::Panel));
         assert!(report.role_ready(ShellSurfaceRole::Launcher));
         assert!(report.role_ready(ShellSurfaceRole::AppSwitcher));
+        assert!(report.role_ready(ShellSurfaceRole::LockScreen));
         assert!(!report.role_ready(ShellSurfaceRole::NotificationHost));
     }
 
@@ -229,11 +293,35 @@ mod tests {
         assert!(report.panel.battery_visible);
         assert!(report.panel.network_visible);
         assert!(report.panel.volume_visible);
+        assert!(report.panel.power_menu.ready());
         assert!(report.panel.network.ready());
         assert!(report.panel.audio.ready());
         assert!(report.panel.workspace.visible);
         assert_eq!(report.panel.workspace.active, 0);
         assert_eq!(report.panel.workspace.count, 4);
+    }
+
+    #[test]
+    fn panel_power_menu_exposes_design_actions() {
+        let report = run_shell_chrome_smoke();
+
+        assert!(report.panel.power_menu.visible);
+        assert!(report.panel.power_menu.opens_lock_screen);
+        assert_eq!(report.panel.power_menu.action_count(), 4);
+        assert!(report.panel.power_menu.has_action(PowerAction::Lock));
+        assert!(report.panel.power_menu.has_action(PowerAction::Logout));
+        assert!(report.panel.power_menu.has_action(PowerAction::Reboot));
+        assert!(report.panel.power_menu.has_action(PowerAction::Shutdown));
+    }
+
+    #[test]
+    fn lock_screen_surface_is_ready_for_activation() {
+        let report = run_shell_chrome_smoke();
+
+        assert!(report.lock_screen.ready());
+        assert!(report.lock_screen.covers_output);
+        assert!(report.lock_screen.unlock_prompt_visible);
+        assert!(report.lock_screen.password_field_focused);
     }
 
     #[test]

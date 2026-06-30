@@ -119,6 +119,7 @@ version = "0.1.0"
 dependencies = [
  "backlit-common",
  "backlit-launcher",
+ "backlit-settings-daemon",
  "backlit-shell-protocol",
 ]
 

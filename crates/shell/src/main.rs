@@ -5,6 +5,7 @@ use std::time::Duration;
 
 use backlit_common::metrics::{event_json, FieldValue};
 use backlit_launcher::LaunchTarget;
+use backlit_settings_daemon::PowerAction;
 use backlit_shell::run_shell_chrome_smoke;
 use backlit_shell_protocol::{ShellSurfaceRole, MVP_SHELL_ROLES};
 
@@ -84,6 +85,10 @@ fn run() -> Result<(), String> {
                     FieldValue::Bool(report.app_switcher.ready())
                 ),
                 (
+                    "lock_screen_ready",
+                    FieldValue::Bool(report.lock_screen.ready())
+                ),
+                (
                     "clock_visible",
                     FieldValue::Bool(report.panel.clock_visible)
                 ),
@@ -98,6 +103,34 @@ fn run() -> Result<(), String> {
                 (
                     "volume_visible",
                     FieldValue::Bool(report.panel.volume_visible)
+                ),
+                (
+                    "power_menu_ready",
+                    FieldValue::Bool(report.panel.power_menu.ready())
+                ),
+                (
+                    "power_menu_visible",
+                    FieldValue::Bool(report.panel.power_menu.visible)
+                ),
+                (
+                    "power_menu_actions",
+                    FieldValue::U64(report.panel.power_menu.action_count())
+                ),
+                (
+                    "power_menu_lock",
+                    FieldValue::Bool(report.panel.power_menu.has_action(PowerAction::Lock))
+                ),
+                (
+                    "power_menu_logout",
+                    FieldValue::Bool(report.panel.power_menu.has_action(PowerAction::Logout))
+                ),
+                (
+                    "power_menu_reboot",
+                    FieldValue::Bool(report.panel.power_menu.has_action(PowerAction::Reboot))
+                ),
+                (
+                    "power_menu_shutdown",
+                    FieldValue::Bool(report.panel.power_menu.has_action(PowerAction::Shutdown))
                 ),
                 (
                     "network_status_ready",
@@ -164,6 +197,18 @@ fn run() -> Result<(), String> {
                 (
                     "app_switcher_entries",
                     FieldValue::U64(report.app_switcher.entry_count())
+                ),
+                (
+                    "lock_screen_covers_output",
+                    FieldValue::Bool(report.lock_screen.covers_output)
+                ),
+                (
+                    "lock_screen_unlock_prompt_visible",
+                    FieldValue::Bool(report.lock_screen.unlock_prompt_visible)
+                ),
+                (
+                    "lock_screen_password_field_focused",
+                    FieldValue::Bool(report.lock_screen.password_field_focused)
                 ),
             ],
         )

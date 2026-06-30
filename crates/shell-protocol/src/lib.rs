@@ -25,7 +25,7 @@ impl ShellSurfaceRole {
     pub fn mvp_required(self) -> bool {
         matches!(
             self,
-            Self::Wallpaper | Self::Panel | Self::Launcher | Self::AppSwitcher
+            Self::Wallpaper | Self::Panel | Self::Launcher | Self::AppSwitcher | Self::LockScreen
         )
     }
 }
@@ -68,6 +68,7 @@ pub const MVP_SHELL_ROLES: &[ShellSurfaceRole] = &[
     ShellSurfaceRole::Panel,
     ShellSurfaceRole::Launcher,
     ShellSurfaceRole::AppSwitcher,
+    ShellSurfaceRole::LockScreen,
 ];
 
 #[cfg(test)]
@@ -77,6 +78,7 @@ mod tests {
     #[test]
     fn parses_shell_surface_roles() {
         assert_eq!("panel".parse(), Ok(ShellSurfaceRole::Panel));
+        assert_eq!("lock-screen".parse(), Ok(ShellSurfaceRole::LockScreen));
         assert_eq!(
             "notifications".parse(),
             Ok(ShellSurfaceRole::NotificationHost)
@@ -93,7 +95,8 @@ mod tests {
 
     #[test]
     fn mvp_shell_roles_are_explicit() {
-        assert_eq!(MVP_SHELL_ROLES.len(), 4);
+        assert_eq!(MVP_SHELL_ROLES.len(), 5);
         assert!(MVP_SHELL_ROLES.iter().all(|role| role.mvp_required()));
+        assert!(!ShellSurfaceRole::NotificationHost.mvp_required());
     }
 }

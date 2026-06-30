@@ -279,7 +279,7 @@ Artifacts are written to `target/gui-smoke/`:
 
 The verifier also runs `backlit-protocols --verify --list` so MVP protocol coverage stays explicit while the real Smithay compositor is being brought up.
 
-The shell smoke path runs `backlit-shell --component=all --verify` and checks the MVP chrome state: wallpaper, panel clock/battery indicators, NetworkManager-backed network status, PipeWire-backed audio status, workspace indicator, launcher targets, and app switcher entries.
+The shell smoke path runs `backlit-shell --component=all --verify` and checks the MVP chrome state: wallpaper, panel clock/battery indicators, power menu actions, NetworkManager-backed network status, PipeWire-backed audio status, workspace indicator, launcher targets, app switcher entries, and lock-screen readiness.
 
 It also runs `backlit-perf --verify`, which measures the deterministic GUI render path, headless backend present path, idle no-redraw behavior, targeted surface damage path, and 60-frame drag pacing path against generous MVP 0 smoke budgets.
 

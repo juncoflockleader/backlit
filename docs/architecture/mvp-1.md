@@ -22,7 +22,7 @@ Current launch-readiness checks:
 - `scripts/verify-launcher-desktop-discovery.sh` verifies fixture `.desktop` parsing and host XDG application discovery for launching installed apps.
 - `backlit-input --verify` verifies the policy-level input contract that future libinput events must satisfy: terminal hotkey routing, app-switcher focus changes, pointer focus, title-bar move, resize-grip resize, and clean pointer grab release.
 - `backlit-session --verify` verifies workspace switching and left/right window snapping through the same window-policy layer used for focus and movement.
-- `backlit-shell --component=all --verify` verifies the current shell chrome contract: wallpaper, panel clock/battery/network/volume indicators, workspace indicator, launcher targets, and app switcher entries.
+- `backlit-shell --component=all --verify` verifies the current shell chrome contract: wallpaper, panel clock/battery/network/volume indicators, panel power menu, workspace indicator, launcher targets, app switcher entries, and lock-screen readiness.
 - `backlit-surface --verify` verifies the policy-level xdg-shell toplevel contract: create, configure, ack, map into window policy, focus, maximize, fullscreen, close request, and clean removal.
 - `backlit-perf --verify` verifies a deterministic 60-frame drag pacing smoke with zero dropped frames and pointer-to-frame p99 under 16 ms.
 - `backlit-compositor -- --smoke-test` verifies direct-scanout eligibility policy for opaque fullscreen dmabuf surfaces, including overlay and SHM blockers.
