@@ -127,6 +127,11 @@ if [ -n "$artifact_root" ] && [ -d "$artifact_root" ]; then
   require_contains "$artifact_root/session-clean-exit/manifest.json" '"windows_after_shutdown": 0'
   require_contains "$artifact_root/session-clean-exit/manifest.json" '"focus_cleared": true'
   require_contains "$artifact_root/drm-session-smoke/manifest.json" '"name": "backlit-drm-session-smoke"'
+  if grep '"drm_session_smoke_ready": true' "$artifact_root/drm-session-smoke/manifest.json" >/dev/null; then
+    require_contains "$artifact_root/drm-session-smoke/manifest.json" '"drm_session_clean_exit": true'
+  else
+    require_contains "$artifact_root/drm-session-smoke/manifest.json" '"drm_session_smoke_blocked_expected": true'
+  fi
 
   if [ -f "$artifact_root/nested-wayland/manifest.json" ]; then
     nested_wayland_artifact=true
@@ -135,6 +140,7 @@ if [ -n "$artifact_root" ] && [ -d "$artifact_root" ]; then
     require_contains "$artifact_root/nested-wayland/manifest.json" '"compositor_wayland_smoke": true'
     require_contains "$artifact_root/nested-wayland/manifest.json" '"session_wayland_client_spawn": true'
     require_contains "$artifact_root/nested-wayland/manifest.json" '"session_wayland_services": true'
+    require_contains "$artifact_root/nested-wayland/manifest.json" '"session_wayland_clean_exit": true'
   fi
 fi
 

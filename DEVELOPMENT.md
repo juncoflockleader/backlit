@@ -151,7 +151,7 @@ The nested Wayland path can be checked without a visible VM desktop by running W
 ./scripts/verify-nested-wayland-smoke.sh
 ```
 
-This starts a temporary parent Weston compositor, verifies the parent socket with `wayland-info` or `weston-info`, then runs Backlit's Wayland backend preflight, compositor smoke path, and `backlit-session --backend=wayland --verify-services` path against that socket.
+This starts a temporary parent Weston compositor, verifies the parent socket with `wayland-info` or `weston-info`, then runs Backlit's Wayland backend preflight, compositor smoke path, and `backlit-session --backend=wayland --verify-services --verify-clean-exit` path against that socket.
 
 When the real compositor loop lands, launch clients into Backlit with:
 
@@ -317,7 +317,7 @@ To capture the current host's launch readiness:
 ./scripts/verify-drm-session-smoke.sh
 ```
 
-These write `target/launch-readiness/manifest.json`, `target/session-launch/manifest.json`, `target/session-clean-exit/manifest.json`, and `target/drm-session-smoke/manifest.json`. On macOS or headless CI they can pass with DRM expected-blocked; inside the Parallels Ubuntu GUI VM they should report DRM expected-ready and ready. The session launch verifier also checks that `packaging/sessions/backlit.desktop` resolves to `backlit-session` and that `backlit-session --preflight-only` exits cleanly for launchable backends. The session clean-exit verifier checks requested shutdown from the headless session path. The DRM session smoke verifier runs the full `backlit-session --backend=drm` path with GUI verification, terminal spawn verification, and compositor/shell service probes when the host is launch-ready.
+These write `target/launch-readiness/manifest.json`, `target/session-launch/manifest.json`, `target/session-clean-exit/manifest.json`, and `target/drm-session-smoke/manifest.json`. On macOS or headless CI they can pass with DRM expected-blocked; inside the Parallels Ubuntu GUI VM they should report DRM expected-ready and ready. The session launch verifier also checks that `packaging/sessions/backlit.desktop` resolves to `backlit-session` and that `backlit-session --preflight-only` exits cleanly for launchable backends. The session clean-exit verifier checks requested shutdown from the headless session path. The DRM session smoke verifier runs the full `backlit-session --backend=drm` path with GUI verification, terminal spawn verification, compositor/shell service probes, and clean shutdown when the host is launch-ready.
 
 ## Packaging Contract Verification
 

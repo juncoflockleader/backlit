@@ -5,7 +5,7 @@ MVP 0 is the development harness:
 - Cargo workspace.
 - Headless compositor entrypoint and backend state model.
 - Backend preflight checks for headless, nested Wayland, and DRM launch paths.
-- Nested Wayland backend flag and Weston-backed compositor/session smoke verifier.
+- Nested Wayland backend flag and Weston-backed compositor/session smoke verifier with clean shutdown.
 - Pure window-policy logic.
 - MVP shell role smoke checks.
 - Dry-run launcher catalog for terminal, browser, and settings.
@@ -19,7 +19,7 @@ MVP 0 is the development harness:
 - Session move/resize smoke through pure window policy.
 - Minimized-window focus skipping in session smoke.
 - Focus fallback after closing a window.
-- Clean session shutdown smoke for closing managed windows and clearing focus.
+- Clean session shutdown smoke for closing managed windows and clearing focus across headless, nested Wayland, and launch-ready DRM paths.
 - Output work-area policy for panel-aware maximize and fullscreen geometry.
 - Session supervisor crash isolation smoke.
 - Clipboard state smoke for text owner, replacement, and clearing.

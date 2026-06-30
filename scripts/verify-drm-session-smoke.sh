@@ -57,6 +57,7 @@ fi
 
 drm_session_smoke_ready=false
 drm_session_smoke_blocked_expected=false
+drm_session_clean_exit=false
 
 if [ "$drm_expected_ready" = true ]; then
   cargo build -p backlit-session -p backlit-compositor -p backlit-shell
@@ -69,6 +70,7 @@ if [ "$drm_expected_ready" = true ]; then
     --launch-spawn-program=true \
     --wayland-display=backlit-drm-smoke \
     --verify-services \
+    --verify-clean-exit \
     --service-log-dir="$service_log_dir" > "$session_log" 2> "$session_err"
 
   grep '"event":"session.backend_preflight"' "$session_log" >/dev/null
@@ -78,6 +80,7 @@ if [ "$drm_expected_ready" = true ]; then
   grep '"event":"session.verified"' "$session_log" >/dev/null
   grep '"event":"session.launch_spawn"' "$session_log" >/dev/null
   grep '"event":"session.services_verified"' "$session_log" >/dev/null
+  grep '"event":"session.clean_exit"' "$session_log" >/dev/null
   grep '"passed":true' "$session_log" >/dev/null
   grep '"golden_ok":true' "$session_log" >/dev/null
   grep '"spawned":true' "$session_log" >/dev/null
@@ -86,12 +89,17 @@ if [ "$drm_expected_ready" = true ]; then
   grep '"compositor_ready":true' "$session_log" >/dev/null
   grep '"shell_ready":true' "$session_log" >/dev/null
   grep '"children_exited_cleanly":true' "$session_log" >/dev/null
+  grep '"windows_before_shutdown":3' "$session_log" >/dev/null
+  grep '"windows_closed":3' "$session_log" >/dev/null
+  grep '"windows_after_shutdown":0' "$session_log" >/dev/null
+  grep '"focus_cleared":true' "$session_log" >/dev/null
   grep "\"checksum\":$expected_checksum" "$session_log" >/dev/null
   test -s "$session_screenshot"
 
   session_ppm_bytes="$(wc -c < "$session_screenshot" | tr -d ' ')"
   test "$session_ppm_bytes" = "$expected_ppm_bytes"
   drm_session_smoke_ready=true
+  drm_session_clean_exit=true
 else
   set +e
   cargo run -p backlit-session -- \
@@ -126,6 +134,7 @@ cat > "$out_dir/manifest.json" <<EOF
     "drm_expected_ready": $drm_expected_ready,
     "drm_session_smoke_ready": $drm_session_smoke_ready,
     "drm_session_smoke_blocked_expected": $drm_session_smoke_blocked_expected,
+    "drm_session_clean_exit": $drm_session_clean_exit,
     "xdg_runtime_dir_present": $runtime_present,
     "session_present": $session_present,
     "drm_card_nodes": $drm_card_nodes,

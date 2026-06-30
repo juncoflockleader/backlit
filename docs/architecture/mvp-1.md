@@ -20,7 +20,7 @@ Current launch-readiness checks:
 - `backlit-surface --verify` verifies the policy-level xdg-shell toplevel contract: create, configure, ack, map into window policy, focus, maximize, fullscreen, close request, and clean removal.
 - `scripts/verify-launch-performance.sh` verifies MVP launch budgets from built binaries: GUI ready under 500 ms, terminal hotkey spawn under 300 ms, and shell-ready service probes under 2 seconds.
 - `scripts/verify-resource-budget.sh` verifies Linux idle resource budgets from bounded compositor and shell probes: compositor idle CPU under 0.5% and combined compositor+shell RSS under 250 MB.
-- `scripts/verify-drm-session-smoke.sh` runs the full DRM session path with GUI verification, launch spawn, and compositor/shell service probes on launch-ready Linux hosts.
+- `scripts/verify-drm-session-smoke.sh` runs the full DRM session path with GUI verification, launch spawn, compositor/shell service probes, and clean shutdown on launch-ready Linux hosts.
 - The Linux E2E manifest includes the launch-readiness manifest.
 - The Linux E2E manifest includes the session launch manifest.
 - The Linux E2E manifest includes the launch-performance manifest.
