@@ -420,6 +420,8 @@ fn run_compositor_probe(path: &Path, config: &Config) -> Result<ServiceProbe, St
             backend_event,
             String::from("\"xdg_surface_lifecycle\":true"),
             String::from("\"xdg_backend_surface_presented\":true"),
+            String::from("\"xdg_popup_mapped\":true"),
+            String::from("\"xdg_popup_backend_surface_presented\":true"),
         ],
     )
 }

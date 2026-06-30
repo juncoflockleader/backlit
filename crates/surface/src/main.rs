@@ -47,6 +47,37 @@ fn run() -> Result<(), String> {
                     "focused_after_map",
                     FieldValue::Bool(report.focused_after_map),
                 ),
+                ("created_popup", FieldValue::Bool(report.created_popup)),
+                (
+                    "popup_configured",
+                    FieldValue::Bool(report.popup_configured),
+                ),
+                (
+                    "popup_ack_configure_ok",
+                    FieldValue::Bool(report.popup_ack_configure_ok),
+                ),
+                ("popup_mapped", FieldValue::Bool(report.popup_mapped)),
+                (
+                    "popup_position_constrained",
+                    FieldValue::Bool(report.popup_position_constrained),
+                ),
+                (
+                    "popup_keeps_parent_focus",
+                    FieldValue::Bool(report.popup_keeps_parent_focus),
+                ),
+                (
+                    "popup_did_not_create_window",
+                    FieldValue::Bool(report.popup_did_not_create_window),
+                ),
+                (
+                    "popup_close_requested",
+                    FieldValue::Bool(report.popup_close_requested),
+                ),
+                ("popup_closed", FieldValue::Bool(report.popup_closed)),
+                (
+                    "windows_after_popup_close",
+                    FieldValue::U64(report.windows_after_popup_close),
+                ),
                 (
                     "maximize_configured",
                     FieldValue::Bool(report.maximize_configured),
@@ -117,7 +148,7 @@ Usage:
   backlit-surface [--verify]
 
 Flags:
-  --verify  Fail if xdg-style toplevel lifecycle smoke checks fail.
+  --verify  Fail if xdg-style toplevel and popup lifecycle smoke checks fail.
 "
     );
 }

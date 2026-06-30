@@ -63,8 +63,14 @@ grep '"xdg_initial_configured":true' "$out_dir/compositor.jsonl" >/dev/null
 grep '"xdg_ack_configure_ok":true' "$out_dir/compositor.jsonl" >/dev/null
 grep '"xdg_mapped_window":true' "$out_dir/compositor.jsonl" >/dev/null
 grep '"xdg_backend_surface_presented":true' "$out_dir/compositor.jsonl" >/dev/null
-grep '"xdg_presented_surfaces":1' "$out_dir/compositor.jsonl" >/dev/null
-grep '"xdg_presented_pixels":307200' "$out_dir/compositor.jsonl" >/dev/null
+grep '"xdg_popup_created":true' "$out_dir/compositor.jsonl" >/dev/null
+grep '"xdg_popup_mapped":true' "$out_dir/compositor.jsonl" >/dev/null
+grep '"xdg_popup_backend_surface_presented":true' "$out_dir/compositor.jsonl" >/dev/null
+grep '"xdg_popup_position_constrained":true' "$out_dir/compositor.jsonl" >/dev/null
+grep '"xdg_popup_did_not_create_window":true' "$out_dir/compositor.jsonl" >/dev/null
+grep '"xdg_popup_closed":true' "$out_dir/compositor.jsonl" >/dev/null
+grep '"xdg_presented_surfaces":2' "$out_dir/compositor.jsonl" >/dev/null
+grep '"xdg_presented_pixels":345600' "$out_dir/compositor.jsonl" >/dev/null
 grep '"xdg_focused_after_map":true' "$out_dir/compositor.jsonl" >/dev/null
 grep '"xdg_maximize_uses_work_area":true' "$out_dir/compositor.jsonl" >/dev/null
 grep '"xdg_fullscreen_uses_output":true' "$out_dir/compositor.jsonl" >/dev/null
@@ -205,6 +211,16 @@ grep '"event":"surface.lifecycle"' "$out_dir/surface.jsonl" >/dev/null
 grep '"xdg_shell_registered":true' "$out_dir/surface.jsonl" >/dev/null
 grep '"mapped_window":true' "$out_dir/surface.jsonl" >/dev/null
 grep '"focused_after_map":true' "$out_dir/surface.jsonl" >/dev/null
+grep '"created_popup":true' "$out_dir/surface.jsonl" >/dev/null
+grep '"popup_configured":true' "$out_dir/surface.jsonl" >/dev/null
+grep '"popup_ack_configure_ok":true' "$out_dir/surface.jsonl" >/dev/null
+grep '"popup_mapped":true' "$out_dir/surface.jsonl" >/dev/null
+grep '"popup_position_constrained":true' "$out_dir/surface.jsonl" >/dev/null
+grep '"popup_keeps_parent_focus":true' "$out_dir/surface.jsonl" >/dev/null
+grep '"popup_did_not_create_window":true' "$out_dir/surface.jsonl" >/dev/null
+grep '"popup_close_requested":true' "$out_dir/surface.jsonl" >/dev/null
+grep '"popup_closed":true' "$out_dir/surface.jsonl" >/dev/null
+grep '"windows_after_popup_close":1' "$out_dir/surface.jsonl" >/dev/null
 grep '"maximize_uses_work_area":true' "$out_dir/surface.jsonl" >/dev/null
 grep '"fullscreen_uses_output":true' "$out_dir/surface.jsonl" >/dev/null
 grep '"window_removed":true' "$out_dir/surface.jsonl" >/dev/null
@@ -337,7 +353,9 @@ cat > "$out_dir/manifest.json" <<EOF
     "keyboard_input": true,
     "pointer_input": true,
     "surface_lifecycle": true,
+    "popup_lifecycle": true,
     "compositor_surface_lifecycle": true,
+    "compositor_popup_lifecycle": true,
     "no_idle_redraw": true,
     "targeted_damage": true,
     "direct_scanout": true,

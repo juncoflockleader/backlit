@@ -183,6 +183,30 @@ fn run_smoke_test(config: &RunConfig) {
                 FieldValue::Bool(surface_smoke.backend_surface_presented),
             ),
             (
+                "xdg_popup_created",
+                FieldValue::Bool(surface_smoke.popup_created),
+            ),
+            (
+                "xdg_popup_mapped",
+                FieldValue::Bool(surface_smoke.popup_mapped),
+            ),
+            (
+                "xdg_popup_backend_surface_presented",
+                FieldValue::Bool(surface_smoke.popup_backend_surface_presented),
+            ),
+            (
+                "xdg_popup_position_constrained",
+                FieldValue::Bool(surface_smoke.popup_position_constrained),
+            ),
+            (
+                "xdg_popup_did_not_create_window",
+                FieldValue::Bool(surface_smoke.popup_did_not_create_window),
+            ),
+            (
+                "xdg_popup_closed",
+                FieldValue::Bool(surface_smoke.popup_closed),
+            ),
+            (
                 "xdg_presented_surfaces",
                 FieldValue::U64(surface_smoke.presented_surfaces),
             ),
@@ -229,6 +253,12 @@ struct CompositorSurfaceSmoke {
     ack_configure_ok: bool,
     mapped_window: bool,
     backend_surface_presented: bool,
+    popup_created: bool,
+    popup_mapped: bool,
+    popup_backend_surface_presented: bool,
+    popup_position_constrained: bool,
+    popup_did_not_create_window: bool,
+    popup_closed: bool,
     presented_surfaces: u64,
     presented_pixels: u64,
     focused_after_map: bool,
@@ -247,8 +277,14 @@ impl CompositorSurfaceSmoke {
             && self.ack_configure_ok
             && self.mapped_window
             && self.backend_surface_presented
-            && self.presented_surfaces == 1
-            && self.presented_pixels == 640 * 480
+            && self.popup_created
+            && self.popup_mapped
+            && self.popup_backend_surface_presented
+            && self.popup_position_constrained
+            && self.popup_did_not_create_window
+            && self.popup_closed
+            && self.presented_surfaces == 2
+            && self.presented_pixels == 640 * 480 + 240 * 160
             && self.focused_after_map
             && self.maximize_uses_work_area
             && self.fullscreen_uses_output
@@ -296,7 +332,52 @@ fn run_compositor_surface_smoke() -> CompositorSurfaceSmoke {
     } else {
         false
     };
+    let popup = manager.create_popup(surface, "xdg-terminal-menu", (240, 160), (32, 36));
+    let popup_created = popup
+        .and_then(|popup| manager.surface(popup))
+        .map(|popup_surface| {
+            popup_surface.role == SurfaceRole::XdgPopup
+                && popup_surface.parent == Some(surface)
+                && popup_surface.phase == SurfacePhase::Created
+        })
+        .unwrap_or(false);
+    let popup_configure = popup.and_then(|popup| manager.send_initial_configure(popup));
+    let popup_ack_configure_ok = match (popup, popup_configure) {
+        (Some(popup), Some(configure)) => manager.ack_configure(popup, configure.serial),
+        _ => false,
+    };
+    let popup_mapped = popup.map(|popup| manager.commit(popup)).unwrap_or(false);
+    let popup_position_constrained = popup_configure
+        .map(|configure| {
+            configure.width == 240
+                && configure.height == 160
+                && configure.x >= manager.layout().output.x
+                && configure.y >= manager.layout().output.y
+                && configure.x + configure.width
+                    <= manager.layout().output.x + manager.layout().output.width
+                && configure.y + configure.height
+                    <= manager.layout().output.y + manager.layout().output.height
+        })
+        .unwrap_or(false);
+    let popup_did_not_create_window = manager.policy().windows().len() == 1;
+    let popup_backend_surface_presented = if popup_mapped {
+        backend
+            .submit_surface(client, "xdg-terminal-menu", 240, 160)
+            .map(|_| true)
+            .unwrap_or(false)
+    } else {
+        false
+    };
     let frame = backend.present();
+    let popup_closed = popup
+        .map(|popup| {
+            manager.close(popup)
+                && manager
+                    .surface(popup)
+                    .map(|surface| surface.phase == SurfacePhase::Closed)
+                    .unwrap_or(false)
+        })
+        .unwrap_or(false);
 
     let maximize_uses_work_area = manager
         .request_maximize(surface)
@@ -336,6 +417,12 @@ fn run_compositor_surface_smoke() -> CompositorSurfaceSmoke {
         ack_configure_ok,
         mapped_window,
         backend_surface_presented,
+        popup_created,
+        popup_mapped: popup_mapped && popup_ack_configure_ok,
+        popup_backend_surface_presented,
+        popup_position_constrained,
+        popup_did_not_create_window,
+        popup_closed,
         presented_surfaces: frame.surface_count,
         presented_pixels: frame.total_pixels,
         focused_after_map,
@@ -556,8 +643,8 @@ mod tests {
         let report = run_compositor_surface_smoke();
 
         assert!(report.passed(), "{report:?}");
-        assert_eq!(report.presented_surfaces, 1);
-        assert_eq!(report.presented_pixels, 640 * 480);
+        assert_eq!(report.presented_surfaces, 2);
+        assert_eq!(report.presented_pixels, 640 * 480 + 240 * 160);
         assert_eq!(report.windows_after_close, 0);
     }
 }
