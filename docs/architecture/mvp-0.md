@@ -49,6 +49,7 @@ MVP 0 is the development harness:
 - GitHub Actions Linux E2E workflow with artifact upload and local contract verification.
 - MVP 0 contract verifier that checks the executable harness still covers the design deliverables and, inside E2E, validates the generated artifact manifests.
 - Parallels runner for repeatable macOS-to-Ubuntu guest verification with the active guest user's logind session and runtime directory.
+- Parallels E2E artifact export for guest manifests, Linux-only DRM/package checks, nested Wayland evidence, MVP contract evidence, and the guest-rendered GUI preview image.
 - Packaging contract verifier for session desktop entry, Backlit user target, systemd units, and Debian package split.
 - Package manifest verifier for the `fastgui-core` bare-session meta package and Debian `.install` file ownership split.
 - Debian package-build verifier that assembles and inspects real `fastgui-*` `.deb` artifacts on Linux.

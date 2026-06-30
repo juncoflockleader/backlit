@@ -43,6 +43,8 @@ require_executable scripts/verify-settings-app.sh
 require_executable scripts/verify-portal-security.sh
 require_executable scripts/verify-crash-logs.sh
 require_executable scripts/verify-linux-e2e.sh
+require_executable scripts/verify-parallels-linux-e2e.sh
+require_executable scripts/render-parallels-gui-preview.sh
 require_executable scripts/verify-ci-contract.sh
 require_executable scripts/verify-packaging-contract.sh
 require_executable scripts/verify-package-manifests.sh
@@ -120,6 +122,12 @@ require_contains scripts/verify-linux-e2e.sh './scripts/verify-staged-session-in
 require_contains scripts/verify-linux-e2e.sh './scripts/verify-systemd-activation.sh'
 require_contains scripts/verify-linux-e2e.sh './scripts/verify-drm-session-smoke.sh'
 require_contains scripts/verify-linux-e2e.sh './scripts/verify-session-clean-exit.sh'
+require_contains scripts/verify-parallels-linux-e2e.sh '"name": "backlit-parallels-linux-e2e-export"'
+require_contains scripts/verify-parallels-linux-e2e.sh '"guest_e2e_passed": true'
+require_contains scripts/verify-parallels-linux-e2e.sh '"parallels_drm_launch_ready": true'
+require_contains scripts/verify-parallels-linux-e2e.sh '"dpkg_root_install": true'
+require_contains scripts/verify-parallels-linux-e2e.sh 'debian-package-install-manifest.json'
+require_contains scripts/verify-parallels-linux-e2e.sh 'drm-session-smoke-manifest.json'
 require_contains scripts/verify-session-launch.sh '--verify-systemd-units'
 require_contains scripts/verify-session-launch.sh 'XDG_RUNTIME_DIR XDG_SESSION_ID XDG_SEAT XDG_SESSION_TYPE WAYLAND_DISPLAY XDG_CURRENT_DESKTOP DESKTOP_SESSION'
 require_contains scripts/verify-session-launch.sh '"session_systemd_units": true'

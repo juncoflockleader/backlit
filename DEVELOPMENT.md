@@ -105,7 +105,7 @@ The Parallels runner bootstraps an Ubuntu guest, updates a clean checkout from `
 ./scripts/render-parallels-gui-preview.sh
 ```
 
-The E2E runner verifies the full Ubuntu path. The preview runner renders the Backlit preview inside Ubuntu, copies the generated PPM/session logs/manifest back to `target/gui-preview-parallels/`, and converts the PPM to a local PNG on macOS when possible.
+The E2E runner verifies the full Ubuntu path, then copies a compact evidence bundle back to `target/linux-e2e-parallels/`: the guest E2E manifest, GUI smoke/preview manifests, launch-readiness and DRM session-smoke manifests, Debian package build/install manifests, nested Wayland manifest, MVP contract manifest, and the E2E GUI preview image. The preview runner renders the Backlit preview inside Ubuntu, copies the generated PPM/session logs/manifest back to `target/gui-preview-parallels/`, and converts the PPM to a local PNG on macOS when possible.
 
 The runners read a local credential file that is ignored by Git:
 
@@ -123,6 +123,7 @@ Useful overrides:
 ```bash
 BACKLIT_PARALLELS_VM="Ubuntu 22.04.2 ARM64" ./scripts/verify-parallels-linux-e2e.sh
 BACKLIT_E2E_BRANCH=main BACKLIT_E2E_OUT_DIR=target/linux-e2e-parallels ./scripts/verify-parallels-linux-e2e.sh
+./scripts/verify-parallels-linux-e2e.sh target/linux-e2e-parallels
 ```
 
 The Linux-side verifier can also be run directly inside any Ubuntu checkout:

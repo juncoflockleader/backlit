@@ -47,4 +47,4 @@ Current launch-readiness checks:
 - The Linux E2E manifest includes the notification-daemon manifest.
 - The Linux E2E manifest includes the settings-daemon manifest.
 - The Linux E2E manifest includes the DRM session smoke manifest.
-- Parallels Ubuntu E2E maps the active `parallels` logind session before running the guest verifier and is expected to report `xdg_runtime_dir_owned_by_user: true`, `session_local: true`, `drm_card_access_ready: true`, `input_broker_ready: true`, `input_broker_mode: "logind-libseat"`, `drm_expected_ready: true`, `drm_ready: true`, and `drm_session_smoke_ready: true`.
+- Parallels Ubuntu E2E maps the active `parallels` logind session before running the guest verifier, exports the guest manifests and GUI preview back to the host, and is expected to report `xdg_runtime_dir_owned_by_user: true`, `session_local: true`, `drm_card_access_ready: true`, `input_broker_ready: true`, `drm_expected_ready: true`, `drm_ready: true`, `drm_session_smoke_ready: true`, and `dpkg_root_install: true`.

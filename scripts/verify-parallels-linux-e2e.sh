@@ -6,7 +6,8 @@ credential_file="${BACKLIT_PARALLELS_CREDENTIAL_FILE:-$repo_root/.local/parallel
 vm_name="${BACKLIT_PARALLELS_VM:-Ubuntu 22.04.2 ARM64}"
 repo_url="${BACKLIT_E2E_REPO_URL:-https://github.com/juncoflockleader/backlit.git}"
 branch="${BACKLIT_E2E_BRANCH:-main}"
-e2e_out_dir="${BACKLIT_E2E_OUT_DIR:-target/linux-e2e-parallels}"
+host_out_dir="${1:-${BACKLIT_PARALLELS_E2E_HOST_OUT_DIR:-target/linux-e2e-parallels}}"
+e2e_out_dir="${BACKLIT_E2E_OUT_DIR:-$host_out_dir}"
 
 prlctl_bin="${PRLCTL:-}"
 if [ -z "$prlctl_bin" ]; then
@@ -73,6 +74,22 @@ upload_script() {
 
   "$prlctl_bin" exec "$vm_name" --user root python3 -c \
     "\"import base64,os,pathlib; src=pathlib.Path(\\\"$remote_payload_path\\\"); dst=pathlib.Path(\\\"$remote_path\\\"); data=base64.b64decode(src.read_text()); assert data, \\\"empty upload\\\"; dst.write_bytes(data); os.chmod(dst,0o755); src.unlink()\""
+}
+
+download_file() {
+  local remote_path="$1"
+  local local_path="$2"
+  mkdir -p "$(dirname "$local_path")"
+  "$prlctl_bin" exec "$vm_name" --user "$guest_user" cat "$remote_path" > "$local_path"
+}
+
+require_contains() {
+  local file="$1"
+  local value="$2"
+  grep -F -- "$value" "$file" >/dev/null || {
+    echo "Parallels E2E export verification failed: missing text in $file: $value" >&2
+    exit 1
+  }
 }
 
 tmp_dir="$(mktemp -d "${TMPDIR:-/tmp}/backlit-parallels-e2e.XXXXXX")"
@@ -240,3 +257,164 @@ upload_script "$repo_root/scripts/verify-nested-wayland-smoke.sh" "/tmp/backlit-
 upload_script "$root_runner" "/tmp/backlit-parallels-root-runner.sh"
 
 "$prlctl_bin" exec "$vm_name" --user root /tmp/backlit-parallels-root-runner.sh
+
+guest_commit="$("$prlctl_bin" exec "$vm_name" --user "$guest_user" git -C "$repo_dir" rev-parse --short HEAD | tr -d '\r')"
+guest_e2e_dir="$repo_dir/$e2e_out_dir"
+
+host_guest_manifest="$host_out_dir/guest-manifest.json"
+host_gui_smoke_manifest="$host_out_dir/gui-smoke-manifest.json"
+host_gui_preview_manifest="$host_out_dir/gui-preview-manifest.json"
+host_launch_readiness_manifest="$host_out_dir/launch-readiness-manifest.json"
+host_drm_session_smoke_manifest="$host_out_dir/drm-session-smoke-manifest.json"
+host_debian_package_build_manifest="$host_out_dir/debian-package-build-manifest.json"
+host_debian_package_install_manifest="$host_out_dir/debian-package-install-manifest.json"
+host_nested_wayland_manifest="$host_out_dir/nested-wayland-manifest.json"
+host_mvp0_contract_manifest="$host_out_dir/mvp0-contract-manifest.json"
+host_ppm="$host_out_dir/gui-preview-backlit-session.ppm"
+host_png="$host_out_dir/gui-preview-backlit-session.png"
+
+mkdir -p "$host_out_dir"
+rm -f \
+  "$host_guest_manifest" \
+  "$host_gui_smoke_manifest" \
+  "$host_gui_preview_manifest" \
+  "$host_launch_readiness_manifest" \
+  "$host_drm_session_smoke_manifest" \
+  "$host_debian_package_build_manifest" \
+  "$host_debian_package_install_manifest" \
+  "$host_nested_wayland_manifest" \
+  "$host_mvp0_contract_manifest" \
+  "$host_ppm" \
+  "$host_png" \
+  "$host_out_dir/manifest.json"
+
+download_file "$guest_e2e_dir/manifest.json" "$host_guest_manifest"
+download_file "$guest_e2e_dir/gui-smoke/manifest.json" "$host_gui_smoke_manifest"
+download_file "$guest_e2e_dir/gui-preview/manifest.json" "$host_gui_preview_manifest"
+download_file "$guest_e2e_dir/launch-readiness/manifest.json" "$host_launch_readiness_manifest"
+download_file "$guest_e2e_dir/drm-session-smoke/manifest.json" "$host_drm_session_smoke_manifest"
+download_file "$guest_e2e_dir/debian-package-build/manifest.json" "$host_debian_package_build_manifest"
+download_file "$guest_e2e_dir/debian-package-install/manifest.json" "$host_debian_package_install_manifest"
+download_file "$guest_e2e_dir/nested-wayland/manifest.json" "$host_nested_wayland_manifest"
+download_file "$guest_e2e_dir/mvp0-contract/manifest.json" "$host_mvp0_contract_manifest"
+download_file "$guest_e2e_dir/gui-preview/backlit-session.ppm" "$host_ppm"
+
+preview_image="$host_ppm"
+preview_format="ppm"
+png_written=false
+converter="none"
+
+if command -v sips >/dev/null 2>&1; then
+  if sips -s format png "$host_ppm" --out "$host_png" >/dev/null 2>&1; then
+    preview_image="$host_png"
+    preview_format="png"
+    png_written=true
+    converter="sips"
+  fi
+elif command -v magick >/dev/null 2>&1; then
+  if magick "$host_ppm" "$host_png" >/dev/null 2>&1; then
+    preview_image="$host_png"
+    preview_format="png"
+    png_written=true
+    converter="magick"
+  fi
+elif command -v convert >/dev/null 2>&1; then
+  if convert "$host_ppm" "$host_png" >/dev/null 2>&1; then
+    preview_image="$host_png"
+    preview_format="png"
+    png_written=true
+    converter="convert"
+  fi
+elif command -v pnmtopng >/dev/null 2>&1; then
+  if pnmtopng "$host_ppm" > "$host_png"; then
+    preview_image="$host_png"
+    preview_format="png"
+    png_written=true
+    converter="pnmtopng"
+  fi
+fi
+
+ppm_bytes="$(wc -c < "$host_ppm" | tr -d ' ')"
+test "$ppm_bytes" = "1248015"
+
+require_contains "$host_guest_manifest" '"passed": true'
+require_contains "$host_guest_manifest" "\"commit\": \"$guest_commit\""
+require_contains "$host_guest_manifest" '"debian_package_build": true'
+require_contains "$host_guest_manifest" '"debian_package_install": true'
+require_contains "$host_guest_manifest" '"launch_readiness": true'
+require_contains "$host_guest_manifest" '"drm_session_smoke": true'
+require_contains "$host_guest_manifest" '"nested_wayland": true'
+require_contains "$host_gui_smoke_manifest" '"golden_checksum": true'
+require_contains "$host_gui_preview_manifest" '"session_verified": true'
+require_contains "$host_gui_preview_manifest" '"session_services": true'
+require_contains "$host_launch_readiness_manifest" '"drm_expected_ready": true'
+require_contains "$host_launch_readiness_manifest" '"drm_ready": true'
+require_contains "$host_launch_readiness_manifest" '"xdg_runtime_dir_owned_by_user": true'
+require_contains "$host_launch_readiness_manifest" '"session_local": true'
+require_contains "$host_launch_readiness_manifest" '"drm_card_access_ready": true'
+require_contains "$host_launch_readiness_manifest" '"input_broker_ready": true'
+require_contains "$host_drm_session_smoke_manifest" '"drm_session_smoke_ready": true'
+require_contains "$host_drm_session_smoke_manifest" '"drm_session_clean_exit": true'
+require_contains "$host_drm_session_smoke_manifest" '"settings_service": true'
+require_contains "$host_drm_session_smoke_manifest" '"notification_service": true'
+require_contains "$host_debian_package_build_manifest" '"debs_built": true'
+require_contains "$host_debian_package_build_manifest" '"fastgui_core_deb": true'
+require_contains "$host_debian_package_install_manifest" '"debs_installed": true'
+require_contains "$host_debian_package_install_manifest" '"dpkg_root_install": true'
+require_contains "$host_debian_package_install_manifest" '"session_gui_from_extracted_debs": true'
+require_contains "$host_debian_package_install_manifest" '"session_services_from_extracted_debs": true'
+require_contains "$host_debian_package_install_manifest" '"session_clean_exit_from_extracted_debs": true'
+require_contains "$host_nested_wayland_manifest" '"session_wayland_clean_exit": true'
+require_contains "$host_mvp0_contract_manifest" '"artifact_manifests_checked": true'
+
+cat > "$host_out_dir/manifest.json" <<EOF
+{
+  "name": "backlit-parallels-linux-e2e-export",
+  "passed": true,
+  "vm": "$vm_name",
+  "guest_commit": "$guest_commit",
+  "guest_repo": "$repo_dir",
+  "guest_e2e_dir": "$e2e_out_dir",
+  "artifacts": {
+    "guest_manifest": "$host_guest_manifest",
+    "gui_smoke_manifest": "$host_gui_smoke_manifest",
+    "gui_preview_manifest": "$host_gui_preview_manifest",
+    "launch_readiness_manifest": "$host_launch_readiness_manifest",
+    "drm_session_smoke_manifest": "$host_drm_session_smoke_manifest",
+    "debian_package_build_manifest": "$host_debian_package_build_manifest",
+    "debian_package_install_manifest": "$host_debian_package_install_manifest",
+    "nested_wayland_manifest": "$host_nested_wayland_manifest",
+    "mvp0_contract_manifest": "$host_mvp0_contract_manifest",
+    "gui_preview_ppm": "$host_ppm",
+    "gui_preview_image": "$preview_image"
+  },
+  "checks": {
+    "guest_e2e_passed": true,
+    "guest_commit_matches_manifest": true,
+    "guest_artifacts_exported": true,
+    "gui_smoke": true,
+    "gui_preview": true,
+    "launch_readiness": true,
+    "parallels_drm_launch_ready": true,
+    "drm_session_smoke": true,
+    "drm_session_clean_exit": true,
+    "debian_package_build": true,
+    "debian_package_install": true,
+    "dpkg_root_install": true,
+    "nested_wayland": true,
+    "mvp0_contract": true,
+    "ppm_bytes": $ppm_bytes,
+    "png_written": $png_written,
+    "preview_format": "$preview_format",
+    "converter": "$converter"
+  }
+}
+EOF
+
+printf 'Backlit Parallels Linux E2E exported: %s\n' "$host_out_dir"
+printf 'Manifest: %s\n' "$host_out_dir/manifest.json"
+if [ "$preview_format" = "png" ]; then
+  printf 'To view E2E preview on macOS: open %s\n' "$preview_image"
+else
+  printf 'No PNG converter found; view the PPM directly or install ImageMagick/netpbm.\n'
+fi
