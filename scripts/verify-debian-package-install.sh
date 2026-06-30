@@ -12,6 +12,7 @@ dpkg_install_log="$out_dir/dpkg-install.log"
 session_log="$out_dir/session.jsonl"
 systemd_units_log="$out_dir/systemd-units.jsonl"
 settings_app_log="$out_dir/settings-app.jsonl"
+session_replay_dir="$out_dir/session-replay"
 session_screenshot="$out_dir/deb-installed-session.ppm"
 service_log_dir="$out_dir/session-services"
 manifest="$out_dir/manifest.json"
@@ -59,6 +60,7 @@ write_skipped_manifest() {
     "session_systemd_units_from_extracted_debs": false,
     "session_gui_from_extracted_debs": false,
     "session_services_from_extracted_debs": false,
+    "session_replay_from_extracted_debs": false,
     "session_clean_exit_from_extracted_debs": false,
     "settings_app_from_extracted_debs": false
   }
@@ -228,6 +230,12 @@ grep -F '"children_exited_cleanly":true' "$session_log" >/dev/null || fail "sess
 grep -F '"windows_after_shutdown":0' "$session_log" >/dev/null || fail "session did not close all windows"
 grep -F '"focus_cleared":true' "$session_log" >/dev/null || fail "session did not clear focus"
 
+BACKLIT_SESSION_BIN="$bin_dir/backlit-session" ./scripts/verify-session-replay.sh "$session_replay_dir"
+grep -F '"session_replay_event": true' "$session_replay_dir/manifest.json" >/dev/null || fail "missing installed session replay event"
+grep -F '"frame_count": 9' "$session_replay_dir/manifest.json" >/dev/null || fail "installed session replay frame count mismatch"
+grep -F '"launcher_overlay_frame": true' "$session_replay_dir/manifest.json" >/dev/null || fail "installed session replay launcher overlay missing"
+grep -F '"app_switcher_overlay_frame": true' "$session_replay_dir/manifest.json" >/dev/null || fail "installed session replay app switcher overlay missing"
+
 "$bin_dir/backlit-settings" --verify > "$settings_app_log"
 grep -F '"event":"settings_app.verified"' "$settings_app_log" >/dev/null || fail "missing settings app verification event"
 grep -F '"passed":true' "$settings_app_log" >/dev/null || fail "settings app verification did not pass"
@@ -251,6 +259,8 @@ cat > "$manifest" <<EOF
     "systemd_units_log": "$systemd_units_log",
     "session_log": "$session_log",
     "session_screenshot": "$session_screenshot",
+    "session_replay_manifest": "$session_replay_dir/manifest.json",
+    "session_replay_frames": "$session_replay_dir/frames",
     "service_log_dir": "$service_log_dir",
     "settings_app_log": "$settings_app_log"
   },
@@ -263,6 +273,7 @@ cat > "$manifest" <<EOF
     "session_systemd_units_from_extracted_debs": true,
     "session_gui_from_extracted_debs": true,
     "session_services_from_extracted_debs": true,
+    "session_replay_from_extracted_debs": true,
     "session_clean_exit_from_extracted_debs": true,
     "settings_app_from_extracted_debs": true
   }

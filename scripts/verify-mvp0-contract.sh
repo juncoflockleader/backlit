@@ -352,6 +352,7 @@ if [ -n "$artifact_root" ] && [ -d "$artifact_root" ]; then
     require_contains "$artifact_root/debian-package-install/manifest.json" '"session_systemd_units_from_extracted_debs": true'
     require_contains "$artifact_root/debian-package-install/manifest.json" '"session_gui_from_extracted_debs": true'
     require_contains "$artifact_root/debian-package-install/manifest.json" '"session_services_from_extracted_debs": true'
+    require_contains "$artifact_root/debian-package-install/manifest.json" '"session_replay_from_extracted_debs": true'
     require_contains "$artifact_root/debian-package-install/manifest.json" '"session_clean_exit_from_extracted_debs": true'
     require_contains "$artifact_root/debian-package-install/manifest.json" '"settings_app_from_extracted_debs": true'
   else
@@ -365,6 +366,7 @@ if [ -n "$artifact_root" ] && [ -d "$artifact_root" ]; then
     require_contains "$artifact_root/debian-system-install/manifest.json" '"systemd_units_from_system_install": true'
     require_contains "$artifact_root/debian-system-install/manifest.json" '"session_gui_from_system_install": true'
     require_contains "$artifact_root/debian-system-install/manifest.json" '"session_services_from_system_install": true'
+    require_contains "$artifact_root/debian-system-install/manifest.json" '"session_replay_from_system_install": true'
     require_contains "$artifact_root/debian-system-install/manifest.json" '"session_clean_exit_from_system_install": true'
     require_contains "$artifact_root/debian-system-install/manifest.json" '"settings_app_from_system_install": true'
     require_contains "$artifact_root/debian-system-install/manifest.json" '"packages_purged_after_verification": true'

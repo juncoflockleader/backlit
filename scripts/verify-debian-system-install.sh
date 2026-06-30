@@ -13,6 +13,7 @@ dpkg_purge_log="$out_dir/dpkg-purge.log"
 systemd_units_log="$out_dir/systemd-units.jsonl"
 session_log="$out_dir/session.jsonl"
 settings_app_log="$out_dir/settings-app.jsonl"
+session_replay_dir="$out_dir/session-replay"
 session_screenshot="$out_dir/system-installed-session.ppm"
 service_log_dir="$out_dir/session-services"
 mkdir -p "$out_dir"
@@ -62,6 +63,7 @@ write_skipped_manifest() {
     "systemd_units_from_system_install": false,
     "session_gui_from_system_install": false,
     "session_services_from_system_install": false,
+    "session_replay_from_system_install": false,
     "session_clean_exit_from_system_install": false,
     "settings_app_from_system_install": false,
     "packages_purged_after_verification": false
@@ -217,6 +219,12 @@ grep -F '"children_exited_cleanly":true' "$session_log" >/dev/null || fail "sess
 grep -F '"windows_after_shutdown":0' "$session_log" >/dev/null || fail "session did not close all windows"
 grep -F '"focus_cleared":true' "$session_log" >/dev/null || fail "session did not clear focus"
 
+BACKLIT_SESSION_BIN=/usr/bin/backlit-session ./scripts/verify-session-replay.sh "$session_replay_dir"
+grep -F '"session_replay_event": true' "$session_replay_dir/manifest.json" >/dev/null || fail "missing system-installed session replay event"
+grep -F '"frame_count": 9' "$session_replay_dir/manifest.json" >/dev/null || fail "system-installed session replay frame count mismatch"
+grep -F '"launcher_overlay_frame": true' "$session_replay_dir/manifest.json" >/dev/null || fail "system-installed session replay launcher overlay missing"
+grep -F '"app_switcher_overlay_frame": true' "$session_replay_dir/manifest.json" >/dev/null || fail "system-installed session replay app switcher overlay missing"
+
 /usr/bin/backlit-settings --verify > "$settings_app_log"
 grep -F '"event":"settings_app.verified"' "$settings_app_log" >/dev/null || fail "missing settings app verification event"
 grep -F '"passed":true' "$settings_app_log" >/dev/null || fail "settings app verification did not pass"
@@ -246,6 +254,8 @@ cat > "$manifest" <<EOF
     "systemd_units_log": "$systemd_units_log",
     "session_log": "$session_log",
     "session_screenshot": "$session_screenshot",
+    "session_replay_manifest": "$session_replay_dir/manifest.json",
+    "session_replay_frames": "$session_replay_dir/frames",
     "service_log_dir": "$service_log_dir",
     "settings_app_log": "$settings_app_log"
   },
@@ -258,6 +268,7 @@ cat > "$manifest" <<EOF
     "systemd_units_from_system_install": true,
     "session_gui_from_system_install": true,
     "session_services_from_system_install": true,
+    "session_replay_from_system_install": true,
     "session_clean_exit_from_system_install": true,
     "settings_app_from_system_install": true,
     "packages_purged_after_verification": true

@@ -105,7 +105,7 @@ The Parallels runner bootstraps an Ubuntu guest, updates a clean checkout from `
 ./scripts/render-parallels-gui-preview.sh
 ```
 
-The E2E runner verifies the full Ubuntu path, runs an opt-in root system-install smoke inside the disposable guest, then copies a compact evidence bundle back to `target/linux-e2e-parallels/`: the guest E2E manifest, GUI smoke/preview manifests, launch-readiness and DRM session-smoke manifests, Debian package build/install/system-install manifests, nested Wayland manifest, MVP contract manifest, and the E2E GUI preview image. The preview runner renders the Backlit preview inside Ubuntu, copies the generated PPM/session logs/manifest back to `target/gui-preview-parallels/`, and converts the PPM to a local PNG on macOS when possible.
+The E2E runner verifies the full Ubuntu path, runs an opt-in root system-install smoke inside the disposable guest, then copies a compact evidence bundle back to `target/linux-e2e-parallels/`: the guest E2E manifest, GUI smoke/preview manifests, launch-readiness and DRM session-smoke manifests, Debian package build/install/system-install manifests, nested Wayland manifest, MVP contract manifest, and the E2E GUI preview image. The package-install and system-install checks also run the scripted session replay from the installed `backlit-session` binary, so launcher and app-switcher overlay frames are proven after packaging. The preview runner renders the Backlit preview inside Ubuntu, copies the generated PPM/session logs/manifest back to `target/gui-preview-parallels/`, and converts the PPM to a local PNG on macOS when possible.
 
 The runners read a local credential file that is ignored by Git:
 
