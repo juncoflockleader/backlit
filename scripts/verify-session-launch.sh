@@ -10,6 +10,8 @@ mkdir -p "$out_dir"
 session_desktop="packaging/sessions/backlit.desktop"
 headless_log="$out_dir/headless-session.jsonl"
 headless_err="$out_dir/headless-session.stderr"
+systemd_units_log="$out_dir/systemd-units.jsonl"
+systemd_units_err="$out_dir/systemd-units.stderr"
 drm_log="$out_dir/drm-session.jsonl"
 drm_err="$out_dir/drm-session.stderr"
 
@@ -46,6 +48,24 @@ grep '"event":"session.launch_ready"' "$headless_log" >/dev/null
 grep '"passed":true' "$headless_log" >/dev/null
 grep '"preflight_only":true' "$headless_log" >/dev/null
 grep '"event":"session.exit"' "$headless_log" >/dev/null
+
+cargo run -p backlit-session -- \
+  --backend=headless \
+  --socket=backlit-launch-check \
+  --preflight-only \
+  --verify-systemd-units \
+  --systemd-unit-dir packaging/systemd > "$systemd_units_log" 2> "$systemd_units_err"
+
+grep '"event":"session.systemd_units_verified"' "$systemd_units_log" >/dev/null
+grep '"passed":true' "$systemd_units_log" >/dev/null
+grep '"units_present":true' "$systemd_units_log" >/dev/null
+grep '"exec_starts":true' "$systemd_units_log" >/dev/null
+grep '"startup_order":true' "$systemd_units_log" >/dev/null
+grep '"graphical_session_target":true' "$systemd_units_log" >/dev/null
+grep '"journal_output":true' "$systemd_units_log" >/dev/null
+grep '"rust_backtrace_enabled":true' "$systemd_units_log" >/dev/null
+grep '"restart_policy":true' "$systemd_units_log" >/dev/null
+grep '"event":"session.exit"' "$systemd_units_log" >/dev/null
 
 set +e
 cargo run -p backlit-session -- \
@@ -119,12 +139,15 @@ cat > "$out_dir/manifest.json" <<EOF
     "session_desktop": "$session_desktop",
     "headless_session_log": "$headless_log",
     "headless_session_stderr": "$headless_err",
+    "systemd_units_log": "$systemd_units_log",
+    "systemd_units_stderr": "$systemd_units_err",
     "drm_session_log": "$drm_log",
     "drm_session_stderr": "$drm_err"
   },
   "checks": {
     "desktop_exec": "$session_exec",
     "headless_session_launch_ready": true,
+    "session_systemd_units": true,
     "drm_session_checked": true,
     "drm_session_ready": $drm_session_ready,
     "drm_session_expected_ready": $drm_session_expected_ready,

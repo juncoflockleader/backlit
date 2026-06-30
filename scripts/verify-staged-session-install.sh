@@ -20,6 +20,7 @@ compositor_log="$out_dir/compositor.jsonl"
 shell_log="$out_dir/shell.jsonl"
 notification_log="$out_dir/notification-daemon.jsonl"
 settings_log="$out_dir/settings-daemon.jsonl"
+systemd_units_log="$out_dir/systemd-units.jsonl"
 
 fail() {
   echo "staged session install verification failed: $*" >&2
@@ -122,6 +123,21 @@ require_executable "$(resolve_usr_bin "$settings_command")"
 "$bin_dir/backlit-session" \
   --backend=headless \
   --socket=backlit-0 \
+  --preflight-only \
+  --verify-systemd-units \
+  --systemd-unit-dir "$systemd_dir" > "$systemd_units_log"
+
+grep -F '"event":"session.systemd_units_verified"' "$systemd_units_log" >/dev/null || fail "missing session systemd unit verification event"
+grep -F '"passed":true' "$systemd_units_log" >/dev/null || fail "session systemd unit verification did not pass"
+grep -F '"units_present":true' "$systemd_units_log" >/dev/null || fail "session systemd units were not all present"
+grep -F '"exec_starts":true' "$systemd_units_log" >/dev/null || fail "session systemd ExecStart contract did not verify"
+grep -F '"startup_order":true' "$systemd_units_log" >/dev/null || fail "session systemd startup order did not verify"
+grep -F '"graphical_session_target":true' "$systemd_units_log" >/dev/null || fail "session systemd graphical-session target did not verify"
+grep -F '"journal_output":true' "$systemd_units_log" >/dev/null || fail "session systemd journal output did not verify"
+
+"$bin_dir/backlit-session" \
+  --backend=headless \
+  --socket=backlit-0 \
   --screenshot "$session_screenshot" \
   --verify \
   --verify-launch-spawn \
@@ -177,6 +193,7 @@ cat > "$out_dir/manifest.json" <<EOF
     "shell_service": "$shell_service",
     "notification_daemon_service": "$notification_service",
     "settings_daemon_service": "$settings_service",
+    "systemd_units_log": "$systemd_units_log",
     "session_log": "$session_log",
     "session_services_dir": "$out_dir/session-services",
     "session_screenshot": "$session_screenshot",
@@ -188,6 +205,7 @@ cat > "$out_dir/manifest.json" <<EOF
   "checks": {
     "desktop_exec_resolves": true,
     "systemd_exec_resolves": true,
+    "session_systemd_units": true,
     "systemd_journal_output": true,
     "rust_backtrace_enabled": true,
     "staged_session_help": true,

@@ -17,7 +17,7 @@ Current launch-readiness checks:
 - DRM/KMS preflight requires logind to verify that the session is active, local, seated, and has a concrete session type such as `tty` or `wayland`.
 - `scripts/verify-launch-readiness.sh` records whether the host is DRM launch-ready or expected-blocked.
 - `backlit-session --preflight-only` verifies backend launch prerequisites through the actual session entrypoint before rendering starts.
-- `scripts/verify-session-launch.sh` verifies the desktop session entry, headless session launch, and DRM session launch preflight.
+- `scripts/verify-session-launch.sh` verifies the desktop session entry, headless session launch, user systemd unit contract, and DRM session launch preflight.
 - `backlit-session --verify-launch-spawn` verifies that the `Super+Enter` terminal route can spawn a process with `WAYLAND_DISPLAY` set.
 - `backlit-input --verify` verifies the policy-level input contract that future libinput events must satisfy: terminal hotkey routing, app-switcher focus changes, pointer focus, title-bar move, resize-grip resize, and clean pointer grab release.
 - `backlit-session --verify` verifies workspace switching and left/right window snapping through the same window-policy layer used for focus and movement.

@@ -45,6 +45,10 @@ fn run() -> Result<(), String> {
                 "verify_clean_exit",
                 FieldValue::Bool(config.verify_clean_exit),
             ),
+            (
+                "verify_systemd_units",
+                FieldValue::Bool(config.verify_systemd_units),
+            ),
             ("preflight_only", FieldValue::Bool(config.preflight_only)),
         ],
     );
@@ -61,6 +65,15 @@ fn run() -> Result<(), String> {
             preflight_report.backend.as_str(),
             preflight_report.code,
         ));
+    }
+
+    if config.verify_systemd_units {
+        let unit_report = verify_systemd_units(Path::new(&config.systemd_unit_dir));
+        emit_systemd_unit_verification(&config, &unit_report);
+
+        if !unit_report.passed() {
+            return Err(String::from("session systemd unit verification failed"));
+        }
     }
 
     if config.preflight_only {
@@ -582,6 +595,233 @@ fn emit_service_verification(config: &Config, report: &ServiceVerification, elap
             (
                 "settings_stdout_bytes",
                 FieldValue::U64(report.settings.stdout.len() as u64),
+            ),
+        ],
+    );
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+struct SystemdUnitContract {
+    unit_name: &'static str,
+    exec_start: &'static str,
+    after: &'static str,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+struct SystemdUnitProbe {
+    present: bool,
+    exec_start_ok: bool,
+    after_ok: bool,
+    part_of_graphical_session: bool,
+    wanted_by_graphical_session: bool,
+    rust_backtrace_enabled: bool,
+    journal_stdout: bool,
+    journal_stderr: bool,
+    restart_on_failure: bool,
+}
+
+impl SystemdUnitProbe {
+    fn missing() -> Self {
+        Self {
+            present: false,
+            exec_start_ok: false,
+            after_ok: false,
+            part_of_graphical_session: false,
+            wanted_by_graphical_session: false,
+            rust_backtrace_enabled: false,
+            journal_stdout: false,
+            journal_stderr: false,
+            restart_on_failure: false,
+        }
+    }
+
+    fn passed(self) -> bool {
+        self.present
+            && self.exec_start_ok
+            && self.after_ok
+            && self.part_of_graphical_session
+            && self.wanted_by_graphical_session
+            && self.rust_backtrace_enabled
+            && self.journal_stdout
+            && self.journal_stderr
+            && self.restart_on_failure
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct SystemdUnitVerification {
+    unit_dir: PathBuf,
+    compositor: SystemdUnitProbe,
+    shell: SystemdUnitProbe,
+    notification: SystemdUnitProbe,
+    settings: SystemdUnitProbe,
+}
+
+impl SystemdUnitVerification {
+    fn passed(&self) -> bool {
+        self.compositor.passed()
+            && self.shell.passed()
+            && self.notification.passed()
+            && self.settings.passed()
+    }
+
+    fn units_present(&self) -> bool {
+        self.compositor.present
+            && self.shell.present
+            && self.notification.present
+            && self.settings.present
+    }
+
+    fn exec_starts_ok(&self) -> bool {
+        self.compositor.exec_start_ok
+            && self.shell.exec_start_ok
+            && self.notification.exec_start_ok
+            && self.settings.exec_start_ok
+    }
+
+    fn startup_order_ok(&self) -> bool {
+        self.compositor.after_ok
+            && self.shell.after_ok
+            && self.notification.after_ok
+            && self.settings.after_ok
+    }
+
+    fn graphical_session_target_ok(&self) -> bool {
+        self.compositor.part_of_graphical_session
+            && self.shell.part_of_graphical_session
+            && self.notification.part_of_graphical_session
+            && self.settings.part_of_graphical_session
+            && self.compositor.wanted_by_graphical_session
+            && self.shell.wanted_by_graphical_session
+            && self.notification.wanted_by_graphical_session
+            && self.settings.wanted_by_graphical_session
+    }
+
+    fn journal_output_ok(&self) -> bool {
+        self.compositor.journal_stdout
+            && self.compositor.journal_stderr
+            && self.shell.journal_stdout
+            && self.shell.journal_stderr
+            && self.notification.journal_stdout
+            && self.notification.journal_stderr
+            && self.settings.journal_stdout
+            && self.settings.journal_stderr
+    }
+
+    fn rust_backtrace_enabled(&self) -> bool {
+        self.compositor.rust_backtrace_enabled
+            && self.shell.rust_backtrace_enabled
+            && self.notification.rust_backtrace_enabled
+            && self.settings.rust_backtrace_enabled
+    }
+
+    fn restart_policy_ok(&self) -> bool {
+        self.compositor.restart_on_failure
+            && self.shell.restart_on_failure
+            && self.notification.restart_on_failure
+            && self.settings.restart_on_failure
+    }
+}
+
+fn verify_systemd_units(unit_dir: &Path) -> SystemdUnitVerification {
+    let [compositor_contract, shell_contract, notification_contract, settings_contract] =
+        systemd_unit_contracts();
+
+    SystemdUnitVerification {
+        unit_dir: unit_dir.to_path_buf(),
+        compositor: verify_systemd_unit(unit_dir, compositor_contract),
+        shell: verify_systemd_unit(unit_dir, shell_contract),
+        notification: verify_systemd_unit(unit_dir, notification_contract),
+        settings: verify_systemd_unit(unit_dir, settings_contract),
+    }
+}
+
+fn systemd_unit_contracts() -> [SystemdUnitContract; 4] {
+    [
+        SystemdUnitContract {
+            unit_name: "backlit-compositor.service",
+            exec_start: "ExecStart=/usr/bin/backlit-compositor --backend=drm --socket=backlit-0",
+            after: "After=graphical-session-pre.target",
+        },
+        SystemdUnitContract {
+            unit_name: "backlit-shell.service",
+            exec_start: "ExecStart=/usr/bin/backlit-shell --component=all --socket=backlit-0",
+            after: "After=backlit-compositor.service",
+        },
+        SystemdUnitContract {
+            unit_name: "backlit-notification-daemon.service",
+            exec_start: "ExecStart=/usr/bin/backlit-notification-daemon",
+            after: "After=backlit-compositor.service",
+        },
+        SystemdUnitContract {
+            unit_name: "backlit-settings-daemon.service",
+            exec_start: "ExecStart=/usr/bin/backlit-settings-daemon",
+            after: "After=backlit-compositor.service",
+        },
+    ]
+}
+
+fn verify_systemd_unit(unit_dir: &Path, contract: SystemdUnitContract) -> SystemdUnitProbe {
+    let path = unit_dir.join(contract.unit_name);
+    let Ok(contents) = fs::read_to_string(path) else {
+        return SystemdUnitProbe::missing();
+    };
+    let lines: Vec<&str> = contents.lines().map(str::trim).collect();
+    let contains_line = |required: &str| lines.iter().any(|line| *line == required);
+
+    SystemdUnitProbe {
+        present: true,
+        exec_start_ok: contains_line(contract.exec_start),
+        after_ok: contains_line(contract.after),
+        part_of_graphical_session: contains_line("PartOf=graphical-session.target"),
+        wanted_by_graphical_session: contains_line("WantedBy=graphical-session.target"),
+        rust_backtrace_enabled: contains_line("Environment=RUST_BACKTRACE=1"),
+        journal_stdout: contains_line("StandardOutput=journal"),
+        journal_stderr: contains_line("StandardError=journal"),
+        restart_on_failure: contains_line("Restart=on-failure"),
+    }
+}
+
+fn emit_systemd_unit_verification(config: &Config, report: &SystemdUnitVerification) {
+    let unit_dir = report.unit_dir.to_string_lossy();
+
+    emit(
+        "session.systemd_units_verified",
+        config,
+        &[
+            ("passed", FieldValue::Bool(report.passed())),
+            ("unit_dir", FieldValue::Str(unit_dir.as_ref())),
+            (
+                "compositor_unit",
+                FieldValue::Str("backlit-compositor.service"),
+            ),
+            ("shell_unit", FieldValue::Str("backlit-shell.service")),
+            (
+                "notification_unit",
+                FieldValue::Str("backlit-notification-daemon.service"),
+            ),
+            (
+                "settings_unit",
+                FieldValue::Str("backlit-settings-daemon.service"),
+            ),
+            ("units_present", FieldValue::Bool(report.units_present())),
+            ("exec_starts", FieldValue::Bool(report.exec_starts_ok())),
+            ("startup_order", FieldValue::Bool(report.startup_order_ok())),
+            (
+                "graphical_session_target",
+                FieldValue::Bool(report.graphical_session_target_ok()),
+            ),
+            (
+                "journal_output",
+                FieldValue::Bool(report.journal_output_ok()),
+            ),
+            (
+                "rust_backtrace_enabled",
+                FieldValue::Bool(report.rust_backtrace_enabled()),
+            ),
+            (
+                "restart_policy",
+                FieldValue::Bool(report.restart_policy_ok()),
             ),
         ],
     );
@@ -1123,6 +1363,8 @@ struct Config {
     verify: bool,
     verify_services: bool,
     verify_clean_exit: bool,
+    verify_systemd_units: bool,
+    systemd_unit_dir: String,
     preflight_only: bool,
     verify_launch_spawn: bool,
     launch_spawn_program: Option<String>,
@@ -1143,6 +1385,8 @@ impl Default for Config {
             verify: false,
             verify_services: false,
             verify_clean_exit: false,
+            verify_systemd_units: false,
+            systemd_unit_dir: String::from("/usr/lib/systemd/user"),
             preflight_only: false,
             verify_launch_spawn: false,
             launch_spawn_program: None,
@@ -1171,6 +1415,14 @@ impl Config {
                 config.verify_services = true;
             } else if arg == "--verify-clean-exit" {
                 config.verify_clean_exit = true;
+            } else if arg == "--verify-systemd-units" {
+                config.verify_systemd_units = true;
+            } else if let Some(value) = arg.strip_prefix("--systemd-unit-dir=") {
+                config.systemd_unit_dir = value.to_string();
+            } else if arg == "--systemd-unit-dir" {
+                config.systemd_unit_dir = args
+                    .next()
+                    .ok_or_else(|| String::from("missing value for --systemd-unit-dir"))?;
             } else if arg == "--preflight-only" {
                 config.preflight_only = true;
             } else if arg == "--verify-launch-spawn" {
@@ -1262,7 +1514,7 @@ fn print_help() {
 backlit-session
 
 Usage:
-  backlit-session [--backend=headless|wayland|drm] [--socket=backlit-0] [--screenshot=target/backlit-session.ppm] [--verify] [--verify-services] [--verify-launch-spawn] [--verify-clean-exit] [--preflight-only]
+  backlit-session [--backend=headless|wayland|drm] [--socket=backlit-0] [--screenshot=target/backlit-session.ppm] [--verify] [--verify-services] [--verify-systemd-units] [--verify-launch-spawn] [--verify-clean-exit] [--preflight-only]
 
 Flags:
   --backend      Select compositor backend. Defaults to headless.
@@ -1279,6 +1531,10 @@ Flags:
                  Spawn the terminal launch target resolved from Super+Enter.
   --verify-clean-exit
                  Verify session shutdown closes managed windows and clears focus.
+  --verify-systemd-units
+                 Verify installed user systemd units for the graphical session.
+  --systemd-unit-dir
+                 Directory containing Backlit user systemd units. Defaults to /usr/lib/systemd/user.
   --launch-spawn-program
                  Override terminal program for deterministic spawn verification.
   --launch-spawn-arg
@@ -1293,7 +1549,11 @@ Flags:
 
 #[cfg(test)]
 mod tests {
-    use super::{binary_name, Config};
+    use std::fs;
+    use std::path::Path;
+    use std::time::{SystemTime, UNIX_EPOCH};
+
+    use super::{binary_name, verify_systemd_units, Config};
 
     #[test]
     fn parses_service_verification_flags() {
@@ -1301,6 +1561,9 @@ mod tests {
             "--verify",
             "--verify-services",
             "--verify-clean-exit",
+            "--verify-systemd-units",
+            "--systemd-unit-dir",
+            "packaging/systemd",
             "--preflight-only",
             "--verify-launch-spawn",
             "--launch-spawn-program",
@@ -1317,6 +1580,8 @@ mod tests {
         assert!(config.verify);
         assert!(config.verify_services);
         assert!(config.verify_clean_exit);
+        assert!(config.verify_systemd_units);
+        assert_eq!(config.systemd_unit_dir, "packaging/systemd");
         assert!(config.preflight_only);
         assert!(config.verify_launch_spawn);
         assert_eq!(config.launch_spawn_program.as_deref(), Some("true"));
@@ -1331,5 +1596,108 @@ mod tests {
     #[test]
     fn binary_name_uses_platform_suffix() {
         assert!(binary_name("backlit-compositor").starts_with("backlit-compositor"));
+    }
+
+    #[test]
+    fn verifies_systemd_unit_contracts() {
+        let unit_dir = unique_test_dir("systemd-units-ok");
+        fs::create_dir_all(&unit_dir).expect("unit dir should be created");
+        write_unit(
+            &unit_dir,
+            "backlit-compositor.service",
+            "Backlit Wayland compositor",
+            "After=graphical-session-pre.target",
+            "ExecStart=/usr/bin/backlit-compositor --backend=drm --socket=backlit-0",
+        );
+        write_unit(
+            &unit_dir,
+            "backlit-shell.service",
+            "Backlit shell",
+            "After=backlit-compositor.service",
+            "ExecStart=/usr/bin/backlit-shell --component=all --socket=backlit-0",
+        );
+        write_unit(
+            &unit_dir,
+            "backlit-notification-daemon.service",
+            "Backlit notification daemon",
+            "After=backlit-compositor.service",
+            "ExecStart=/usr/bin/backlit-notification-daemon",
+        );
+        write_unit(
+            &unit_dir,
+            "backlit-settings-daemon.service",
+            "Backlit settings daemon",
+            "After=backlit-compositor.service",
+            "ExecStart=/usr/bin/backlit-settings-daemon",
+        );
+
+        let report = verify_systemd_units(&unit_dir);
+
+        assert!(report.passed(), "{report:?}");
+        assert!(report.units_present());
+        assert!(report.exec_starts_ok());
+        assert!(report.startup_order_ok());
+        assert!(report.graphical_session_target_ok());
+        assert!(report.journal_output_ok());
+        assert!(report.rust_backtrace_enabled());
+        assert!(report.restart_policy_ok());
+    }
+
+    #[test]
+    fn rejects_incomplete_systemd_unit_contracts() {
+        let unit_dir = unique_test_dir("systemd-units-missing");
+        fs::create_dir_all(&unit_dir).expect("unit dir should be created");
+        write_unit(
+            &unit_dir,
+            "backlit-compositor.service",
+            "Backlit Wayland compositor",
+            "After=graphical-session-pre.target",
+            "ExecStart=/usr/bin/backlit-compositor --backend=drm --socket=backlit-0",
+        );
+
+        let report = verify_systemd_units(&unit_dir);
+
+        assert!(!report.passed());
+        assert!(!report.units_present());
+        assert!(report.compositor.passed());
+        assert!(!report.shell.present);
+    }
+
+    fn unique_test_dir(name: &str) -> std::path::PathBuf {
+        let nanos = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .expect("test time should be after epoch")
+            .as_nanos();
+        std::env::temp_dir().join(format!("backlit-{name}-{}-{nanos}", std::process::id()))
+    }
+
+    fn write_unit(
+        unit_dir: &Path,
+        unit_name: &str,
+        description: &str,
+        after: &str,
+        exec_start: &str,
+    ) {
+        let contents = format!(
+            "\
+[Unit]
+Description={description}
+{after}
+PartOf=graphical-session.target
+
+[Service]
+Type=simple
+{exec_start}
+Environment=RUST_BACKTRACE=1
+SyslogIdentifier={unit_name}
+StandardOutput=journal
+StandardError=journal
+Restart=on-failure
+
+[Install]
+WantedBy=graphical-session.target
+"
+        );
+        fs::write(unit_dir.join(unit_name), contents).expect("unit should be written");
     }
 }
