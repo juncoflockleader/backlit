@@ -126,7 +126,7 @@ The Linux-side verifier can also be run directly inside any Ubuntu checkout:
 ./scripts/verify-linux-e2e.sh
 ```
 
-It runs `cargo fmt`, workspace tests, `cargo clippy`, the deterministic GUI smoke verifier, the preview renderer, CI contract verifier, packaging contract verifier, staged session install verifier, launch-readiness verifier, nested Wayland smoke verifier, and MVP 0 contract verifier, then writes `target/linux-e2e/manifest.json`.
+It runs `cargo fmt`, workspace tests, `cargo clippy`, the deterministic GUI smoke verifier, the preview renderer, CI contract verifier, packaging contract verifier, staged session install verifier, launch-readiness verifier, session launch verifier, nested Wayland smoke verifier, and MVP 0 contract verifier, then writes `target/linux-e2e/manifest.json`.
 
 ## GUI Linux VM Workflow
 
@@ -191,6 +191,7 @@ cargo run -p backlit-session -- --backend=headless --screenshot target/backlit-s
 ./scripts/render-parallels-gui-preview.sh
 ./scripts/verify-gui-smoke.sh
 ./scripts/verify-launch-readiness.sh
+./scripts/verify-session-launch.sh
 ./scripts/verify-mvp0-contract.sh
 ./scripts/verify-ci-contract.sh
 ./scripts/verify-packaging-contract.sh
@@ -292,9 +293,10 @@ To capture the current host's launch readiness:
 
 ```bash
 ./scripts/verify-launch-readiness.sh
+./scripts/verify-session-launch.sh
 ```
 
-This writes `target/launch-readiness/manifest.json`. On macOS or headless CI it can pass with `drm_blocked_expected: true`; inside the Parallels Ubuntu GUI VM it should report `drm_expected_ready: true` and `drm_ready: true`.
+These write `target/launch-readiness/manifest.json` and `target/session-launch/manifest.json`. On macOS or headless CI they can pass with DRM expected-blocked; inside the Parallels Ubuntu GUI VM they should report DRM expected-ready and ready. The session launch verifier also checks that `packaging/sessions/backlit.desktop` resolves to `backlit-session` and that `backlit-session --preflight-only` exits cleanly for launchable backends.
 
 ## Packaging Contract Verification
 

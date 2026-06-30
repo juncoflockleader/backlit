@@ -11,6 +11,7 @@ ci_contract_dir="$out_dir/ci-contract"
 packaging_dir="$out_dir/packaging-contract"
 staged_install_dir="$out_dir/staged-session-install"
 launch_readiness_dir="$out_dir/launch-readiness"
+session_launch_dir="$out_dir/session-launch"
 mvp0_contract_dir="$out_dir/mvp0-contract"
 mkdir -p "$out_dir"
 
@@ -28,6 +29,7 @@ cargo clippy --workspace --all-targets -- -D warnings
 ./scripts/verify-packaging-contract.sh "$packaging_dir"
 ./scripts/verify-staged-session-install.sh "$staged_install_dir"
 ./scripts/verify-launch-readiness.sh "$launch_readiness_dir"
+./scripts/verify-session-launch.sh "$session_launch_dir"
 
 nested_wayland=false
 nested_wayland_manifest=""
@@ -54,6 +56,7 @@ cat > "$out_dir/manifest.json" <<EOF
     "packaging_contract_manifest": "$packaging_dir/manifest.json",
     "staged_session_install_manifest": "$staged_install_dir/manifest.json",
     "launch_readiness_manifest": "$launch_readiness_dir/manifest.json",
+    "session_launch_manifest": "$session_launch_dir/manifest.json",
     "mvp0_contract_manifest": "$mvp0_contract_dir/manifest.json",
     "nested_wayland_manifest": "$nested_wayland_manifest"
   },
@@ -67,6 +70,7 @@ cat > "$out_dir/manifest.json" <<EOF
     "packaging_contract": true,
     "staged_session_install": true,
     "launch_readiness": true,
+    "session_launch": true,
     "mvp0_contract": true,
     "nested_wayland": $nested_wayland
   }

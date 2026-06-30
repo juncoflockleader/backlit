@@ -6,7 +6,10 @@ use std::str::FromStr;
 use std::time::Instant;
 
 use backlit_common::metrics::{event_json, FieldValue};
-use backlit_compositor_backend::BackendKind;
+use backlit_compositor_backend::{
+    preflight_backend_with_environment, BackendKind, BackendPreflightEnvironment,
+    BackendPreflightReport,
+};
 use backlit_demo_client::{
     render_demo_gui, verify_demo_gui, DEFAULT_DEMO_HEIGHT, DEFAULT_DEMO_WIDTH,
 };
@@ -29,12 +32,6 @@ fn run() -> Result<(), String> {
         return Ok(());
     }
 
-    if config.backend == BackendKind::Drm && !cfg!(target_os = "linux") {
-        return Err(String::from(
-            "the drm backend requires Linux with a real graphics/input stack",
-        ));
-    }
-
     let started = Instant::now();
     emit(
         "session.launch",
@@ -42,8 +39,35 @@ fn run() -> Result<(), String> {
         &[
             ("verify", FieldValue::Bool(config.verify)),
             ("verify_services", FieldValue::Bool(config.verify_services)),
+            ("preflight_only", FieldValue::Bool(config.preflight_only)),
         ],
     );
+
+    let preflight_environment = BackendPreflightEnvironment::from_host();
+    let preflight_report =
+        preflight_backend_with_environment(config.backend, &preflight_environment);
+    emit_backend_preflight(&config, &preflight_report, &preflight_environment);
+    emit_launch_ready(&config, preflight_report.ready);
+
+    if !preflight_report.ready {
+        return Err(format!(
+            "{} session launch preflight failed: {}",
+            preflight_report.backend.as_str(),
+            preflight_report.code,
+        ));
+    }
+
+    if config.preflight_only {
+        emit(
+            "session.exit",
+            &config,
+            &[(
+                "elapsed_ms",
+                FieldValue::U64(started.elapsed().as_millis() as u64),
+            )],
+        );
+        return Ok(());
+    }
 
     let mut policy = WindowPolicy::default();
     policy.add_window("terminal", (800, 600));
@@ -378,6 +402,57 @@ fn emit_service_verification(config: &Config, report: &ServiceVerification) {
     );
 }
 
+fn emit_backend_preflight(
+    config: &Config,
+    report: &BackendPreflightReport,
+    environment: &BackendPreflightEnvironment,
+) {
+    let wayland_display = environment.wayland_display.as_deref().unwrap_or("");
+    let xdg_runtime_dir = environment.xdg_runtime_dir.as_deref().unwrap_or("");
+    let session_id = environment.session_id.as_deref().unwrap_or("");
+    let seat = environment.seat.as_deref().unwrap_or("");
+    let session_type = environment.session_type.as_deref().unwrap_or("");
+
+    emit(
+        "session.backend_preflight",
+        config,
+        &[
+            ("ready", FieldValue::Bool(report.ready)),
+            ("code", FieldValue::Str(report.code)),
+            ("detail", FieldValue::Str(report.detail.as_str())),
+            ("target_os", FieldValue::Str(environment.target_os.as_str())),
+            ("wayland_display", FieldValue::Str(wayland_display)),
+            ("xdg_runtime_dir", FieldValue::Str(xdg_runtime_dir)),
+            (
+                "drm_card_nodes",
+                FieldValue::U64(environment.drm_card_nodes),
+            ),
+            (
+                "drm_render_nodes",
+                FieldValue::U64(environment.drm_render_nodes),
+            ),
+            (
+                "input_event_nodes",
+                FieldValue::U64(environment.input_event_nodes),
+            ),
+            ("session_id", FieldValue::Str(session_id)),
+            ("seat", FieldValue::Str(seat)),
+            ("session_type", FieldValue::Str(session_type)),
+        ],
+    );
+}
+
+fn emit_launch_ready(config: &Config, passed: bool) {
+    emit(
+        "session.launch_ready",
+        config,
+        &[
+            ("passed", FieldValue::Bool(passed)),
+            ("preflight_only", FieldValue::Bool(config.preflight_only)),
+        ],
+    );
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 struct InteractionReport {
     initial_focus: u64,
@@ -522,6 +597,7 @@ struct Config {
     height: u32,
     verify: bool,
     verify_services: bool,
+    preflight_only: bool,
     help: bool,
 }
 
@@ -536,6 +612,7 @@ impl Default for Config {
             height: DEFAULT_DEMO_HEIGHT,
             verify: false,
             verify_services: false,
+            preflight_only: false,
             help: false,
         }
     }
@@ -557,6 +634,8 @@ impl Config {
                 config.verify = true;
             } else if arg == "--verify-services" {
                 config.verify_services = true;
+            } else if arg == "--preflight-only" {
+                config.preflight_only = true;
             } else if let Some(value) = arg.strip_prefix("--backend=") {
                 config.backend = parse_backend(value)?;
             } else if arg == "--backend" {
@@ -623,7 +702,7 @@ fn print_help() {
 backlit-session
 
 Usage:
-  backlit-session [--backend=headless|wayland|drm] [--socket=backlit-0] [--screenshot=target/backlit-session.ppm] [--verify] [--verify-services]
+  backlit-session [--backend=headless|wayland|drm] [--socket=backlit-0] [--screenshot=target/backlit-session.ppm] [--verify] [--verify-services] [--preflight-only]
 
 Flags:
   --backend      Select compositor backend. Defaults to headless.
@@ -636,6 +715,8 @@ Flags:
   --verify       Fail if expected GUI regions are missing.
   --verify-services
                  Fail if sibling compositor and shell probes cannot launch.
+  --preflight-only
+                 Verify backend launch prerequisites and exit before rendering.
 "
     );
 }
@@ -649,6 +730,7 @@ mod tests {
         let config = Config::parse([
             "--verify",
             "--verify-services",
+            "--preflight-only",
             "--service-log-dir",
             "target/session-services",
         ])
@@ -656,6 +738,7 @@ mod tests {
 
         assert!(config.verify);
         assert!(config.verify_services);
+        assert!(config.preflight_only);
         assert_eq!(
             config.service_log_dir.as_deref(),
             Some("target/session-services")
