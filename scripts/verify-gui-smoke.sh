@@ -115,6 +115,23 @@ grep '"drag_damage_ok":true' "$out_dir/perf.jsonl" >/dev/null
 grep '"drag_frame_pacing_ok":true' "$out_dir/perf.jsonl" >/dev/null
 grep '"event":"shell.verified"' "$out_dir/shell.jsonl" >/dev/null
 grep '"required_components":4' "$out_dir/shell.jsonl" >/dev/null
+grep '"required_roles":4' "$out_dir/shell.jsonl" >/dev/null
+grep '"wallpaper_ready":true' "$out_dir/shell.jsonl" >/dev/null
+grep '"panel_ready":true' "$out_dir/shell.jsonl" >/dev/null
+grep '"launcher_ready":true' "$out_dir/shell.jsonl" >/dev/null
+grep '"app_switcher_ready":true' "$out_dir/shell.jsonl" >/dev/null
+grep '"clock_visible":true' "$out_dir/shell.jsonl" >/dev/null
+grep '"battery_visible":true' "$out_dir/shell.jsonl" >/dev/null
+grep '"network_visible":true' "$out_dir/shell.jsonl" >/dev/null
+grep '"volume_visible":true' "$out_dir/shell.jsonl" >/dev/null
+grep '"workspace_indicator_visible":true' "$out_dir/shell.jsonl" >/dev/null
+grep '"workspace_count":4' "$out_dir/shell.jsonl" >/dev/null
+grep '"active_workspace":0' "$out_dir/shell.jsonl" >/dev/null
+grep '"launcher_targets":3' "$out_dir/shell.jsonl" >/dev/null
+grep '"terminal_target":true' "$out_dir/shell.jsonl" >/dev/null
+grep '"browser_target":true' "$out_dir/shell.jsonl" >/dev/null
+grep '"settings_target":true' "$out_dir/shell.jsonl" >/dev/null
+grep '"app_switcher_entries":3' "$out_dir/shell.jsonl" >/dev/null
 grep '"event":"launcher.verified"' "$out_dir/launcher.jsonl" >/dev/null
 grep '"required_targets":3' "$out_dir/launcher.jsonl" >/dev/null
 grep '"desktop_entries":3' "$out_dir/launcher.jsonl" >/dev/null
@@ -206,6 +223,12 @@ cat > "$out_dir/manifest.json" <<EOF
   "checks": {
     "protocol_required_count": 7,
     "shell_required_components": 4,
+    "shell_required_roles": 4,
+    "shell_wallpaper": true,
+    "shell_panel_status": true,
+    "shell_workspace_indicator": true,
+    "shell_launcher_targets": 3,
+    "shell_app_switcher": true,
     "launcher_required_targets": 3,
     "desktop_entries": 3,
     "launcher_spawn": true,

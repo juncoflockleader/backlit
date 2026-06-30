@@ -7,7 +7,7 @@ MVP 0 is the development harness:
 - Backend preflight checks for headless, nested Wayland, and DRM launch paths.
 - Nested Wayland backend flag and Weston-backed compositor/session smoke verifier with clean shutdown.
 - Pure window-policy logic.
-- MVP shell role smoke checks.
+- MVP shell chrome smoke for wallpaper, panel status indicators, workspace indicator, launcher targets, and app switcher entries.
 - Dry-run launcher catalog for terminal, browser, and settings.
 - Deterministic `.desktop` app discovery smoke for launcher.
 - Launcher process-spawn smoke with Wayland display environment propagation.

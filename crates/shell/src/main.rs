@@ -4,6 +4,8 @@ use std::thread;
 use std::time::Duration;
 
 use backlit_common::metrics::{event_json, FieldValue};
+use backlit_launcher::LaunchTarget;
+use backlit_shell::run_shell_chrome_smoke;
 use backlit_shell_protocol::{ShellSurfaceRole, MVP_SHELL_ROLES};
 
 fn main() {
@@ -52,25 +54,90 @@ fn run() -> Result<(), String> {
     }
 
     let components = component.components();
+    let report = run_shell_chrome_smoke();
     for role in components {
-        emit_component_ready(*role, socket.as_str());
+        emit_component_ready(*role, socket.as_str(), report.role_ready(*role));
     }
 
+    let passed = report.passed();
     println!(
         "{}",
         event_json(
             "shell.verified",
             &[
                 ("socket", FieldValue::Str(socket.as_str())),
-                ("passed", FieldValue::Bool(true)),
+                ("passed", FieldValue::Bool(passed)),
                 ("verify", FieldValue::Bool(verify)),
                 (
                     "required_components",
                     FieldValue::U64(components.len() as u64)
                 ),
+                ("required_roles", FieldValue::U64(report.required_roles)),
+                (
+                    "wallpaper_ready",
+                    FieldValue::Bool(report.wallpaper.ready())
+                ),
+                ("panel_ready", FieldValue::Bool(report.panel.ready())),
+                ("launcher_ready", FieldValue::Bool(report.launcher.ready())),
+                (
+                    "app_switcher_ready",
+                    FieldValue::Bool(report.app_switcher.ready())
+                ),
+                (
+                    "clock_visible",
+                    FieldValue::Bool(report.panel.clock_visible)
+                ),
+                (
+                    "battery_visible",
+                    FieldValue::Bool(report.panel.battery_visible)
+                ),
+                (
+                    "network_visible",
+                    FieldValue::Bool(report.panel.network_visible)
+                ),
+                (
+                    "volume_visible",
+                    FieldValue::Bool(report.panel.volume_visible)
+                ),
+                (
+                    "workspace_indicator_visible",
+                    FieldValue::Bool(report.panel.workspace.visible)
+                ),
+                (
+                    "workspace_count",
+                    FieldValue::U64(report.panel.workspace.count)
+                ),
+                (
+                    "active_workspace",
+                    FieldValue::U64(report.panel.workspace.active)
+                ),
+                (
+                    "launcher_targets",
+                    FieldValue::U64(report.launcher.target_count())
+                ),
+                (
+                    "terminal_target",
+                    FieldValue::Bool(report.launcher.has_target(LaunchTarget::Terminal))
+                ),
+                (
+                    "browser_target",
+                    FieldValue::Bool(report.launcher.has_target(LaunchTarget::Browser))
+                ),
+                (
+                    "settings_target",
+                    FieldValue::Bool(report.launcher.has_target(LaunchTarget::Settings))
+                ),
+                (
+                    "app_switcher_entries",
+                    FieldValue::U64(report.app_switcher.entry_count())
+                ),
             ],
         )
     );
+
+    if verify && !passed {
+        return Err(String::from("shell chrome verification failed"));
+    }
 
     if let Some(duration_ms) = idle_probe_ms {
         println!(
@@ -101,7 +168,7 @@ fn run() -> Result<(), String> {
     Ok(())
 }
 
-fn emit_component_ready(role: ShellSurfaceRole, socket: &str) {
+fn emit_component_ready(role: ShellSurfaceRole, socket: &str, connected: bool) {
     println!(
         "{}",
         event_json(
@@ -110,7 +177,7 @@ fn emit_component_ready(role: ShellSurfaceRole, socket: &str) {
                 ("component", FieldValue::Str(role.as_str())),
                 ("socket", FieldValue::Str(socket)),
                 ("mvp_required", FieldValue::Bool(role.mvp_required())),
-                ("connected", FieldValue::Bool(false)),
+                ("connected", FieldValue::Bool(connected)),
             ],
         )
     );

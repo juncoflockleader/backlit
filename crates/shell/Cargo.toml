@@ -9,5 +9,5 @@ publish = false
 
 [dependencies]
 backlit-common = { path = "../common" }
+backlit-launcher = { path = "../launcher" }
 backlit-shell-protocol = { path = "../shell-protocol" }
-

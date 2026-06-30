@@ -66,6 +66,10 @@ require_contains scripts/verify-gui-smoke.sh 'cargo run -p backlit-surface -- --
 require_contains scripts/verify-gui-smoke.sh 'cargo run -p backlit-demo-client --'
 require_contains scripts/verify-gui-smoke.sh 'cargo run -p backlit-settings-daemon -- --verify'
 require_contains scripts/verify-gui-smoke.sh 'cargo run -p backlit-portal-backend -- --verify'
+require_contains scripts/verify-gui-smoke.sh '"shell_panel_status": true'
+require_contains scripts/verify-gui-smoke.sh '"shell_workspace_indicator": true'
+require_contains scripts/verify-gui-smoke.sh '"shell_launcher_targets": 3'
+require_contains scripts/verify-gui-smoke.sh '"shell_app_switcher": true'
 require_contains scripts/verify-gui-smoke.sh '"golden_checksum": true'
 require_contains scripts/verify-launch-performance.sh '"name": "backlit-launch-performance"'
 require_contains scripts/verify-linux-e2e.sh './scripts/verify-nested-wayland-smoke.sh'
@@ -103,6 +107,12 @@ if [ -n "$artifact_root" ] && [ -d "$artifact_root" ]; then
   require_file "$artifact_root/drm-session-smoke/manifest.json"
 
   require_contains "$artifact_root/gui-smoke/manifest.json" '"protocol_required_count": 7'
+  require_contains "$artifact_root/gui-smoke/manifest.json" '"shell_required_roles": 4'
+  require_contains "$artifact_root/gui-smoke/manifest.json" '"shell_wallpaper": true'
+  require_contains "$artifact_root/gui-smoke/manifest.json" '"shell_panel_status": true'
+  require_contains "$artifact_root/gui-smoke/manifest.json" '"shell_workspace_indicator": true'
+  require_contains "$artifact_root/gui-smoke/manifest.json" '"shell_launcher_targets": 3'
+  require_contains "$artifact_root/gui-smoke/manifest.json" '"shell_app_switcher": true'
   require_contains "$artifact_root/gui-smoke/manifest.json" '"launcher_required_targets": 3'
   require_contains "$artifact_root/gui-smoke/manifest.json" '"shortcut_required_bindings": 6'
   require_contains "$artifact_root/gui-smoke/manifest.json" '"keyboard_input": true'
@@ -200,6 +210,7 @@ cat > "$out_dir/manifest.json" <<EOF
     "portal_security": true,
     "input_smoke": true,
     "surface_lifecycle": true,
+    "shell_chrome": true,
     "workspace_switch": true,
     "window_snap": true,
     "frame_damage": true,

@@ -23,7 +23,7 @@ crates/
   surface/             xdg-shell-style toplevel lifecycle smoke checks.
   window-policy/       Focus, placement, workspaces, snapping; pure logic.
   shell-protocol/      Private shell/compositor protocol model.
-  shell/               Shell host stub for panel/launcher/wallpaper work.
+  shell/               Shell chrome state and host smoke checks.
   settings-daemon/     Display, input, and power policy daemon smoke checks.
   portal-backend/      Future xdg-desktop-portal backend.
 apps/
@@ -234,13 +234,23 @@ To render the current preview for inspection:
 
 This writes `target/gui-preview/backlit-session.ppm` and, when `sips`, ImageMagick, or netpbm is available, `target/gui-preview/backlit-session.png`.
 
+On macOS, open the local preview with:
+
+```bash
+open target/gui-preview/backlit-session.png
+```
+
 To render the same preview inside the Ubuntu Parallels guest and copy it back for inspection:
 
 ```bash
 ./scripts/render-parallels-gui-preview.sh
 ```
 
-This writes host-side artifacts under `target/gui-preview-parallels/`, including `backlit-session.png` on macOS.
+This writes host-side artifacts under `target/gui-preview-parallels/`, including `backlit-session.png` on macOS:
+
+```bash
+open target/gui-preview-parallels/backlit-session.png
+```
 
 CI is defined in `.github/workflows/linux-e2e.yml` and is contract-checked locally:
 
@@ -263,6 +273,8 @@ Artifacts are written to `target/gui-smoke/`:
 - `*.jsonl`: structured launch and verification events.
 
 The verifier also runs `backlit-protocols --verify --list` so MVP protocol coverage stays explicit while the real Smithay compositor is being brought up.
+
+The shell smoke path runs `backlit-shell --component=all --verify` and checks the MVP chrome state: wallpaper, panel clock/battery/network/volume indicators, workspace indicator, launcher targets, and app switcher entries.
 
 It also runs `backlit-perf --verify`, which measures the deterministic GUI render path, headless backend present path, idle no-redraw behavior, targeted surface damage path, and 60-frame drag pacing path against generous MVP 0 smoke budgets.
 
