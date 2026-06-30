@@ -108,6 +108,10 @@ pub fn default_catalog() -> Vec<LaunchCommand> {
         .collect()
 }
 
+pub fn resolve_command(commands: &[LaunchCommand], target: LaunchTarget) -> Option<&LaunchCommand> {
+    commands.iter().find(|command| command.target == target)
+}
+
 pub fn verify_catalog(commands: &[LaunchCommand]) -> LauncherVerification {
     let mut missing_targets = Vec::new();
     let mut empty_programs = Vec::new();
@@ -255,8 +259,8 @@ fn strip_exec_field_codes(value: &str) -> String {
 #[cfg(test)]
 mod tests {
     use super::{
-        default_catalog, parse_desktop_entry, verify_catalog, DesktopEntryError, LaunchTarget,
-        REQUIRED_TARGETS,
+        default_catalog, parse_desktop_entry, resolve_command, verify_catalog, DesktopEntryError,
+        LaunchTarget, REQUIRED_TARGETS,
     };
 
     #[test]
@@ -283,6 +287,15 @@ mod tests {
 
         assert!(!report.passed());
         assert_eq!(report.missing_targets, vec![LaunchTarget::Browser]);
+    }
+
+    #[test]
+    fn resolves_launch_targets() {
+        let catalog = default_catalog();
+        let command = resolve_command(&catalog, LaunchTarget::Terminal).unwrap();
+
+        assert_eq!(command.program, "foot");
+        assert_eq!(command.target.shortcut(), "Super+Enter");
     }
 
     #[test]

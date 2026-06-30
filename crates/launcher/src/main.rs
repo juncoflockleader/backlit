@@ -1,8 +1,11 @@
 use std::env;
-use std::process;
+use std::process::{self, Command};
 
 use backlit_common::metrics::{event_json, FieldValue};
-use backlit_launcher::{default_catalog, discover_desktop_entries, verify_catalog, LaunchTarget};
+use backlit_launcher::{
+    default_catalog, discover_desktop_entries, resolve_command, verify_catalog, LaunchCommand,
+    LaunchTarget,
+};
 
 fn main() {
     if let Err(error) = run() {
@@ -39,9 +42,7 @@ fn run() -> Result<(), String> {
     }
 
     if let Some(target) = config.target {
-        let command = catalog
-            .iter()
-            .find(|command| command.target == target)
+        let command = resolve_command(&catalog, target)
             .ok_or_else(|| format!("missing launch target {}", target.as_str()))?;
 
         println!(
@@ -56,6 +57,36 @@ fn run() -> Result<(), String> {
                 ],
             )
         );
+    }
+
+    if config.spawn_smoke {
+        let target = config.target.unwrap_or(LaunchTarget::Terminal);
+        let command = resolve_command(&catalog, target)
+            .ok_or_else(|| format!("missing launch target {}", target.as_str()))?;
+        let report = run_spawn_smoke(command, &config)?;
+
+        println!(
+            "{}",
+            event_json(
+                "launcher.spawn",
+                &[
+                    ("target", FieldValue::Str(target.as_str())),
+                    ("dry_run", FieldValue::Bool(false)),
+                    ("program", FieldValue::Str(report.program.as_str())),
+                    ("spawned", FieldValue::Bool(report.spawned)),
+                    ("exit_success", FieldValue::Bool(report.exit_success)),
+                    ("status_code", FieldValue::U64(report.status_code)),
+                    (
+                        "wayland_display_set",
+                        FieldValue::Bool(report.wayland_display_set),
+                    ),
+                ],
+            )
+        );
+
+        if config.verify && !report.passed() {
+            return Err(String::from("launcher spawn smoke failed"));
+        }
     }
 
     let desktop_entries = if let Some(desktop_dir) = config.desktop_dir.as_deref() {
@@ -122,6 +153,10 @@ fn run() -> Result<(), String> {
 struct Config {
     target: Option<LaunchTarget>,
     desktop_dir: Option<String>,
+    spawn_program: Option<String>,
+    spawn_args: Vec<String>,
+    wayland_display: Option<String>,
+    spawn_smoke: bool,
     list: bool,
     verify: bool,
     help: bool,
@@ -143,6 +178,8 @@ impl Config {
                 config.verify = true;
             } else if arg == "--list" {
                 config.list = true;
+            } else if arg == "--spawn-smoke" {
+                config.spawn_smoke = true;
             } else if let Some(value) = arg.strip_prefix("--target=") {
                 config.target = Some(parse_target(value)?);
             } else if arg == "--target" {
@@ -157,6 +194,27 @@ impl Config {
                     args.next()
                         .ok_or_else(|| String::from("missing value for --desktop-dir"))?,
                 );
+            } else if let Some(value) = arg.strip_prefix("--spawn-program=") {
+                config.spawn_program = Some(value.to_string());
+            } else if arg == "--spawn-program" {
+                config.spawn_program = Some(
+                    args.next()
+                        .ok_or_else(|| String::from("missing value for --spawn-program"))?,
+                );
+            } else if let Some(value) = arg.strip_prefix("--spawn-arg=") {
+                config.spawn_args.push(value.to_string());
+            } else if arg == "--spawn-arg" {
+                config.spawn_args.push(
+                    args.next()
+                        .ok_or_else(|| String::from("missing value for --spawn-arg"))?,
+                );
+            } else if let Some(value) = arg.strip_prefix("--wayland-display=") {
+                config.wayland_display = Some(value.to_string());
+            } else if arg == "--wayland-display" {
+                config.wayland_display = Some(
+                    args.next()
+                        .ok_or_else(|| String::from("missing value for --wayland-display"))?,
+                );
             } else {
                 return Err(format!("unknown flag: {arg}"));
             }
@@ -170,19 +228,98 @@ fn parse_target(value: &str) -> Result<LaunchTarget, String> {
     value.parse()
 }
 
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct SpawnReport {
+    program: String,
+    spawned: bool,
+    exit_success: bool,
+    status_code: u64,
+    wayland_display_set: bool,
+}
+
+impl SpawnReport {
+    fn passed(&self) -> bool {
+        self.spawned && self.exit_success
+    }
+}
+
+fn run_spawn_smoke(command: &LaunchCommand, config: &Config) -> Result<SpawnReport, String> {
+    let program = config
+        .spawn_program
+        .clone()
+        .unwrap_or_else(|| command.program.to_string());
+    let args: Vec<String> = if config.spawn_program.is_some() {
+        config.spawn_args.clone()
+    } else {
+        command.args.iter().map(|arg| (*arg).to_string()).collect()
+    };
+    let wayland_display = config
+        .wayland_display
+        .clone()
+        .or_else(|| env::var("WAYLAND_DISPLAY").ok());
+
+    let mut child = Command::new(&program);
+    child.args(&args);
+    if let Some(display) = &wayland_display {
+        child.env("WAYLAND_DISPLAY", display);
+    }
+
+    let status = child
+        .status()
+        .map_err(|error| format!("failed to spawn {program}: {error}"))?;
+
+    Ok(SpawnReport {
+        program,
+        spawned: true,
+        exit_success: status.success(),
+        status_code: status.code().unwrap_or(255) as u64,
+        wayland_display_set: wayland_display.is_some(),
+    })
+}
+
 fn print_help() {
     println!(
         "\
 backlit-launcher
 
 Usage:
-  backlit-launcher [--verify] [--list] [--target=terminal|browser|settings] [--desktop-dir=DIR]
+  backlit-launcher [--verify] [--list] [--target=terminal|browser|settings] [--desktop-dir=DIR] [--spawn-smoke]
 
 Flags:
   --verify  Fail if the required launch catalog is incomplete.
   --list    Emit the required launch catalog as JSON.
   --target  Resolve a single target in dry-run mode.
   --desktop-dir  Discover visible .desktop application entries from DIR.
+  --spawn-smoke  Spawn the selected launch target or override program and verify it exits successfully.
+  --spawn-program  Program override for deterministic spawn verification.
+  --spawn-arg  Argument for the spawn program override. May be passed more than once.
+  --wayland-display  WAYLAND_DISPLAY value to pass to the spawned process.
 "
     );
+}
+
+#[cfg(test)]
+mod tests {
+    use super::Config;
+
+    #[test]
+    fn parses_spawn_smoke_flags() {
+        let config = Config::parse([
+            "--target",
+            "terminal",
+            "--spawn-smoke",
+            "--spawn-program",
+            "true",
+            "--spawn-arg",
+            "--help",
+            "--wayland-display",
+            "wayland-1",
+        ])
+        .expect("config should parse");
+
+        assert!(config.spawn_smoke);
+        assert_eq!(config.spawn_program.as_deref(), Some("true"));
+        assert_eq!(config.spawn_args, ["--help"]);
+        assert_eq!(config.wayland_display.as_deref(), Some("wayland-1"));
+    }
 }

@@ -15,6 +15,12 @@ cargo run -p backlit-protocols -- --verify --list > "$out_dir/protocols.jsonl"
 cargo run -p backlit-perf -- --verify > "$out_dir/perf.jsonl"
 cargo run -p backlit-shell -- --component=all --socket=backlit-0 --verify > "$out_dir/shell.jsonl"
 cargo run -p backlit-launcher -- --verify --list --target=terminal --desktop-dir=crates/launcher/fixtures > "$out_dir/launcher.jsonl"
+cargo run -p backlit-launcher -- \
+  --verify \
+  --target=terminal \
+  --spawn-smoke \
+  --spawn-program=true \
+  --wayland-display=backlit-0 > "$out_dir/launcher-spawn.jsonl"
 cargo run -p backlit-shortcuts -- --verify --list --resolve=Super+Enter > "$out_dir/shortcuts.jsonl"
 cargo run -p backlit-session-supervisor -- --verify > "$out_dir/supervisor.jsonl"
 cargo run -p backlit-clipboard -- --verify > "$out_dir/clipboard.jsonl"
@@ -61,6 +67,11 @@ grep '"event":"launcher.verified"' "$out_dir/launcher.jsonl" >/dev/null
 grep '"required_targets":3' "$out_dir/launcher.jsonl" >/dev/null
 grep '"desktop_entries":3' "$out_dir/launcher.jsonl" >/dev/null
 grep '"target":"terminal"' "$out_dir/launcher.jsonl" >/dev/null
+grep '"event":"launcher.spawn"' "$out_dir/launcher-spawn.jsonl" >/dev/null
+grep '"target":"terminal"' "$out_dir/launcher-spawn.jsonl" >/dev/null
+grep '"spawned":true' "$out_dir/launcher-spawn.jsonl" >/dev/null
+grep '"exit_success":true' "$out_dir/launcher-spawn.jsonl" >/dev/null
+grep '"wayland_display_set":true' "$out_dir/launcher-spawn.jsonl" >/dev/null
 grep '"event":"shortcut.verified"' "$out_dir/shortcuts.jsonl" >/dev/null
 grep '"required_bindings":6' "$out_dir/shortcuts.jsonl" >/dev/null
 grep '"action":"launch-terminal"' "$out_dir/shortcuts.jsonl" >/dev/null
@@ -97,6 +108,7 @@ cat > "$out_dir/manifest.json" <<EOF
     "perf_log": "$out_dir/perf.jsonl",
     "shell_log": "$out_dir/shell.jsonl",
     "launcher_log": "$out_dir/launcher.jsonl",
+    "launcher_spawn_log": "$out_dir/launcher-spawn.jsonl",
     "shortcuts_log": "$out_dir/shortcuts.jsonl",
     "supervisor_log": "$out_dir/supervisor.jsonl",
     "clipboard_log": "$out_dir/clipboard.jsonl",
@@ -111,6 +123,7 @@ cat > "$out_dir/manifest.json" <<EOF
     "shell_required_components": 4,
     "launcher_required_targets": 3,
     "desktop_entries": 3,
+    "launcher_spawn": true,
     "shortcut_required_bindings": 6,
     "shell_crash_isolated": true,
     "clipboard_generation": 3,

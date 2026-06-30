@@ -61,6 +61,12 @@ test -S "$XDG_RUNTIME_DIR/$socket_name"
 WAYLAND_DISPLAY="$socket_name" timeout 5s "$info_tool" > "$out_dir/wayland-info.txt"
 WAYLAND_DISPLAY="$socket_name" cargo run -p backlit-compositor-backend -- --backend=wayland --verify > "$out_dir/backend-preflight.jsonl"
 WAYLAND_DISPLAY="$socket_name" cargo run -p backlit-compositor -- --backend=wayland --socket=backlit-0 --smoke-test > "$out_dir/compositor.jsonl"
+WAYLAND_DISPLAY="$socket_name" cargo run -p backlit-launcher -- \
+  --verify \
+  --target=terminal \
+  --spawn-smoke \
+  --spawn-program="$info_tool" \
+  --wayland-display="$socket_name" > "$out_dir/launcher-spawn.jsonl"
 cargo build -p backlit-session -p backlit-compositor -p backlit-shell
 WAYLAND_DISPLAY="$socket_name" cargo run -p backlit-session -- \
   --backend=wayland \
@@ -75,6 +81,10 @@ grep '"backend":"wayland"' "$out_dir/backend-preflight.jsonl" >/dev/null
 grep '"ready":true' "$out_dir/backend-preflight.jsonl" >/dev/null
 grep '"event":"compositor.smoke_test"' "$out_dir/compositor.jsonl" >/dev/null
 grep '"backend":"wayland"' "$out_dir/compositor.jsonl" >/dev/null
+grep '"event":"launcher.spawn"' "$out_dir/launcher-spawn.jsonl" >/dev/null
+grep '"spawned":true' "$out_dir/launcher-spawn.jsonl" >/dev/null
+grep '"exit_success":true' "$out_dir/launcher-spawn.jsonl" >/dev/null
+grep '"wayland_display_set":true' "$out_dir/launcher-spawn.jsonl" >/dev/null
 grep '"event":"session.services_verified"' "$out_dir/session.jsonl" >/dev/null
 grep '"backend":"wayland"' "$out_dir/session.jsonl" >/dev/null
 grep '"compositor_ready":true' "$out_dir/session.jsonl" >/dev/null
@@ -95,6 +105,7 @@ cat > "$out_dir/manifest.json" <<EOF
     "wayland_info": "$out_dir/wayland-info.txt",
     "backend_preflight_log": "$out_dir/backend-preflight.jsonl",
     "compositor_log": "$out_dir/compositor.jsonl",
+    "launcher_spawn_log": "$out_dir/launcher-spawn.jsonl",
     "session_log": "$out_dir/session.jsonl",
     "session_screenshot": "$out_dir/session.ppm",
     "session_services_dir": "$out_dir/session-services"
@@ -103,6 +114,7 @@ cat > "$out_dir/manifest.json" <<EOF
     "parent_socket_ready": true,
     "wayland_preflight_ready": true,
     "compositor_wayland_smoke": true,
+    "launcher_wayland_client_spawn": true,
     "session_wayland_services": true
   }
 }

@@ -10,6 +10,7 @@ MVP 0 is the development harness:
 - MVP shell role smoke checks.
 - Dry-run launcher catalog for terminal, browser, and settings.
 - Deterministic `.desktop` app discovery smoke for launcher.
+- Launcher process-spawn smoke with Wayland display environment propagation.
 - Keyboard shortcut routing for launcher, app switcher, and core launch targets.
 - Session interaction smoke for app switching and terminal launch resolution.
 - Session service orchestration smoke for launching compositor and shell probes from `backlit-session`.
