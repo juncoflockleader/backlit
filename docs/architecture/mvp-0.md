@@ -17,6 +17,7 @@ MVP 0 is the development harness:
 - Focus fallback after closing a window.
 - Output work-area policy for panel-aware maximize and fullscreen geometry.
 - Session supervisor crash isolation smoke.
+- Clipboard state smoke for text owner, replacement, and clearing.
 - Deterministic demo GUI renderer.
 - Headless session launch verification.
 - Basic MVP protocol smoke registry.

@@ -139,6 +139,7 @@ cargo run -p backlit-perf -- --verify
 cargo run -p backlit-launcher -- --verify --list --target=terminal --desktop-dir=crates/launcher/fixtures
 cargo run -p backlit-shortcuts -- --verify --list --resolve=Super+Enter
 cargo run -p backlit-session-supervisor -- --verify
+cargo run -p backlit-clipboard -- --verify
 cargo run -p backlit-session -- --backend=headless --screenshot target/backlit-session.ppm --verify
 ./scripts/verify-gui-smoke.sh
 cargo run -p backlit-shell -- --component=all --socket=backlit-0 --verify
@@ -191,6 +192,8 @@ Minimized windows are kept in policy state but skipped by focus cycling; this is
 Closing the focused window is verified too, including fallback focus that skips minimized windows.
 
 Crash isolation is covered by `backlit-session-supervisor --verify`: shell crashes restart without killing the compositor, while compositor crashes end the session.
+
+Clipboard state is covered by `backlit-clipboard --verify`, which checks text ownership, replacement, clearing, and generation tracking.
 
 Backend preflight can be run directly:
 

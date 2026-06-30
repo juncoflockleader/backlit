@@ -17,6 +17,7 @@ cargo run -p backlit-shell -- --component=all --socket=backlit-0 --verify > "$ou
 cargo run -p backlit-launcher -- --verify --list --target=terminal --desktop-dir=crates/launcher/fixtures > "$out_dir/launcher.jsonl"
 cargo run -p backlit-shortcuts -- --verify --list --resolve=Super+Enter > "$out_dir/shortcuts.jsonl"
 cargo run -p backlit-session-supervisor -- --verify > "$out_dir/supervisor.jsonl"
+cargo run -p backlit-clipboard -- --verify > "$out_dir/clipboard.jsonl"
 cargo run -p backlit-session -- \
   --backend=headless \
   --socket=backlit-0 \
@@ -59,6 +60,8 @@ grep '"action":"launch-terminal"' "$out_dir/shortcuts.jsonl" >/dev/null
 grep '"event":"supervisor.crash_smoke"' "$out_dir/supervisor.jsonl" >/dev/null
 grep '"shell_crash_isolated":true' "$out_dir/supervisor.jsonl" >/dev/null
 grep '"compositor_crash_ends_session":true' "$out_dir/supervisor.jsonl" >/dev/null
+grep '"event":"clipboard.smoke"' "$out_dir/clipboard.jsonl" >/dev/null
+grep '"generation":3' "$out_dir/clipboard.jsonl" >/dev/null
 grep '"event":"demo_client.verified"' "$out_dir/demo-client.jsonl" >/dev/null
 grep '"passed":true' "$out_dir/demo-client.jsonl" >/dev/null
 grep '"golden_ok":true' "$out_dir/demo-client.jsonl" >/dev/null
@@ -89,6 +92,7 @@ cat > "$out_dir/manifest.json" <<EOF
     "launcher_log": "$out_dir/launcher.jsonl",
     "shortcuts_log": "$out_dir/shortcuts.jsonl",
     "supervisor_log": "$out_dir/supervisor.jsonl",
+    "clipboard_log": "$out_dir/clipboard.jsonl",
     "session_log": "$out_dir/session.jsonl",
     "demo_client_log": "$out_dir/demo-client.jsonl",
     "session_screenshot": "$out_dir/backlit-session.ppm",
@@ -101,6 +105,7 @@ cat > "$out_dir/manifest.json" <<EOF
     "desktop_entries": 3,
     "shortcut_required_bindings": 6,
     "shell_crash_isolated": true,
+    "clipboard_generation": 3,
     "session_windows_after_launch": 4,
     "session_move_resize": true,
     "session_minimize_skips_focus": true,
