@@ -26,6 +26,7 @@ MVP 0 is the development harness:
 - Linux E2E verifier for fmt, tests, clippy, GUI smoke, packaging contract, and nested Wayland smoke inside an Ubuntu guest.
 - Parallels runner for repeatable macOS-to-Ubuntu guest verification.
 - Packaging contract verifier for session desktop entry, systemd units, and Debian package split.
+- Staged session install verifier for fake `/usr` layout, launch command resolution, and headless GUI verification from staged binaries.
 - CI.
 - Packaging skeleton.
 

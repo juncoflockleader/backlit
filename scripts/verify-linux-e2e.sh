@@ -7,6 +7,7 @@ cd "$repo_root"
 out_dir="${1:-target/linux-e2e}"
 smoke_dir="$out_dir/gui-smoke"
 packaging_dir="$out_dir/packaging-contract"
+staged_install_dir="$out_dir/staged-session-install"
 mkdir -p "$out_dir"
 
 commit="$(git rev-parse --short HEAD 2>/dev/null || printf unknown)"
@@ -19,6 +20,7 @@ cargo test --workspace --all-targets
 cargo clippy --workspace --all-targets -- -D warnings
 ./scripts/verify-gui-smoke.sh "$smoke_dir"
 ./scripts/verify-packaging-contract.sh "$packaging_dir"
+./scripts/verify-staged-session-install.sh "$staged_install_dir"
 
 nested_wayland=false
 nested_wayland_manifest=""
@@ -39,6 +41,7 @@ cat > "$out_dir/manifest.json" <<EOF
   "artifacts": {
     "gui_smoke_manifest": "$smoke_dir/manifest.json",
     "packaging_contract_manifest": "$packaging_dir/manifest.json",
+    "staged_session_install_manifest": "$staged_install_dir/manifest.json",
     "nested_wayland_manifest": "$nested_wayland_manifest"
   },
   "checks": {
@@ -47,6 +50,7 @@ cat > "$out_dir/manifest.json" <<EOF
     "clippy": true,
     "gui_smoke": true,
     "packaging_contract": true,
+    "staged_session_install": true,
     "nested_wayland": $nested_wayland
   }
 }

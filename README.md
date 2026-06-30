@@ -24,6 +24,7 @@ cargo run -p backlit-clipboard -- --verify
 cargo run -p backlit-shell -- --component=all --verify
 ./scripts/verify-gui-smoke.sh
 ./scripts/verify-packaging-contract.sh
+./scripts/verify-staged-session-install.sh
 ./scripts/verify-linux-e2e.sh
 ```
 

@@ -123,7 +123,7 @@ The Linux-side verifier can also be run directly inside any Ubuntu checkout:
 ./scripts/verify-linux-e2e.sh
 ```
 
-It runs `cargo fmt`, workspace tests, `cargo clippy`, the deterministic GUI smoke verifier, the packaging contract verifier, and the nested Wayland smoke verifier, then writes `target/linux-e2e/manifest.json`.
+It runs `cargo fmt`, workspace tests, `cargo clippy`, the deterministic GUI smoke verifier, the packaging contract verifier, the staged session install verifier, and the nested Wayland smoke verifier, then writes `target/linux-e2e/manifest.json`.
 
 ## GUI Linux VM Workflow
 
@@ -185,6 +185,7 @@ cargo run -p backlit-clipboard -- --verify
 cargo run -p backlit-session -- --backend=headless --screenshot target/backlit-session.ppm --verify
 ./scripts/verify-gui-smoke.sh
 ./scripts/verify-packaging-contract.sh
+./scripts/verify-staged-session-install.sh
 ./scripts/verify-nested-wayland-smoke.sh
 ./scripts/verify-linux-e2e.sh
 cargo run -p backlit-shell -- --component=all --socket=backlit-0 --verify
@@ -259,6 +260,16 @@ The packaging contract verifier checks that the session desktop entry, systemd u
 ```
 
 It writes `target/packaging-contract/manifest.json` by default.
+
+## Staged Session Install Verification
+
+The staged install verifier builds the session, compositor, and shell binaries, lays them out under a fake `/usr`, installs the session desktop entry and user systemd units, and verifies that all launch commands resolve to staged executables:
+
+```bash
+./scripts/verify-staged-session-install.sh
+```
+
+It then launches the staged `backlit-session` with the headless backend and `--verify`, checks the deterministic GUI output, and writes `target/staged-session-install/manifest.json`.
 
 ## Engineering Rules
 
