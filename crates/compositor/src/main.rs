@@ -7,7 +7,7 @@ use std::time::Instant;
 use backlit_common::metrics::{event_json, FieldValue};
 use backlit_compositor_backend::{
     parse_args, preflight_backend_with_environment, BackendPreflightEnvironment,
-    BackendPreflightReport, HeadlessCompositor, RunConfig,
+    BackendPreflightReport, HeadlessCompositor, RunConfig, SurfaceOptions,
 };
 use backlit_window_policy::WindowPolicy;
 
@@ -107,6 +107,7 @@ fn run_smoke_test(config: &RunConfig) {
     let no_idle_redraw =
         idle_frame.damaged_surfaces == 0 && post_damage_idle_frame.damaged_surfaces == 0;
     let targeted_damage_ok = damage_frame.damaged_surfaces == 1;
+    let scanout_smoke = run_direct_scanout_smoke();
 
     emit(
         "compositor.smoke_test",
@@ -131,11 +132,92 @@ fn run_smoke_test(config: &RunConfig) {
             ("no_idle_redraw", FieldValue::Bool(no_idle_redraw)),
             ("targeted_damage_ok", FieldValue::Bool(targeted_damage_ok)),
             ("frames", FieldValue::U64(post_damage_idle_frame.frame)),
+            (
+                "direct_scanout_eligible",
+                FieldValue::Bool(scanout_smoke.eligible),
+            ),
+            (
+                "direct_scanout_dmabuf",
+                FieldValue::Bool(scanout_smoke.dmabuf),
+            ),
+            (
+                "direct_scanout_fullscreen",
+                FieldValue::Bool(scanout_smoke.fullscreen),
+            ),
+            (
+                "direct_scanout_overlay_blocked",
+                FieldValue::Bool(scanout_smoke.overlay_blocked),
+            ),
+            (
+                "direct_scanout_shm_blocked",
+                FieldValue::Bool(scanout_smoke.shm_blocked),
+            ),
             ("total_surface_pixels", FieldValue::U64(frame.total_pixels)),
             ("first_window", FieldValue::U64(first.0)),
             ("focused_window", FieldValue::U64(second.0)),
         ],
     );
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+struct DirectScanoutSmoke {
+    eligible: bool,
+    dmabuf: bool,
+    fullscreen: bool,
+    overlay_blocked: bool,
+    shm_blocked: bool,
+}
+
+fn run_direct_scanout_smoke() -> DirectScanoutSmoke {
+    let mut compositor = HeadlessCompositor::default();
+    let client = compositor.connect_client("scanout-video-client");
+    let video = compositor
+        .submit_surface_with_options(
+            client,
+            "fullscreen-video",
+            1920,
+            1080,
+            SurfaceOptions::dmabuf_fullscreen(),
+        )
+        .expect("scanout client should be registered");
+    let eligible = compositor
+        .direct_scanout_candidate(video, 1920, 1080)
+        .expect("scanout surface should exist");
+
+    compositor
+        .submit_surface(client, "panel-overlay", 1920, 42)
+        .expect("scanout client should be registered");
+    let overlay_blocked = compositor
+        .direct_scanout_candidate(video, 1920, 1080)
+        .map(|report| !report.eligible && report.reason == "occluded-by-other-surface")
+        .unwrap_or(false);
+
+    let mut shm_compositor = HeadlessCompositor::default();
+    let client = shm_compositor.connect_client("scanout-shm-client");
+    let shm_video = shm_compositor
+        .submit_surface_with_options(
+            client,
+            "fullscreen-shm-video",
+            1920,
+            1080,
+            SurfaceOptions {
+                fullscreen: true,
+                ..SurfaceOptions::default()
+            },
+        )
+        .expect("scanout client should be registered");
+    let shm_blocked = shm_compositor
+        .direct_scanout_candidate(shm_video, 1920, 1080)
+        .map(|report| !report.eligible && report.reason == "not-dmabuf")
+        .unwrap_or(false);
+
+    DirectScanoutSmoke {
+        eligible: eligible.eligible,
+        dmabuf: eligible.buffer_kind.as_str() == "dmabuf",
+        fullscreen: eligible.reason == "eligible",
+        overlay_blocked,
+        shm_blocked,
+    }
 }
 
 fn emit(event: &str, config: &RunConfig, fields: &[(&str, FieldValue<'_>)]) {

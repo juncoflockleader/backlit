@@ -31,6 +31,7 @@ MVP 0 is the development harness:
 - Headless performance smoke checks.
 - Headless frame damage smoke for no idle redraws and targeted surface damage.
 - Headless drag-frame pacing smoke for dropped-frame and pointer-to-frame latency budgets.
+- Headless direct-scanout eligibility smoke for fullscreen dmabuf surfaces and overlay/SHM blockers.
 - Launch performance budget verifier for session GUI readiness, shell readiness, and terminal hotkey spawn.
 - Linux resource budget verifier for bounded idle CPU and compositor+shell RSS probes.
 - JSON metrics.

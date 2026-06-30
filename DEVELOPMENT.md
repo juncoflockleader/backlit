@@ -262,6 +262,8 @@ The verifier also runs `backlit-protocols --verify --list` so MVP protocol cover
 
 It also runs `backlit-perf --verify`, which measures the deterministic GUI render path, headless backend present path, idle no-redraw behavior, targeted surface damage path, and 60-frame drag pacing path against generous MVP 0 smoke budgets.
 
+The compositor smoke path also checks the headless direct-scanout policy: an opaque fullscreen dmabuf surface covering the output is eligible, while overlays and SHM buffers block scanout.
+
 The launch-performance verifier runs the built `backlit-session`, `backlit-compositor`, and `backlit-shell` binaries directly, then writes `target/launch-performance/manifest.json`. It enforces the current MVP budgets for session GUI readiness under 500 ms, shell-ready service probes under 2 seconds, and terminal hotkey spawn under 300 ms.
 
 The resource-budget verifier runs bounded idle probes for `backlit-compositor` and `backlit-shell`, samples Linux `/proc`, then writes `target/resource-budget/manifest.json`. On Linux it enforces compositor idle CPU under 0.5% and combined compositor+shell RSS under 250 MB; on non-Linux hosts it records an expected skip so Parallels remains the authoritative resource-budget proof.

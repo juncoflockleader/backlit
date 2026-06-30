@@ -101,6 +101,7 @@ if [ -n "$artifact_root" ] && [ -d "$artifact_root" ]; then
   require_contains "$artifact_root/gui-smoke/manifest.json" '"session_surface_lifecycle": true'
   require_contains "$artifact_root/gui-smoke/manifest.json" '"no_idle_redraw": true'
   require_contains "$artifact_root/gui-smoke/manifest.json" '"targeted_damage": true'
+  require_contains "$artifact_root/gui-smoke/manifest.json" '"direct_scanout": true'
   require_contains "$artifact_root/gui-smoke/manifest.json" '"drag_frame_pacing": true'
   require_contains "$artifact_root/gui-smoke/manifest.json" '"session_services": true'
   require_contains "$artifact_root/gui-smoke/manifest.json" '"session_launch_spawn": true'
@@ -167,6 +168,7 @@ cat > "$out_dir/manifest.json" <<EOF
     "input_smoke": true,
     "surface_lifecycle": true,
     "frame_damage": true,
+    "direct_scanout": true,
     "drag_frame_pacing": true,
     "protocol_smoke": true,
     "golden_gui": true,

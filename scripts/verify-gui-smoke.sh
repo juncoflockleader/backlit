@@ -47,6 +47,11 @@ grep '"targeted_damage_surfaces":1' "$out_dir/compositor.jsonl" >/dev/null
 grep '"post_damage_idle_surfaces":0' "$out_dir/compositor.jsonl" >/dev/null
 grep '"no_idle_redraw":true' "$out_dir/compositor.jsonl" >/dev/null
 grep '"targeted_damage_ok":true' "$out_dir/compositor.jsonl" >/dev/null
+grep '"direct_scanout_eligible":true' "$out_dir/compositor.jsonl" >/dev/null
+grep '"direct_scanout_dmabuf":true' "$out_dir/compositor.jsonl" >/dev/null
+grep '"direct_scanout_fullscreen":true' "$out_dir/compositor.jsonl" >/dev/null
+grep '"direct_scanout_overlay_blocked":true' "$out_dir/compositor.jsonl" >/dev/null
+grep '"direct_scanout_shm_blocked":true' "$out_dir/compositor.jsonl" >/dev/null
 grep '"event":"session.verified"' "$out_dir/session.jsonl" >/dev/null
 grep '"event":"session.interactions"' "$out_dir/session.jsonl" >/dev/null
 grep '"event":"session.launch_spawn"' "$out_dir/session.jsonl" >/dev/null
@@ -184,6 +189,7 @@ cat > "$out_dir/manifest.json" <<EOF
     "surface_lifecycle": true,
     "no_idle_redraw": true,
     "targeted_damage": true,
+    "direct_scanout": true,
     "drag_frame_pacing": true,
     "shell_crash_isolated": true,
     "clipboard_generation": 3,

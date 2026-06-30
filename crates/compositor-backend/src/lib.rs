@@ -375,12 +375,55 @@ pub struct HeadlessSurface {
     pub width: u32,
     pub height: u32,
     pub damaged: bool,
+    pub options: SurfaceOptions,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct HeadlessClient {
     pub id: ClientId,
     pub name: String,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum BufferKind {
+    Shm,
+    Dmabuf,
+}
+
+impl BufferKind {
+    pub const fn as_str(self) -> &'static str {
+        match self {
+            Self::Shm => "shm",
+            Self::Dmabuf => "dmabuf",
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct SurfaceOptions {
+    pub buffer_kind: BufferKind,
+    pub opaque: bool,
+    pub fullscreen: bool,
+}
+
+impl Default for SurfaceOptions {
+    fn default() -> Self {
+        Self {
+            buffer_kind: BufferKind::Shm,
+            opaque: true,
+            fullscreen: false,
+        }
+    }
+}
+
+impl SurfaceOptions {
+    pub const fn dmabuf_fullscreen() -> Self {
+        Self {
+            buffer_kind: BufferKind::Dmabuf,
+            opaque: true,
+            fullscreen: true,
+        }
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -390,6 +433,17 @@ pub struct FrameReport {
     pub surface_count: u64,
     pub damaged_surfaces: u64,
     pub total_pixels: u64,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct DirectScanoutReport {
+    pub surface: SurfaceId,
+    pub eligible: bool,
+    pub reason: &'static str,
+    pub buffer_kind: BufferKind,
+    pub surface_count: u64,
+    pub output_pixels: u64,
+    pub surface_pixels: u64,
 }
 
 #[derive(Debug, Clone)]
@@ -431,6 +485,17 @@ impl HeadlessCompositor {
         width: u32,
         height: u32,
     ) -> Result<SurfaceId, HeadlessError> {
+        self.submit_surface_with_options(client, title, width, height, SurfaceOptions::default())
+    }
+
+    pub fn submit_surface_with_options(
+        &mut self,
+        client: ClientId,
+        title: impl Into<String>,
+        width: u32,
+        height: u32,
+        options: SurfaceOptions,
+    ) -> Result<SurfaceId, HeadlessError> {
         if !self.clients.iter().any(|known| known.id == client) {
             return Err(HeadlessError::UnknownClient(client));
         }
@@ -444,6 +509,7 @@ impl HeadlessCompositor {
             width,
             height,
             damaged: true,
+            options,
         });
         Ok(id)
     }
@@ -485,6 +551,46 @@ impl HeadlessCompositor {
         }
     }
 
+    pub fn direct_scanout_candidate(
+        &self,
+        surface: SurfaceId,
+        output_width: u32,
+        output_height: u32,
+    ) -> Result<DirectScanoutReport, HeadlessError> {
+        let candidate = self
+            .surfaces
+            .iter()
+            .find(|known| known.id == surface)
+            .ok_or(HeadlessError::UnknownSurface(surface))?;
+        let output_pixels = output_width as u64 * output_height as u64;
+        let surface_pixels = candidate.width as u64 * candidate.height as u64;
+        let surface_count = self.surfaces.len() as u64;
+
+        let (eligible, reason) = if !candidate.options.fullscreen {
+            (false, "not-fullscreen")
+        } else if candidate.options.buffer_kind != BufferKind::Dmabuf {
+            (false, "not-dmabuf")
+        } else if !candidate.options.opaque {
+            (false, "not-opaque")
+        } else if candidate.width != output_width || candidate.height != output_height {
+            (false, "does-not-cover-output")
+        } else if self.surfaces.iter().any(|known| known.id != surface) {
+            (false, "occluded-by-other-surface")
+        } else {
+            (true, "eligible")
+        };
+
+        Ok(DirectScanoutReport {
+            surface,
+            eligible,
+            reason,
+            buffer_kind: candidate.options.buffer_kind,
+            surface_count,
+            output_pixels,
+            surface_pixels,
+        })
+    }
+
     pub fn clients(&self) -> &[HeadlessClient] {
         &self.clients
     }
@@ -512,8 +618,8 @@ impl fmt::Display for HeadlessError {
 #[cfg(test)]
 mod tests {
     use super::{
-        parse_args, BackendKind, BackendPreflightEnvironment, ClientId, HeadlessCompositor,
-        RunConfig,
+        parse_args, BackendKind, BackendPreflightEnvironment, BufferKind, ClientId,
+        HeadlessCompositor, RunConfig, SurfaceOptions,
     };
 
     #[test]
@@ -578,6 +684,60 @@ mod tests {
             .unwrap_err();
 
         assert_eq!(error.to_string(), "unknown headless client 99");
+    }
+
+    #[test]
+    fn direct_scanout_requires_fullscreen_dmabuf_without_overlays() {
+        let mut compositor = HeadlessCompositor::default();
+        let client = compositor.connect_client("video-client");
+        let video = compositor
+            .submit_surface_with_options(
+                client,
+                "video",
+                1920,
+                1080,
+                SurfaceOptions::dmabuf_fullscreen(),
+            )
+            .unwrap();
+
+        let eligible = compositor
+            .direct_scanout_candidate(video, 1920, 1080)
+            .unwrap();
+        assert!(eligible.eligible, "{eligible:?}");
+        assert_eq!(eligible.reason, "eligible");
+        assert_eq!(eligible.buffer_kind, BufferKind::Dmabuf);
+
+        compositor
+            .submit_surface(client, "panel", 1920, 42)
+            .expect("client should be registered");
+
+        let occluded = compositor
+            .direct_scanout_candidate(video, 1920, 1080)
+            .unwrap();
+        assert!(!occluded.eligible);
+        assert_eq!(occluded.reason, "occluded-by-other-surface");
+
+        let mut shm_compositor = HeadlessCompositor::default();
+        let client = shm_compositor.connect_client("shm-client");
+        let shm = shm_compositor
+            .submit_surface_with_options(
+                client,
+                "video-shm",
+                1920,
+                1080,
+                SurfaceOptions {
+                    buffer_kind: BufferKind::Shm,
+                    opaque: true,
+                    fullscreen: true,
+                },
+            )
+            .unwrap();
+        let blocked = shm_compositor
+            .direct_scanout_candidate(shm, 1920, 1080)
+            .unwrap();
+
+        assert!(!blocked.eligible);
+        assert_eq!(blocked.reason, "not-dmabuf");
     }
 
     #[test]
