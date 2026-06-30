@@ -34,6 +34,7 @@ pub struct Window {
     pub title: String,
     pub geometry: Rect,
     pub state: WindowState,
+    restore_geometry: Option<Rect>,
 }
 
 #[derive(Debug, Clone)]
@@ -68,6 +69,7 @@ impl WindowPolicy {
             title: title.into(),
             geometry,
             state: WindowState::Normal,
+            restore_geometry: None,
         });
         self.focused = Some(id);
         id
@@ -124,12 +126,81 @@ impl WindowPolicy {
         }
     }
 
+    pub fn move_window(&mut self, id: WindowId, x: i32, y: i32) -> bool {
+        match self.window_mut(id) {
+            Some(window) => {
+                window.geometry.x = x;
+                window.geometry.y = y;
+                window.state = WindowState::Normal;
+                window.restore_geometry = None;
+                true
+            }
+            None => false,
+        }
+    }
+
+    pub fn resize_window(&mut self, id: WindowId, width: i32, height: i32) -> bool {
+        match self.window_mut(id) {
+            Some(window) => {
+                window.geometry.width = width.max(64);
+                window.geometry.height = height.max(48);
+                window.state = WindowState::Normal;
+                window.restore_geometry = None;
+                true
+            }
+            None => false,
+        }
+    }
+
+    pub fn maximize_window(&mut self, id: WindowId, work_area: Rect) -> bool {
+        self.place_window_in_state(id, work_area, WindowState::Maximized)
+    }
+
+    pub fn fullscreen_window(&mut self, id: WindowId, output_area: Rect) -> bool {
+        self.place_window_in_state(id, output_area, WindowState::Fullscreen)
+    }
+
+    pub fn restore_window(&mut self, id: WindowId) -> bool {
+        match self.window_mut(id) {
+            Some(window) => {
+                if let Some(geometry) = window.restore_geometry.take() {
+                    window.geometry = geometry;
+                }
+                window.state = WindowState::Normal;
+                true
+            }
+            None => false,
+        }
+    }
+
     pub fn focused(&self) -> Option<WindowId> {
         self.focused
     }
 
+    pub fn window(&self, id: WindowId) -> Option<&Window> {
+        self.windows.iter().find(|window| window.id == id)
+    }
+
     pub fn windows(&self) -> &[Window] {
         &self.windows
+    }
+
+    fn place_window_in_state(&mut self, id: WindowId, geometry: Rect, state: WindowState) -> bool {
+        match self.window_mut(id) {
+            Some(window) => {
+                if window.state == WindowState::Normal {
+                    window.restore_geometry = Some(window.geometry);
+                }
+                window.geometry = geometry;
+                window.state = state;
+                true
+            }
+            None => false,
+        }
+    }
+
+    fn window_mut(&mut self, id: WindowId) -> Option<&mut Window> {
+        self.windows.iter_mut().find(|window| window.id == id)
     }
 }
 
@@ -174,5 +245,47 @@ mod tests {
 
         assert!(policy.set_state(id, WindowState::Fullscreen));
         assert_eq!(policy.windows()[0].state, WindowState::Fullscreen);
+    }
+
+    #[test]
+    fn moves_and_resizes_normal_windows() {
+        let mut policy = WindowPolicy::default();
+        let id = policy.add_window("terminal", (800, 600));
+
+        assert!(policy.move_window(id, 120, 96));
+        assert!(policy.resize_window(id, 20, 20));
+
+        let window = policy.window(id).unwrap();
+        assert_eq!(window.geometry, super::Rect::new(120, 96, 64, 48));
+        assert_eq!(window.state, WindowState::Normal);
+    }
+
+    #[test]
+    fn maximizes_and_restores_windows() {
+        let mut policy = WindowPolicy::default();
+        let id = policy.add_window("browser", (1024, 768));
+        let original = policy.window(id).unwrap().geometry;
+        let work_area = super::Rect::new(0, 42, 1920, 1038);
+
+        assert!(policy.maximize_window(id, work_area));
+        assert_eq!(policy.window(id).unwrap().geometry, work_area);
+        assert_eq!(policy.window(id).unwrap().state, WindowState::Maximized);
+
+        assert!(policy.restore_window(id));
+        assert_eq!(policy.window(id).unwrap().geometry, original);
+        assert_eq!(policy.window(id).unwrap().state, WindowState::Normal);
+    }
+
+    #[test]
+    fn fullscreen_uses_output_area() {
+        let mut policy = WindowPolicy::default();
+        let id = policy.add_window("video", (1280, 720));
+        let output = super::Rect::new(0, 0, 2560, 1440);
+
+        assert!(policy.fullscreen_window(id, output));
+
+        let window = policy.window(id).unwrap();
+        assert_eq!(window.geometry, output);
+        assert_eq!(window.state, WindowState::Fullscreen);
     }
 }
