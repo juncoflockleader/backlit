@@ -60,6 +60,8 @@ require_contains scripts/verify-session-replay.sh '"launcher_overlay_frame": tru
 require_contains scripts/verify-session-replay.sh '"app_switcher_overlay_frame": true'
 require_contains scripts/verify-compositor-socket.sh '"session_socket_bound": true'
 require_contains scripts/verify-compositor-socket.sh '"socket_accepts_client_connection": true'
+require_contains scripts/verify-compositor-socket.sh '"demo_client_socket_launch": true'
+require_contains scripts/verify-compositor-socket.sh '"demo_client_surface_mapped": true'
 require_contains scripts/verify-linux-e2e.sh './scripts/verify-drm-session-smoke.sh'
 require_contains scripts/verify-linux-e2e.sh './scripts/verify-mvp1-contract.sh'
 
@@ -141,6 +143,8 @@ if [ -n "$artifact_root" ] && [ -d "$artifact_root" ]; then
   fi
   if grep '"session_socket_bound": true' "$artifact_root/compositor-socket/manifest.json" >/dev/null; then
     require_contains "$artifact_root/compositor-socket/manifest.json" '"socket_accepts_client_connection": true'
+    require_contains "$artifact_root/compositor-socket/manifest.json" '"demo_client_socket_launch": true'
+    require_contains "$artifact_root/compositor-socket/manifest.json" '"demo_client_surface_mapped": true'
     require_contains "$artifact_root/compositor-socket/manifest.json" '"session_socket_cleanup": true'
     compositor_socket_artifact=true
   else

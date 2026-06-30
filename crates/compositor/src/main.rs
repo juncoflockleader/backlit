@@ -1,5 +1,7 @@
 use std::env;
 use std::fs;
+use std::io::ErrorKind;
+use std::io::Read;
 use std::os::unix::fs::FileTypeExt;
 use std::os::unix::net::UnixListener;
 use std::path::Path;
@@ -235,6 +237,7 @@ fn run() -> Result<(), String> {
                 None
             }
         };
+        let mut socket_client_runtime = SocketClientRuntime::new();
 
         emit(
             "compositor.service_running",
@@ -249,7 +252,12 @@ fn run() -> Result<(), String> {
         );
 
         if let Some(duration_ms) = config.serve_for_ms {
-            thread::sleep(Duration::from_millis(duration_ms));
+            run_service_loop_for(
+                &config,
+                session_socket.as_ref(),
+                &mut socket_client_runtime,
+                Duration::from_millis(duration_ms),
+            )?;
             if let Some(mut socket) = session_socket.take() {
                 let path = socket.path_string();
                 let removed = socket.cleanup();
@@ -265,7 +273,8 @@ fn run() -> Result<(), String> {
             );
         } else {
             loop {
-                thread::sleep(Duration::from_secs(3600));
+                poll_socket_clients(&config, session_socket.as_ref(), &mut socket_client_runtime)?;
+                thread::sleep(Duration::from_millis(10));
             }
         }
     }
@@ -289,7 +298,7 @@ struct BoundSessionSocket {
     path: PathBuf,
     stale_socket_removed: bool,
     cleaned: bool,
-    _listener: UnixListener,
+    listener: UnixListener,
 }
 
 impl BoundSessionSocket {
@@ -304,6 +313,35 @@ impl BoundSessionSocket {
 
         self.cleaned = true;
         fs::remove_file(&self.path).is_ok()
+    }
+
+    fn accept_messages(&self) -> Result<Vec<String>, String> {
+        let mut messages = Vec::new();
+
+        loop {
+            match self.listener.accept() {
+                Ok((mut stream, _addr)) => {
+                    stream
+                        .set_read_timeout(Some(Duration::from_millis(100)))
+                        .map_err(|error| {
+                            format!("failed to set socket client read timeout: {error}")
+                        })?;
+                    let mut message = String::new();
+                    stream.read_to_string(&mut message).map_err(|error| {
+                        format!("failed to read compositor socket client message: {error}")
+                    })?;
+                    messages.push(message);
+                }
+                Err(error) if error.kind() == ErrorKind::WouldBlock => break,
+                Err(error) => {
+                    return Err(format!(
+                        "failed to accept compositor socket client: {error}"
+                    ));
+                }
+            }
+        }
+
+        Ok(messages)
     }
 }
 
@@ -375,8 +413,176 @@ fn bind_session_socket_in_runtime(
         path: socket_path,
         stale_socket_removed,
         cleaned: false,
-        _listener: listener,
+        listener,
     }))
+}
+
+#[derive(Debug)]
+struct SocketClientRuntime {
+    backend: HeadlessCompositor,
+    manager: SurfaceManager,
+}
+
+impl SocketClientRuntime {
+    fn new() -> Self {
+        Self {
+            backend: HeadlessCompositor::default(),
+            manager: SurfaceManager::new(OutputLayout::new(1400, 900, 42)),
+        }
+    }
+
+    fn handle_message(&mut self, message: &str) -> SocketClientReport {
+        let Some(request) = DemoSurfaceRequest::parse(message) else {
+            return SocketClientReport::invalid();
+        };
+
+        let client = self
+            .backend
+            .connect_client(format!("socket-client-{}", request.title));
+        let backend_surface_presented = self
+            .backend
+            .submit_surface(
+                client,
+                request.title.as_str(),
+                request.width,
+                request.height,
+            )
+            .is_ok();
+        let policy_window_mapped = map_scripted_toplevel(
+            &mut self.manager,
+            request.title.as_str(),
+            request.width as i32,
+            request.height as i32,
+        )
+        .ok()
+        .and_then(|surface| {
+            self.manager
+                .surface(surface)
+                .and_then(|surface| surface.window_id)
+        })
+        .is_some();
+        let frame = self.backend.present();
+
+        SocketClientReport {
+            message_valid: true,
+            title: request.title,
+            width: request.width,
+            height: request.height,
+            backend_surface_presented,
+            policy_window_mapped,
+            frame: frame.frame,
+            backend_surfaces: frame.surface_count,
+            policy_windows: self.manager.policy().windows().len() as u64,
+            visible_windows: self.manager.policy().visible_windows().count() as u64,
+            focused_window: self.manager.policy().focused().is_some(),
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct SocketClientReport {
+    message_valid: bool,
+    title: String,
+    width: u32,
+    height: u32,
+    backend_surface_presented: bool,
+    policy_window_mapped: bool,
+    frame: u64,
+    backend_surfaces: u64,
+    policy_windows: u64,
+    visible_windows: u64,
+    focused_window: bool,
+}
+
+impl SocketClientReport {
+    fn invalid() -> Self {
+        Self {
+            message_valid: false,
+            title: String::new(),
+            width: 0,
+            height: 0,
+            backend_surface_presented: false,
+            policy_window_mapped: false,
+            frame: 0,
+            backend_surfaces: 0,
+            policy_windows: 0,
+            visible_windows: 0,
+            focused_window: false,
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct DemoSurfaceRequest {
+    title: String,
+    width: u32,
+    height: u32,
+}
+
+impl DemoSurfaceRequest {
+    fn parse(message: &str) -> Option<Self> {
+        let mut tokens = message.split_whitespace();
+        if tokens.next()? != "BACKLIT_DEMO_CLIENT" || tokens.next()? != "surface" {
+            return None;
+        }
+
+        let mut title = None;
+        let mut width = None;
+        let mut height = None;
+
+        for token in tokens {
+            if let Some(value) = token.strip_prefix("title=") {
+                title = Some(value.to_string());
+            } else if let Some(value) = token.strip_prefix("width=") {
+                width = value.parse::<u32>().ok();
+            } else if let Some(value) = token.strip_prefix("height=") {
+                height = value.parse::<u32>().ok();
+            }
+        }
+
+        Some(Self {
+            title: title.filter(|title| !title.is_empty())?,
+            width: width?.max(1),
+            height: height?.max(1),
+        })
+    }
+}
+
+fn run_service_loop_for(
+    config: &RunConfig,
+    socket: Option<&BoundSessionSocket>,
+    runtime: &mut SocketClientRuntime,
+    duration: Duration,
+) -> Result<(), String> {
+    let deadline = Instant::now() + duration;
+
+    while Instant::now() < deadline {
+        poll_socket_clients(config, socket, runtime)?;
+        let remaining = deadline.saturating_duration_since(Instant::now());
+        if remaining.is_zero() {
+            break;
+        }
+        thread::sleep(remaining.min(Duration::from_millis(10)));
+    }
+
+    Ok(())
+}
+
+fn poll_socket_clients(
+    config: &RunConfig,
+    socket: Option<&BoundSessionSocket>,
+    runtime: &mut SocketClientRuntime,
+) -> Result<(), String> {
+    let Some(socket) = socket else {
+        return Ok(());
+    };
+
+    for message in socket.accept_messages()? {
+        let report = runtime.handle_message(message.as_str());
+        emit_socket_client(config, &report);
+    }
+
+    Ok(())
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -1183,6 +1389,32 @@ fn emit_socket_unbound(config: &RunConfig, path: &str, removed: bool) {
     );
 }
 
+fn emit_socket_client(config: &RunConfig, report: &SocketClientReport) {
+    emit(
+        "compositor.socket_client",
+        config,
+        &[
+            ("message_valid", FieldValue::Bool(report.message_valid)),
+            ("title", FieldValue::Str(report.title.as_str())),
+            ("width", FieldValue::U64(report.width as u64)),
+            ("height", FieldValue::U64(report.height as u64)),
+            (
+                "backend_surface_presented",
+                FieldValue::Bool(report.backend_surface_presented),
+            ),
+            (
+                "policy_window_mapped",
+                FieldValue::Bool(report.policy_window_mapped),
+            ),
+            ("frame", FieldValue::U64(report.frame)),
+            ("backend_surfaces", FieldValue::U64(report.backend_surfaces)),
+            ("policy_windows", FieldValue::U64(report.policy_windows)),
+            ("visible_windows", FieldValue::U64(report.visible_windows)),
+            ("focused_window", FieldValue::Bool(report.focused_window)),
+        ],
+    );
+}
+
 fn print_help() {
     println!(
         "\
@@ -1212,7 +1444,7 @@ Backend launch preflight runs before smoke or service readiness events.
 
 #[cfg(test)]
 mod tests {
-    use super::{run_compositor_surface_smoke, run_scripted_client_runtime};
+    use super::{run_compositor_surface_smoke, run_scripted_client_runtime, DemoSurfaceRequest};
     use std::fs;
     use std::os::unix::fs::FileTypeExt;
     use std::os::unix::net::UnixStream;
@@ -1286,5 +1518,18 @@ mod tests {
         assert!(!socket_path.exists());
 
         fs::remove_dir(&runtime_dir).unwrap();
+    }
+
+    #[test]
+    fn demo_surface_request_parses_socket_message() {
+        let request = DemoSurfaceRequest::parse(
+            "BACKLIT_DEMO_CLIENT surface title=socket-demo width=640 height=480\n",
+        )
+        .unwrap();
+
+        assert_eq!(request.title, "socket-demo");
+        assert_eq!(request.width, 640);
+        assert_eq!(request.height, 480);
+        assert!(DemoSurfaceRequest::parse("garbage").is_none());
     }
 }

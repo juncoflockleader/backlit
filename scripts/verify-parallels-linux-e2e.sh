@@ -443,6 +443,8 @@ require_contains "$host_compositor_runtime_manifest" '"targeted_surface_damage":
 require_contains "$host_compositor_runtime_manifest" '"client_disconnect_cleanup": true'
 require_contains "$host_compositor_socket_manifest" '"session_socket_bound": true'
 require_contains "$host_compositor_socket_manifest" '"socket_accepts_client_connection": true'
+require_contains "$host_compositor_socket_manifest" '"demo_client_socket_launch": true'
+require_contains "$host_compositor_socket_manifest" '"demo_client_surface_mapped": true'
 require_contains "$host_compositor_socket_manifest" '"session_socket_cleanup": true'
 require_contains "$host_session_replay_manifest" '"session_replay_event": true'
 require_contains "$host_session_replay_manifest" '"frame_count": 9'

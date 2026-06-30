@@ -11,6 +11,7 @@ duration_ms=500
 socket_name="backlit-socket-contract"
 compositor_log="$out_dir/compositor-socket.jsonl"
 compositor_err="$out_dir/compositor-socket.stderr"
+demo_client_log="$out_dir/demo-client-socket.jsonl"
 
 if [ "$(uname -s)" = "Darwin" ]; then
   runtime_base="/private/tmp"
@@ -53,13 +54,16 @@ write_blocked_manifest() {
   "blocked_reason": "$reason",
   "artifacts": {
     "compositor_log": "$compositor_log",
-    "compositor_stderr": "$compositor_err"
+    "compositor_stderr": "$compositor_err",
+    "demo_client_log": "$demo_client_log"
   },
   "checks": {
     "xdg_runtime_dir_private": true,
     "session_socket_bound": false,
     "socket_path_is_unix_socket": false,
     "socket_accepts_client_connection": false,
+    "demo_client_socket_launch": false,
+    "demo_client_surface_mapped": false,
     "bounded_service_exit": false,
     "session_socket_cleanup": false,
     "socket_permission_denied": true
@@ -70,13 +74,11 @@ EOF
   printf 'Backlit compositor socket verification skipped as expected: %s. Artifacts: %s\n' "$reason" "$out_dir"
 }
 
-command -v python3 >/dev/null 2>&1 || fail "python3 is required for Unix socket connect probe"
-
 mkdir -p "$runtime_dir"
 chmod 700 "$runtime_dir"
 rm -f "$socket_path" "$socket_path.lock"
 
-cargo build -p backlit-compositor
+cargo build -p backlit-compositor -p backlit-demo-client
 
 XDG_RUNTIME_DIR="$runtime_dir" target/debug/backlit-compositor \
   --backend=headless \
@@ -112,16 +114,12 @@ done
 
 test "$socket_seen" = true || fail "socket was not created at $socket_path"
 
-python3 - "$socket_path" <<'PY'
-import socket
-import sys
-
-path = sys.argv[1]
-client = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
-client.settimeout(1.0)
-client.connect(path)
-client.close()
-PY
+XDG_RUNTIME_DIR="$runtime_dir" target/debug/backlit-demo-client \
+  --connect-socket "$socket_name" \
+  --connect-title socket-demo \
+  --connect-only \
+  --width 640 \
+  --height 480 > "$demo_client_log"
 
 set +e
 wait "$compositor_pid"
@@ -138,9 +136,26 @@ require_contains "$compositor_log" '"event":"compositor.socket_bound"'
 require_contains "$compositor_log" "\"socket_name\":\"$socket_name\""
 require_contains "$compositor_log" "\"socket_path\":\"$socket_path\""
 require_contains "$compositor_log" '"event":"compositor.service_running"'
+require_contains "$compositor_log" '"event":"compositor.socket_client"'
+require_contains "$compositor_log" '"message_valid":true'
+require_contains "$compositor_log" '"title":"socket-demo"'
+require_contains "$compositor_log" '"width":640'
+require_contains "$compositor_log" '"height":480'
+require_contains "$compositor_log" '"backend_surface_presented":true'
+require_contains "$compositor_log" '"policy_window_mapped":true'
+require_contains "$compositor_log" '"policy_windows":1'
+require_contains "$compositor_log" '"visible_windows":1'
+require_contains "$compositor_log" '"focused_window":true'
 require_contains "$compositor_log" '"event":"compositor.socket_unbound"'
 require_contains "$compositor_log" '"removed":true'
 require_contains "$compositor_log" '"event":"compositor.service_exit"'
+require_contains "$demo_client_log" '"event":"demo_client.socket_connected"'
+require_contains "$demo_client_log" "\"socket_name\":\"$socket_name\""
+require_contains "$demo_client_log" "\"socket_path\":\"$socket_path\""
+require_contains "$demo_client_log" '"title":"socket-demo"'
+require_contains "$demo_client_log" '"width":640'
+require_contains "$demo_client_log" '"height":480'
+require_contains "$demo_client_log" '"connected":true'
 
 cat > "$out_dir/manifest.json" <<EOF
 {
@@ -152,13 +167,16 @@ cat > "$out_dir/manifest.json" <<EOF
   "socket_path": "$socket_path",
   "artifacts": {
     "compositor_log": "$compositor_log",
-    "compositor_stderr": "$compositor_err"
+    "compositor_stderr": "$compositor_err",
+    "demo_client_log": "$demo_client_log"
   },
   "checks": {
     "xdg_runtime_dir_private": true,
     "session_socket_bound": true,
     "socket_path_is_unix_socket": true,
     "socket_accepts_client_connection": true,
+    "demo_client_socket_launch": true,
+    "demo_client_surface_mapped": true,
     "bounded_service_exit": true,
     "session_socket_cleanup": true
   }

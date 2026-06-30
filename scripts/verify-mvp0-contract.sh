@@ -112,6 +112,8 @@ require_contains scripts/verify-nested-wayland-smoke.sh '"launcher_terminal_no_s
 require_contains scripts/verify-linux-e2e.sh './scripts/render-gui-preview.sh'
 require_contains scripts/verify-linux-e2e.sh './scripts/verify-compositor-runtime.sh'
 require_contains scripts/verify-linux-e2e.sh './scripts/verify-compositor-socket.sh'
+require_contains scripts/verify-compositor-socket.sh '"demo_client_socket_launch": true'
+require_contains scripts/verify-compositor-socket.sh '"demo_client_surface_mapped": true'
 require_contains scripts/verify-linux-e2e.sh './scripts/verify-launch-performance.sh'
 require_contains scripts/verify-linux-e2e.sh './scripts/verify-launcher-desktop-discovery.sh'
 require_contains scripts/verify-linux-e2e.sh './scripts/verify-resource-budget.sh'
@@ -280,6 +282,8 @@ if [ -n "$artifact_root" ] && [ -d "$artifact_root" ]; then
   require_contains "$artifact_root/compositor-runtime/manifest.json" '"service_mode_runtime": true'
   if grep '"session_socket_bound": true' "$artifact_root/compositor-socket/manifest.json" >/dev/null; then
     require_contains "$artifact_root/compositor-socket/manifest.json" '"socket_accepts_client_connection": true'
+    require_contains "$artifact_root/compositor-socket/manifest.json" '"demo_client_socket_launch": true'
+    require_contains "$artifact_root/compositor-socket/manifest.json" '"demo_client_surface_mapped": true'
     require_contains "$artifact_root/compositor-socket/manifest.json" '"session_socket_cleanup": true'
   else
     require_contains "$artifact_root/compositor-socket/manifest.json" '"socket_blocked_expected": true'
