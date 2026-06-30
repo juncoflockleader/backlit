@@ -60,6 +60,12 @@ fn run() -> Result<(), String> {
         emit_component_ready(*role, socket.as_str(), report.role_ready(*role));
     }
 
+    let network_wifi_scan_command = report.panel.network.controls.wifi_scan.command_line();
+    let network_wifi_connect_command = report.panel.network.controls.wifi_connect.command_line();
+    let network_disconnect_command = report.panel.network.controls.disconnect.command_line();
+    let audio_volume_up_command = report.panel.audio.controls.volume_up.command_line();
+    let audio_volume_down_command = report.panel.audio.controls.volume_down.command_line();
+    let audio_mute_toggle_command = report.panel.audio.controls.mute_toggle.command_line();
     let passed = report.passed();
     println!(
         "{}",
@@ -137,6 +143,18 @@ fn run() -> Result<(), String> {
                     FieldValue::Bool(report.panel.network.ready())
                 ),
                 (
+                    "network_controls_ready",
+                    FieldValue::Bool(report.panel.network.controls.ready())
+                ),
+                (
+                    "network_control_commands",
+                    FieldValue::U64(report.panel.network.controls.command_count())
+                ),
+                (
+                    "network_controls_dry_run",
+                    FieldValue::Bool(report.panel.network.controls.dry_run)
+                ),
+                (
                     "network_backend",
                     FieldValue::Str(report.panel.network.backend)
                 ),
@@ -153,8 +171,32 @@ fn run() -> Result<(), String> {
                     FieldValue::U64(report.panel.network.strength_percent)
                 ),
                 (
+                    "network_wifi_scan_command",
+                    FieldValue::Str(&network_wifi_scan_command)
+                ),
+                (
+                    "network_wifi_connect_command",
+                    FieldValue::Str(&network_wifi_connect_command)
+                ),
+                (
+                    "network_disconnect_command",
+                    FieldValue::Str(&network_disconnect_command)
+                ),
+                (
                     "audio_status_ready",
                     FieldValue::Bool(report.panel.audio.ready())
+                ),
+                (
+                    "audio_controls_ready",
+                    FieldValue::Bool(report.panel.audio.controls.ready())
+                ),
+                (
+                    "audio_control_commands",
+                    FieldValue::U64(report.panel.audio.controls.command_count())
+                ),
+                (
+                    "audio_controls_dry_run",
+                    FieldValue::Bool(report.panel.audio.controls.dry_run)
                 ),
                 ("audio_backend", FieldValue::Str(report.panel.audio.backend)),
                 (
@@ -165,6 +207,18 @@ fn run() -> Result<(), String> {
                 (
                     "audio_volume_percent",
                     FieldValue::U64(report.panel.audio.volume_percent)
+                ),
+                (
+                    "audio_volume_up_command",
+                    FieldValue::Str(&audio_volume_up_command)
+                ),
+                (
+                    "audio_volume_down_command",
+                    FieldValue::Str(&audio_volume_down_command)
+                ),
+                (
+                    "audio_mute_toggle_command",
+                    FieldValue::Str(&audio_mute_toggle_command)
                 ),
                 (
                     "workspace_indicator_visible",

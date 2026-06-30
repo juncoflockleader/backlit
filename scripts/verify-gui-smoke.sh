@@ -136,15 +136,27 @@ grep '"power_menu_logout":true' "$out_dir/shell.jsonl" >/dev/null
 grep '"power_menu_reboot":true' "$out_dir/shell.jsonl" >/dev/null
 grep '"power_menu_shutdown":true' "$out_dir/shell.jsonl" >/dev/null
 grep '"network_status_ready":true' "$out_dir/shell.jsonl" >/dev/null
+grep '"network_controls_ready":true' "$out_dir/shell.jsonl" >/dev/null
+grep '"network_control_commands":3' "$out_dir/shell.jsonl" >/dev/null
+grep '"network_controls_dry_run":true' "$out_dir/shell.jsonl" >/dev/null
 grep '"network_backend":"NetworkManager"' "$out_dir/shell.jsonl" >/dev/null
 grep '"network_control_tool":"nmcli"' "$out_dir/shell.jsonl" >/dev/null
 grep '"network_connected":true' "$out_dir/shell.jsonl" >/dev/null
 grep '"network_strength_percent":84' "$out_dir/shell.jsonl" >/dev/null
+grep '"network_wifi_scan_command":"nmcli device wifi list"' "$out_dir/shell.jsonl" >/dev/null
+grep '"network_wifi_connect_command":"nmcli device wifi connect $SSID password $PASSWORD"' "$out_dir/shell.jsonl" >/dev/null
+grep '"network_disconnect_command":"nmcli device disconnect $DEVICE"' "$out_dir/shell.jsonl" >/dev/null
 grep '"audio_status_ready":true' "$out_dir/shell.jsonl" >/dev/null
+grep '"audio_controls_ready":true' "$out_dir/shell.jsonl" >/dev/null
+grep '"audio_control_commands":3' "$out_dir/shell.jsonl" >/dev/null
+grep '"audio_controls_dry_run":true' "$out_dir/shell.jsonl" >/dev/null
 grep '"audio_backend":"PipeWire"' "$out_dir/shell.jsonl" >/dev/null
 grep '"audio_control_tool":"wpctl"' "$out_dir/shell.jsonl" >/dev/null
 grep '"audio_muted":false' "$out_dir/shell.jsonl" >/dev/null
 grep '"audio_volume_percent":72' "$out_dir/shell.jsonl" >/dev/null
+grep '"audio_volume_up_command":"wpctl set-volume @DEFAULT_AUDIO_SINK@ 5%+"' "$out_dir/shell.jsonl" >/dev/null
+grep '"audio_volume_down_command":"wpctl set-volume @DEFAULT_AUDIO_SINK@ 5%-"' "$out_dir/shell.jsonl" >/dev/null
+grep '"audio_mute_toggle_command":"wpctl set-mute @DEFAULT_AUDIO_SINK@ toggle"' "$out_dir/shell.jsonl" >/dev/null
 grep '"workspace_indicator_visible":true' "$out_dir/shell.jsonl" >/dev/null
 grep '"workspace_count":4' "$out_dir/shell.jsonl" >/dev/null
 grep '"active_workspace":0' "$out_dir/shell.jsonl" >/dev/null
@@ -296,7 +308,9 @@ cat > "$out_dir/manifest.json" <<EOF
     "shell_panel_status": true,
     "shell_power_menu": true,
     "shell_network_status": true,
+    "shell_network_controls": true,
     "shell_audio_status": true,
+    "shell_audio_controls": true,
     "shell_workspace_indicator": true,
     "shell_launcher_targets": 3,
     "shell_app_switcher": true,

@@ -29,6 +29,56 @@ impl WorkspaceIndicator {
     }
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct ControlCommand {
+    pub program: &'static str,
+    pub args: &'static [&'static str],
+}
+
+impl ControlCommand {
+    pub fn command_line(self) -> String {
+        if self.args.is_empty() {
+            self.program.to_string()
+        } else {
+            format!("{} {}", self.program, self.args.join(" "))
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct NetworkControlState {
+    pub dry_run: bool,
+    pub wifi_scan: ControlCommand,
+    pub wifi_connect: ControlCommand,
+    pub disconnect: ControlCommand,
+}
+
+impl NetworkControlState {
+    pub fn ready(&self) -> bool {
+        self.dry_run
+            && self.wifi_scan.program == "nmcli"
+            && args_match(self.wifi_scan.args, &["device", "wifi", "list"])
+            && self.wifi_connect.program == "nmcli"
+            && args_match(
+                self.wifi_connect.args,
+                &[
+                    "device",
+                    "wifi",
+                    "connect",
+                    "$SSID",
+                    "password",
+                    "$PASSWORD",
+                ],
+            )
+            && self.disconnect.program == "nmcli"
+            && args_match(self.disconnect.args, &["device", "disconnect", "$DEVICE"])
+    }
+
+    pub const fn command_count(&self) -> u64 {
+        3
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct NetworkStatus {
     pub backend: &'static str,
@@ -37,6 +87,7 @@ pub struct NetworkStatus {
     pub connected: bool,
     pub ssid: &'static str,
     pub strength_percent: u64,
+    pub controls: NetworkControlState,
 }
 
 impl NetworkStatus {
@@ -47,6 +98,40 @@ impl NetworkStatus {
             && self.connected
             && !self.ssid.is_empty()
             && self.strength_percent <= 100
+            && self.controls.ready()
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct AudioControlState {
+    pub dry_run: bool,
+    pub volume_up: ControlCommand,
+    pub volume_down: ControlCommand,
+    pub mute_toggle: ControlCommand,
+}
+
+impl AudioControlState {
+    pub fn ready(&self) -> bool {
+        self.dry_run
+            && self.volume_up.program == "wpctl"
+            && args_match(
+                self.volume_up.args,
+                &["set-volume", "@DEFAULT_AUDIO_SINK@", "5%+"],
+            )
+            && self.volume_down.program == "wpctl"
+            && args_match(
+                self.volume_down.args,
+                &["set-volume", "@DEFAULT_AUDIO_SINK@", "5%-"],
+            )
+            && self.mute_toggle.program == "wpctl"
+            && args_match(
+                self.mute_toggle.args,
+                &["set-mute", "@DEFAULT_AUDIO_SINK@", "toggle"],
+            )
+    }
+
+    pub const fn command_count(&self) -> u64 {
+        3
     }
 }
 
@@ -57,6 +142,7 @@ pub struct AudioStatus {
     pub sink: &'static str,
     pub volume_percent: u64,
     pub muted: bool,
+    pub controls: AudioControlState,
 }
 
 impl AudioStatus {
@@ -65,7 +151,12 @@ impl AudioStatus {
             && self.control_tool == "wpctl"
             && !self.sink.is_empty()
             && self.volume_percent <= 100
+            && self.controls.ready()
     }
+}
+
+fn args_match(args: &[&str], expected: &[&str]) -> bool {
+    args == expected
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -235,6 +326,28 @@ pub fn run_shell_chrome_smoke() -> ShellChromeReport {
                 connected: true,
                 ssid: "Backlit Lab",
                 strength_percent: 84,
+                controls: NetworkControlState {
+                    dry_run: true,
+                    wifi_scan: ControlCommand {
+                        program: "nmcli",
+                        args: &["device", "wifi", "list"],
+                    },
+                    wifi_connect: ControlCommand {
+                        program: "nmcli",
+                        args: &[
+                            "device",
+                            "wifi",
+                            "connect",
+                            "$SSID",
+                            "password",
+                            "$PASSWORD",
+                        ],
+                    },
+                    disconnect: ControlCommand {
+                        program: "nmcli",
+                        args: &["device", "disconnect", "$DEVICE"],
+                    },
+                },
             },
             audio: AudioStatus {
                 backend: "PipeWire",
@@ -242,6 +355,21 @@ pub fn run_shell_chrome_smoke() -> ShellChromeReport {
                 sink: "@DEFAULT_AUDIO_SINK@",
                 volume_percent: 72,
                 muted: false,
+                controls: AudioControlState {
+                    dry_run: true,
+                    volume_up: ControlCommand {
+                        program: "wpctl",
+                        args: &["set-volume", "@DEFAULT_AUDIO_SINK@", "5%+"],
+                    },
+                    volume_down: ControlCommand {
+                        program: "wpctl",
+                        args: &["set-volume", "@DEFAULT_AUDIO_SINK@", "5%-"],
+                    },
+                    mute_toggle: ControlCommand {
+                        program: "wpctl",
+                        args: &["set-mute", "@DEFAULT_AUDIO_SINK@", "toggle"],
+                    },
+                },
             },
             workspace: WorkspaceIndicator {
                 active: 0,
@@ -332,10 +460,44 @@ mod tests {
         assert_eq!(report.panel.network.control_tool, "nmcli");
         assert!(report.panel.network.connected);
         assert!(report.panel.network.strength_percent <= 100);
+        assert!(report.panel.network.controls.ready());
         assert_eq!(report.panel.audio.backend, "PipeWire");
         assert_eq!(report.panel.audio.control_tool, "wpctl");
         assert!(!report.panel.audio.muted);
         assert!(report.panel.audio.volume_percent <= 100);
+        assert!(report.panel.audio.controls.ready());
+    }
+
+    #[test]
+    fn panel_network_and_audio_controls_use_existing_tools() {
+        let report = run_shell_chrome_smoke();
+
+        assert_eq!(report.panel.network.controls.command_count(), 3);
+        assert_eq!(
+            report.panel.network.controls.wifi_scan.command_line(),
+            "nmcli device wifi list"
+        );
+        assert_eq!(
+            report.panel.network.controls.wifi_connect.command_line(),
+            "nmcli device wifi connect $SSID password $PASSWORD"
+        );
+        assert_eq!(
+            report.panel.network.controls.disconnect.command_line(),
+            "nmcli device disconnect $DEVICE"
+        );
+        assert_eq!(report.panel.audio.controls.command_count(), 3);
+        assert_eq!(
+            report.panel.audio.controls.volume_up.command_line(),
+            "wpctl set-volume @DEFAULT_AUDIO_SINK@ 5%+"
+        );
+        assert_eq!(
+            report.panel.audio.controls.volume_down.command_line(),
+            "wpctl set-volume @DEFAULT_AUDIO_SINK@ 5%-"
+        );
+        assert_eq!(
+            report.panel.audio.controls.mute_toggle.command_line(),
+            "wpctl set-mute @DEFAULT_AUDIO_SINK@ toggle"
+        );
     }
 
     #[test]
