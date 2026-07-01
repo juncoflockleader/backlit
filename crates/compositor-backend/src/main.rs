@@ -3,8 +3,9 @@ use std::process;
 
 use backlit_common::metrics::{event_json, FieldValue};
 use backlit_compositor_backend::{
-    backend_launch_plan, preflight_backend_with_environment, smithay_runtime_probe, BackendKind,
-    BackendLaunchPlan, BackendPreflightEnvironment, SmithayRuntimeProbe,
+    backend_launch_plan, preflight_backend_with_environment, smithay_runtime_bootstrap,
+    smithay_runtime_probe, BackendKind, BackendLaunchPlan, BackendPreflightEnvironment,
+    SmithayRuntimeBootstrap, SmithayRuntimeProbe,
 };
 
 fn main() {
@@ -135,10 +136,12 @@ fn run() -> Result<(), String> {
 
     if config.verify_smithay_runtime {
         let probe = smithay_runtime_probe(&environment);
+        let bootstrap = smithay_runtime_bootstrap();
         emit_smithay_runtime_probe(&probe);
-        if config.verify && report.ready && !probe.passed() {
+        emit_smithay_runtime_bootstrap(&bootstrap);
+        if config.verify && report.ready && (!probe.passed() || !bootstrap.passed()) {
             return Err(String::from(
-                "DRM backend preflight is ready but Smithay runtime probe did not pass",
+                "DRM backend preflight is ready but Smithay runtime probe/bootstrap did not pass",
             ));
         }
     }
@@ -152,6 +155,56 @@ fn run() -> Result<(), String> {
     }
 
     Ok(())
+}
+
+fn emit_smithay_runtime_bootstrap(bootstrap: &SmithayRuntimeBootstrap) {
+    println!(
+        "{}",
+        event_json(
+            "backend.smithay_runtime_bootstrap",
+            &[
+                (
+                    "feature_enabled",
+                    FieldValue::Bool(bootstrap.feature_enabled),
+                ),
+                ("compiled", FieldValue::Bool(bootstrap.compiled)),
+                ("passed", FieldValue::Bool(bootstrap.passed())),
+                (
+                    "runtime_backend",
+                    FieldValue::Str(bootstrap.runtime_backend),
+                ),
+                (
+                    "display_created",
+                    FieldValue::Bool(bootstrap.display_created),
+                ),
+                (
+                    "display_handle_created",
+                    FieldValue::Bool(bootstrap.display_handle_created),
+                ),
+                (
+                    "display_clients_dispatched",
+                    FieldValue::Bool(bootstrap.display_clients_dispatched),
+                ),
+                (
+                    "display_dispatch_count",
+                    FieldValue::U64(bootstrap.display_dispatch_count),
+                ),
+                (
+                    "display_clients_flushed",
+                    FieldValue::Bool(bootstrap.display_clients_flushed),
+                ),
+                (
+                    "event_loop_created",
+                    FieldValue::Bool(bootstrap.event_loop_created),
+                ),
+                (
+                    "event_loop_dispatched",
+                    FieldValue::Bool(bootstrap.event_loop_dispatched),
+                ),
+                ("failure", FieldValue::Str(bootstrap.failure.as_str())),
+            ],
+        )
+    );
 }
 
 fn emit_smithay_runtime_probe(probe: &SmithayRuntimeProbe) {

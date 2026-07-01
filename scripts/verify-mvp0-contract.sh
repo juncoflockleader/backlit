@@ -128,6 +128,7 @@ require_contains scripts/verify-linux-e2e.sh './scripts/verify-smithay-runtime-p
 require_contains scripts/verify-smithay-runtime-probe.sh '--features smithay-backend'
 require_contains scripts/verify-smithay-runtime-probe.sh '"smithay_dependency_compiled": true'
 require_contains scripts/verify-smithay-runtime-probe.sh '"smithay_runtime_probe": $smithay_runtime_probe'
+require_contains scripts/verify-smithay-runtime-probe.sh '"smithay_runtime_bootstrap": $smithay_runtime_bootstrap'
 require_contains scripts/verify-compositor-socket.sh '"demo_client_socket_launch": true'
 require_contains scripts/verify-compositor-socket.sh '"demo_client_surface_mapped": true'
 require_contains scripts/verify-compositor-socket.sh '"demo_client_surface_damaged": true'
@@ -333,6 +334,10 @@ if [ -n "$artifact_root" ] && [ -d "$artifact_root" ]; then
   require_contains "$artifact_root/compositor-runtime/manifest.json" '"client_disconnect_cleanup": true'
   require_contains "$artifact_root/compositor-runtime/manifest.json" '"service_mode_runtime": true'
   require_contains "$artifact_root/smithay-runtime-probe/manifest.json" '"name": "backlit-smithay-runtime-probe"'
+  require_contains "$artifact_root/smithay-runtime-probe/manifest.json" '"smithay_runtime_probe":'
+  require_contains "$artifact_root/smithay-runtime-probe/manifest.json" '"smithay_runtime_bootstrap":'
+  require_contains "$artifact_root/smithay-runtime-probe/manifest.json" '"smithay_wayland_display_bootstrap":'
+  require_contains "$artifact_root/smithay-runtime-probe/manifest.json" '"smithay_calloop_dispatch_bootstrap":'
   if grep '"checked": true' "$artifact_root/smithay-runtime-probe/manifest.json" >/dev/null; then
     require_contains "$artifact_root/smithay-runtime-probe/manifest.json" '"smithay_dependency_compiled": true'
     require_contains "$artifact_root/smithay-runtime-probe/manifest.json" '"smithay_backend_feature": true'
@@ -342,6 +347,9 @@ if [ -n "$artifact_root" ] && [ -d "$artifact_root" ]; then
     require_contains "$artifact_root/smithay-runtime-probe/manifest.json" '"smithay_calloop_component": true'
     if grep '"drm_launch_ready": true' "$artifact_root/smithay-runtime-probe/manifest.json" >/dev/null; then
       require_contains "$artifact_root/smithay-runtime-probe/manifest.json" '"smithay_runtime_probe": true'
+      require_contains "$artifact_root/smithay-runtime-probe/manifest.json" '"smithay_runtime_bootstrap": true'
+      require_contains "$artifact_root/smithay-runtime-probe/manifest.json" '"smithay_wayland_display_bootstrap": true'
+      require_contains "$artifact_root/smithay-runtime-probe/manifest.json" '"smithay_calloop_dispatch_bootstrap": true'
     else
       require_contains "$artifact_root/smithay-runtime-probe/manifest.json" '"expected_blocked": true'
     fi

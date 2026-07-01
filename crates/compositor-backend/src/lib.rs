@@ -347,6 +347,36 @@ pub struct SmithayRuntimeProbe {
     pub components: Vec<&'static str>,
 }
 
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct SmithayRuntimeBootstrap {
+    pub feature_enabled: bool,
+    pub compiled: bool,
+    pub runtime_backend: &'static str,
+    pub display_created: bool,
+    pub display_handle_created: bool,
+    pub display_clients_dispatched: bool,
+    pub display_dispatch_count: u64,
+    pub display_clients_flushed: bool,
+    pub event_loop_created: bool,
+    pub event_loop_dispatched: bool,
+    pub failure: String,
+}
+
+impl SmithayRuntimeBootstrap {
+    pub fn passed(&self) -> bool {
+        self.feature_enabled
+            && self.compiled
+            && self.runtime_backend == "smithay-drm-bootstrap"
+            && self.display_created
+            && self.display_handle_created
+            && self.display_clients_dispatched
+            && self.display_clients_flushed
+            && self.event_loop_created
+            && self.event_loop_dispatched
+            && self.failure.is_empty()
+    }
+}
+
 impl SmithayRuntimeProbe {
     pub fn passed(&self) -> bool {
         self.feature_enabled
@@ -363,6 +393,146 @@ impl SmithayRuntimeProbe {
             && self.uses_logind
             && self.uses_libseat
             && self.uses_libinput
+    }
+}
+
+pub fn smithay_runtime_bootstrap() -> SmithayRuntimeBootstrap {
+    smithay_runtime_bootstrap_impl()
+}
+
+#[cfg(all(feature = "smithay-backend", target_os = "linux"))]
+fn smithay_runtime_bootstrap_impl() -> SmithayRuntimeBootstrap {
+    use std::time::Duration;
+
+    use smithay::reexports::calloop::EventLoop;
+    use smithay::reexports::wayland_server::Display;
+
+    #[derive(Default)]
+    struct BootstrapState;
+
+    let mut display = match Display::<BootstrapState>::new() {
+        Ok(display) => display,
+        Err(error) => {
+            return SmithayRuntimeBootstrap {
+                feature_enabled: true,
+                compiled: true,
+                runtime_backend: "smithay-drm-bootstrap",
+                display_created: false,
+                display_handle_created: false,
+                display_clients_dispatched: false,
+                display_dispatch_count: 0,
+                display_clients_flushed: false,
+                event_loop_created: false,
+                event_loop_dispatched: false,
+                failure: format!("display-new:{error}"),
+            };
+        }
+    };
+    let _display_handle = display.handle();
+    let mut state = BootstrapState;
+    let display_dispatch_count = match display.dispatch_clients(&mut state) {
+        Ok(count) => count as u64,
+        Err(error) => {
+            return SmithayRuntimeBootstrap {
+                feature_enabled: true,
+                compiled: true,
+                runtime_backend: "smithay-drm-bootstrap",
+                display_created: true,
+                display_handle_created: true,
+                display_clients_dispatched: false,
+                display_dispatch_count: 0,
+                display_clients_flushed: false,
+                event_loop_created: false,
+                event_loop_dispatched: false,
+                failure: format!("display-dispatch:{error}"),
+            };
+        }
+    };
+    let display_clients_flushed = match display.flush_clients() {
+        Ok(()) => true,
+        Err(error) => {
+            return SmithayRuntimeBootstrap {
+                feature_enabled: true,
+                compiled: true,
+                runtime_backend: "smithay-drm-bootstrap",
+                display_created: true,
+                display_handle_created: true,
+                display_clients_dispatched: true,
+                display_dispatch_count,
+                display_clients_flushed: false,
+                event_loop_created: false,
+                event_loop_dispatched: false,
+                failure: format!("display-flush:{error}"),
+            };
+        }
+    };
+    let mut event_loop = match EventLoop::<BootstrapState>::try_new() {
+        Ok(event_loop) => event_loop,
+        Err(error) => {
+            return SmithayRuntimeBootstrap {
+                feature_enabled: true,
+                compiled: true,
+                runtime_backend: "smithay-drm-bootstrap",
+                display_created: true,
+                display_handle_created: true,
+                display_clients_dispatched: true,
+                display_dispatch_count,
+                display_clients_flushed,
+                event_loop_created: false,
+                event_loop_dispatched: false,
+                failure: format!("event-loop-new:{error}"),
+            };
+        }
+    };
+    let event_loop_dispatched =
+        match event_loop.dispatch(Some(Duration::from_millis(0)), &mut state) {
+            Ok(()) => true,
+            Err(error) => {
+                return SmithayRuntimeBootstrap {
+                    feature_enabled: true,
+                    compiled: true,
+                    runtime_backend: "smithay-drm-bootstrap",
+                    display_created: true,
+                    display_handle_created: true,
+                    display_clients_dispatched: true,
+                    display_dispatch_count,
+                    display_clients_flushed,
+                    event_loop_created: true,
+                    event_loop_dispatched: false,
+                    failure: format!("event-loop-dispatch:{error}"),
+                };
+            }
+        };
+
+    SmithayRuntimeBootstrap {
+        feature_enabled: true,
+        compiled: true,
+        runtime_backend: "smithay-drm-bootstrap",
+        display_created: true,
+        display_handle_created: true,
+        display_clients_dispatched: true,
+        display_dispatch_count,
+        display_clients_flushed,
+        event_loop_created: true,
+        event_loop_dispatched,
+        failure: String::new(),
+    }
+}
+
+#[cfg(not(all(feature = "smithay-backend", target_os = "linux")))]
+fn smithay_runtime_bootstrap_impl() -> SmithayRuntimeBootstrap {
+    SmithayRuntimeBootstrap {
+        feature_enabled: cfg!(feature = "smithay-backend"),
+        compiled: false,
+        runtime_backend: "smithay-uncompiled",
+        display_created: false,
+        display_handle_created: false,
+        display_clients_dispatched: false,
+        display_dispatch_count: 0,
+        display_clients_flushed: false,
+        event_loop_created: false,
+        event_loop_dispatched: false,
+        failure: String::from("unavailable"),
     }
 }
 
@@ -1736,6 +1906,29 @@ mod tests {
             assert!(!probe.compiled, "{probe:?}");
             assert!(!probe.passed(), "{probe:?}");
             assert!(probe.components.is_empty());
+        }
+    }
+
+    #[test]
+    fn smithay_runtime_bootstrap_tracks_feature_and_display_event_loop_state() {
+        let bootstrap = super::smithay_runtime_bootstrap();
+
+        assert_eq!(bootstrap.feature_enabled, cfg!(feature = "smithay-backend"));
+        if cfg!(all(feature = "smithay-backend", target_os = "linux")) {
+            assert!(bootstrap.compiled, "{bootstrap:?}");
+            assert!(bootstrap.passed(), "{bootstrap:?}");
+            assert_eq!(bootstrap.runtime_backend, "smithay-drm-bootstrap");
+            assert!(bootstrap.display_created);
+            assert!(bootstrap.display_handle_created);
+            assert!(bootstrap.display_clients_dispatched);
+            assert!(bootstrap.display_clients_flushed);
+            assert!(bootstrap.event_loop_created);
+            assert!(bootstrap.event_loop_dispatched);
+            assert!(bootstrap.failure.is_empty());
+        } else {
+            assert!(!bootstrap.compiled, "{bootstrap:?}");
+            assert!(!bootstrap.passed(), "{bootstrap:?}");
+            assert_eq!(bootstrap.failure, "unavailable");
         }
     }
 
