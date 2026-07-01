@@ -3358,6 +3358,15 @@ pub trait CompositorRuntime {
     fn input_pointer_handle_ready(&self) -> bool {
         false
     }
+    fn input_seat_dispatch_count(&self) -> u64 {
+        0
+    }
+    fn input_keyboard_dispatch_count(&self) -> u64 {
+        0
+    }
+    fn input_pointer_dispatch_count(&self) -> u64 {
+        0
+    }
     fn input_event_counters(&self) -> InputEventCounters {
         InputEventCounters::default()
     }
@@ -3669,6 +3678,9 @@ struct SmithayCompositorState {
     input_source_count: u64,
     input_sources_ready: bool,
     input_event_loop_dispatch_count: u64,
+    input_keyboard_dispatch_count: u64,
+    input_pointer_dispatch_count: u64,
+    pointer_location: smithay::utils::Point<f64, smithay::utils::Logical>,
     libseat_session_created: bool,
     libseat_event_source_inserted: bool,
     libseat_session_event_count: u64,
@@ -3747,6 +3759,9 @@ pub struct SmithayWaylandClientSmokeReport {
     pub input_seat_ready: bool,
     pub input_keyboard_handle_ready: bool,
     pub input_pointer_handle_ready: bool,
+    pub input_seat_dispatch_count: u64,
+    pub input_keyboard_dispatch_count: u64,
+    pub input_pointer_dispatch_count: u64,
     pub input_event_counters: InputEventCounters,
     pub surface_commit_count: u64,
     pub xdg_toplevel_count: u64,
@@ -3795,6 +3810,9 @@ impl SmithayWaylandClientSmokeReport {
             && self.input_seat_ready
             && self.input_keyboard_handle_ready
             && self.input_pointer_handle_ready
+            && self.input_seat_dispatch_count >= 5
+            && self.input_keyboard_dispatch_count >= 2
+            && self.input_pointer_dispatch_count >= 3
             && self.surface_commit_count >= 1
             && self.xdg_toplevel_count >= 1
             && self.title_changed_count >= 1
@@ -4227,6 +4245,9 @@ impl SmithayCompositorState {
             input_source_count: 0,
             input_sources_ready: false,
             input_event_loop_dispatch_count: 0,
+            input_keyboard_dispatch_count: 0,
+            input_pointer_dispatch_count: 0,
+            pointer_location: smithay::utils::Point::new(0.0, 0.0),
             libseat_session_created: false,
             libseat_event_source_inserted: false,
             libseat_session_event_count: 0,
@@ -4271,6 +4292,67 @@ impl SmithayCompositorState {
 
     fn input_seat_ready(&self) -> bool {
         self.input_keyboard_handle_ready() && self.input_pointer_handle_ready()
+    }
+
+    fn input_seat_dispatch_count(&self) -> u64 {
+        self.input_keyboard_dispatch_count + self.input_pointer_dispatch_count
+    }
+
+    fn dispatch_keyboard_key(
+        &mut self,
+        keycode: smithay::backend::input::Keycode,
+        state: smithay::backend::input::KeyState,
+        time: u32,
+    ) {
+        let keyboard_handle = self.keyboard_handle.clone();
+        let serial = smithay::utils::SERIAL_COUNTER.next_serial();
+        let _ = keyboard_handle.input::<(), _>(self, keycode, state, serial, time, |_, _, _| {
+            smithay::input::keyboard::FilterResult::Forward
+        });
+        self.input_keyboard_dispatch_count += 1;
+    }
+
+    fn dispatch_pointer_motion(&mut self, delta_x: f64, delta_y: f64, time: u32) {
+        let pointer_handle = self.pointer_handle.clone();
+        let serial = smithay::utils::SERIAL_COUNTER.next_serial();
+        self.pointer_location = smithay::utils::Point::new(
+            (self.pointer_location.x + delta_x).max(0.0),
+            (self.pointer_location.y + delta_y).max(0.0),
+        );
+        let event = smithay::input::pointer::MotionEvent {
+            location: self.pointer_location,
+            serial,
+            time,
+        };
+        pointer_handle.motion(self, None, &event);
+        pointer_handle.frame(self);
+        self.input_pointer_dispatch_count += 1;
+    }
+
+    fn dispatch_pointer_button(
+        &mut self,
+        button: u32,
+        state: smithay::backend::input::ButtonState,
+        time: u32,
+    ) {
+        let pointer_handle = self.pointer_handle.clone();
+        let event = smithay::input::pointer::ButtonEvent {
+            serial: smithay::utils::SERIAL_COUNTER.next_serial(),
+            time,
+            button,
+            state,
+        };
+        pointer_handle.button(self, &event);
+        pointer_handle.frame(self);
+        self.input_pointer_dispatch_count += 1;
+    }
+
+    fn dispatch_input_bridge_smoke(&mut self) {
+        self.dispatch_keyboard_key(30, smithay::backend::input::KeyState::Pressed, 0);
+        self.dispatch_keyboard_key(30, smithay::backend::input::KeyState::Released, 1);
+        self.dispatch_pointer_motion(8.0, 6.0, 2);
+        self.dispatch_pointer_button(0x110, smithay::backend::input::ButtonState::Pressed, 3);
+        self.dispatch_pointer_button(0x110, smithay::backend::input::ButtonState::Released, 4);
     }
 }
 
@@ -4445,6 +4527,10 @@ fn install_smithay_input_sources(
     event_loop: &smithay::reexports::calloop::EventLoop<'static, SmithayCompositorState>,
     state: &mut SmithayCompositorState,
 ) {
+    use smithay::backend::input::{
+        Event as _, InputEvent as SmithayInputEvent, KeyboardKeyEvent as _,
+        PointerButtonEvent as _, PointerMotionEvent as _,
+    };
     use smithay::backend::libinput::{LibinputInputBackend, LibinputSessionInterface};
     use smithay::backend::session::{libseat::LibSeatSession, Session};
 
@@ -4508,6 +4594,26 @@ fn install_smithay_input_sources(
                 .libinput_event_counters
                 .record_smithay_libinput_event(&event);
             state.libinput_event_count = state.libinput_event_counters.total;
+            match event {
+                SmithayInputEvent::Keyboard { event } => {
+                    state.dispatch_keyboard_key(event.key_code(), event.state(), event.time_msec());
+                }
+                SmithayInputEvent::PointerMotion { event } => {
+                    state.dispatch_pointer_motion(
+                        event.delta_x(),
+                        event.delta_y(),
+                        event.time_msec(),
+                    );
+                }
+                SmithayInputEvent::PointerButton { event } => {
+                    state.dispatch_pointer_button(
+                        event.button_code(),
+                        event.state(),
+                        event.time_msec(),
+                    );
+                }
+                _ => {}
+            }
         })
         .is_ok();
     if !state.libinput_event_source_inserted {
@@ -4517,6 +4623,7 @@ fn install_smithay_input_sources(
 
     state.input_source_count = 2;
     state.input_sources_ready = true;
+    state.dispatch_input_bridge_smoke();
 }
 
 #[cfg(all(feature = "smithay-backend", target_os = "linux"))]
@@ -4598,6 +4705,18 @@ impl SmithayCompositorRuntime {
         self.state.input_pointer_handle_ready()
     }
 
+    pub fn input_seat_dispatch_count(&self) -> u64 {
+        self.state.input_seat_dispatch_count()
+    }
+
+    pub fn input_keyboard_dispatch_count(&self) -> u64 {
+        self.state.input_keyboard_dispatch_count
+    }
+
+    pub fn input_pointer_dispatch_count(&self) -> u64 {
+        self.state.input_pointer_dispatch_count
+    }
+
     pub fn input_event_counters(&self) -> InputEventCounters {
         self.state.libinput_event_counters
     }
@@ -4675,6 +4794,9 @@ impl SmithayCompositorRuntime {
             input_seat_ready: self.input_seat_ready(),
             input_keyboard_handle_ready: self.input_keyboard_handle_ready(),
             input_pointer_handle_ready: self.input_pointer_handle_ready(),
+            input_seat_dispatch_count: self.input_seat_dispatch_count(),
+            input_keyboard_dispatch_count: self.input_keyboard_dispatch_count(),
+            input_pointer_dispatch_count: self.input_pointer_dispatch_count(),
             input_event_counters: self.input_event_counters(),
             surface_commit_count: self.state.surface_commit_count,
             xdg_toplevel_count: self.state.xdg_toplevel_count,
@@ -4859,6 +4981,18 @@ impl CompositorRuntime for SmithayCompositorRuntime {
 
     fn input_pointer_handle_ready(&self) -> bool {
         SmithayCompositorRuntime::input_pointer_handle_ready(self)
+    }
+
+    fn input_seat_dispatch_count(&self) -> u64 {
+        SmithayCompositorRuntime::input_seat_dispatch_count(self)
+    }
+
+    fn input_keyboard_dispatch_count(&self) -> u64 {
+        SmithayCompositorRuntime::input_keyboard_dispatch_count(self)
+    }
+
+    fn input_pointer_dispatch_count(&self) -> u64 {
+        SmithayCompositorRuntime::input_pointer_dispatch_count(self)
     }
 
     fn input_event_counters(&self) -> InputEventCounters {

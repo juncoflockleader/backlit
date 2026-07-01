@@ -105,6 +105,7 @@ write_blocked_manifest() {
     "smithay_input_sources": false,
     "smithay_input_event_loop": false,
     "smithay_input_seat_handles": false,
+    "smithay_input_seat_dispatch": false,
     "smithay_input_event_classification": false,
     "smithay_real_wayland_client": false,
     "smithay_real_wayland_metadata": false,
@@ -182,6 +183,9 @@ require_line_contains_all "$log" \
   '"input_seat_ready":true' \
   '"input_keyboard_handle_ready":true' \
   '"input_pointer_handle_ready":true' \
+  '"input_seat_dispatch_count":' \
+  '"input_keyboard_dispatch_count":' \
+  '"input_pointer_dispatch_count":' \
   '"input_event_count":' \
   '"input_keyboard_event_count":' \
   '"input_pointer_event_count":' \
@@ -204,6 +208,9 @@ require_line_contains_all "$log" \
   '"input_seat_ready":true' \
   '"input_keyboard_handle_ready":true' \
   '"input_pointer_handle_ready":true' \
+  '"input_seat_dispatch_count":' \
+  '"input_keyboard_dispatch_count":' \
+  '"input_pointer_dispatch_count":' \
   '"input_event_count":' \
   '"input_keyboard_event_count":' \
   '"input_pointer_event_count":' \
@@ -294,6 +301,9 @@ require_line_contains_all "$client_smoke_log" \
   '"input_seat_ready":true' \
   '"input_keyboard_handle_ready":true' \
   '"input_pointer_handle_ready":true' \
+  '"input_seat_dispatch_count":' \
+  '"input_keyboard_dispatch_count":' \
+  '"input_pointer_dispatch_count":' \
   '"input_event_count":' \
   '"input_keyboard_event_count":' \
   '"input_pointer_event_count":' \
@@ -414,6 +424,9 @@ require_line_contains_all "$service_log" \
   '"input_seat_ready":true' \
   '"input_keyboard_handle_ready":true' \
   '"input_pointer_handle_ready":true' \
+  '"input_seat_dispatch_count":' \
+  '"input_keyboard_dispatch_count":' \
+  '"input_pointer_dispatch_count":' \
   '"input_event_count":' \
   '"input_keyboard_event_count":' \
   '"input_pointer_event_count":' \
@@ -439,6 +452,9 @@ require_line_contains_all "$service_log" \
   '"input_seat_ready":true' \
   '"input_keyboard_handle_ready":true' \
   '"input_pointer_handle_ready":true' \
+  '"input_seat_dispatch_count":' \
+  '"input_keyboard_dispatch_count":' \
+  '"input_pointer_dispatch_count":' \
   '"input_event_count":' \
   '"input_keyboard_event_count":' \
   '"input_pointer_event_count":' \
@@ -546,6 +562,7 @@ cat > "$out_dir/manifest.json" <<EOF
     "smithay_input_sources": true,
     "smithay_input_event_loop": true,
     "smithay_input_seat_handles": true,
+    "smithay_input_seat_dispatch": true,
     "smithay_input_event_classification": true,
     "smithay_real_wayland_client": true,
     "smithay_real_wayland_metadata": true,
