@@ -2348,8 +2348,14 @@ struct SmithayCompositorState {
     xdg_popup_count: u64,
     title_changed_count: u64,
     app_id_changed_count: u64,
+    observed_title: Option<String>,
+    observed_app_id: Option<String>,
     title_matched: bool,
     app_id_matched: bool,
+    shm_buffer_commit_count: u64,
+    shm_buffer_width: u64,
+    shm_buffer_height: u64,
+    shm_buffer_pixels: u64,
 }
 
 #[cfg(all(feature = "smithay-backend", target_os = "linux"))]
@@ -2368,13 +2374,21 @@ const SMITHAY_SMOKE_TITLE: &str = "Backlit Smithay smoke";
 const SMITHAY_SMOKE_APP_ID: &str = "org.backlit.SmithaySmoke";
 
 #[cfg(all(feature = "smithay-backend", target_os = "linux"))]
-#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+const SMITHAY_SMOKE_WIDTH: i32 = 320;
+
+#[cfg(all(feature = "smithay-backend", target_os = "linux"))]
+const SMITHAY_SMOKE_HEIGHT: i32 = 240;
+
+#[cfg(all(feature = "smithay-backend", target_os = "linux"))]
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct SmithayWaylandClientSmokeReport {
     pub protocol_globals: u64,
     pub registry_global_count: u64,
     pub registry_announced: bool,
     pub compositor_bound: bool,
     pub shm_bound: bool,
+    pub shm_buffer_created: bool,
+    pub shm_buffer_attached: bool,
     pub xdg_wm_base_bound: bool,
     pub surface_created: bool,
     pub xdg_toplevel_created: bool,
@@ -2389,18 +2403,26 @@ pub struct SmithayWaylandClientSmokeReport {
     pub xdg_popup_count: u64,
     pub title_changed_count: u64,
     pub app_id_changed_count: u64,
+    pub observed_title: String,
+    pub observed_app_id: String,
     pub title_matched: bool,
     pub app_id_matched: bool,
+    pub shm_buffer_commit_count: u64,
+    pub shm_buffer_width: u64,
+    pub shm_buffer_height: u64,
+    pub shm_buffer_pixels: u64,
 }
 
 #[cfg(all(feature = "smithay-backend", target_os = "linux"))]
 impl SmithayWaylandClientSmokeReport {
-    pub fn passed(self) -> bool {
+    pub fn passed(&self) -> bool {
         self.protocol_globals >= 4
             && self.registry_global_count >= 4
             && self.registry_announced
             && self.compositor_bound
             && self.shm_bound
+            && self.shm_buffer_created
+            && self.shm_buffer_attached
             && self.xdg_wm_base_bound
             && self.surface_created
             && self.xdg_toplevel_created
@@ -2416,6 +2438,12 @@ impl SmithayWaylandClientSmokeReport {
             && self.app_id_changed_count >= 1
             && self.title_matched
             && self.app_id_matched
+            && self.observed_title == SMITHAY_SMOKE_TITLE
+            && self.observed_app_id == SMITHAY_SMOKE_APP_ID
+            && self.shm_buffer_commit_count >= 1
+            && self.shm_buffer_width == SMITHAY_SMOKE_WIDTH as u64
+            && self.shm_buffer_height == SMITHAY_SMOKE_HEIGHT as u64
+            && self.shm_buffer_pixels == (SMITHAY_SMOKE_WIDTH * SMITHAY_SMOKE_HEIGHT) as u64
     }
 }
 
@@ -2432,8 +2460,11 @@ struct WaylandGlobal {
 struct WaylandClientEventState {
     globals: Vec<WaylandGlobal>,
     wm_base_ping_serials: Vec<u32>,
+    failure: Option<String>,
     compositor_bound: bool,
     shm_bound: bool,
+    shm_buffer_created: bool,
+    shm_buffer_attached: bool,
     xdg_wm_base_bound: bool,
     surface_created: bool,
     xdg_surface_created: bool,
@@ -2443,6 +2474,10 @@ struct WaylandClientEventState {
     configure_acked: bool,
     surface_committed: bool,
     compositor: Option<wayland_client::protocol::wl_compositor::WlCompositor>,
+    shm: Option<wayland_client::protocol::wl_shm::WlShm>,
+    shm_pool: Option<wayland_client::protocol::wl_shm_pool::WlShmPool>,
+    shm_buffer: Option<wayland_client::protocol::wl_buffer::WlBuffer>,
+    shm_file: Option<std::fs::File>,
     base_surface: Option<wayland_client::protocol::wl_surface::WlSurface>,
     wm_base: Option<wayland_protocols::xdg::shell::client::xdg_wm_base::XdgWmBase>,
     xdg_surface: Option<wayland_protocols::xdg::shell::client::xdg_surface::XdgSurface>,
@@ -2481,6 +2516,7 @@ impl WaylandClientEventState {
 
             let xdg_surface = wm_base.get_xdg_surface(base_surface, qh, ());
             let xdg_toplevel = xdg_surface.get_toplevel(qh, ());
+            xdg_surface.set_window_geometry(0, 0, SMITHAY_SMOKE_WIDTH, SMITHAY_SMOKE_HEIGHT);
             xdg_toplevel.set_title(String::from(SMITHAY_SMOKE_TITLE));
             xdg_toplevel.set_app_id(String::from(SMITHAY_SMOKE_APP_ID));
             base_surface.commit();
@@ -2490,6 +2526,109 @@ impl WaylandClientEventState {
             self.xdg_toplevel_created = true;
         }
     }
+
+    fn init_shm_buffer(&mut self, qh: &wayland_client::QueueHandle<Self>) {
+        if self.shm_buffer.is_some() || self.failure.is_some() {
+            return;
+        }
+
+        let Some(shm) = self.shm.as_ref() else {
+            return;
+        };
+
+        match create_smoke_shm_file() {
+            Ok(mut file) => {
+                use std::os::fd::AsFd;
+
+                let stride = SMITHAY_SMOKE_WIDTH * 4;
+                let byte_len = stride * SMITHAY_SMOKE_HEIGHT;
+                let pool = shm.create_pool(file.as_fd(), byte_len, qh, ());
+                let buffer = pool.create_buffer(
+                    0,
+                    SMITHAY_SMOKE_WIDTH,
+                    SMITHAY_SMOKE_HEIGHT,
+                    stride,
+                    wayland_client::protocol::wl_shm::Format::Argb8888,
+                    qh,
+                    (),
+                );
+                if let Err(error) = std::io::Seek::seek(&mut file, std::io::SeekFrom::Start(0)) {
+                    self.failure = Some(format!("shm-file-seek:{error}"));
+                    return;
+                }
+                self.shm_pool = Some(pool);
+                self.shm_buffer = Some(buffer);
+                self.shm_file = Some(file);
+                self.shm_buffer_created = true;
+            }
+            Err(error) => {
+                self.failure = Some(error);
+            }
+        }
+    }
+
+    fn attach_shm_buffer_if_configured(&mut self) {
+        if self.shm_buffer_attached || self.failure.is_some() || !self.configure_acked {
+            return;
+        }
+
+        let (Some(base_surface), Some(buffer)) =
+            (self.base_surface.as_ref(), self.shm_buffer.as_ref())
+        else {
+            return;
+        };
+
+        base_surface.attach(Some(buffer), 0, 0);
+        base_surface.damage(0, 0, SMITHAY_SMOKE_WIDTH, SMITHAY_SMOKE_HEIGHT);
+        base_surface.commit();
+        self.shm_buffer_attached = true;
+        self.surface_committed = true;
+    }
+}
+
+#[cfg(all(feature = "smithay-backend", target_os = "linux"))]
+fn create_smoke_shm_file() -> Result<std::fs::File, String> {
+    use std::io::{Seek, SeekFrom, Write};
+
+    let dir = std::env::var_os("XDG_RUNTIME_DIR")
+        .map(PathBuf::from)
+        .unwrap_or_else(std::env::temp_dir);
+    let path = dir.join(format!(
+        "backlit-smithay-smoke-{}-{}.shm",
+        std::process::id(),
+        std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .map(|duration| duration.as_nanos())
+            .unwrap_or_default()
+    ));
+    let mut file = fs::OpenOptions::new()
+        .read(true)
+        .write(true)
+        .create_new(true)
+        .open(&path)
+        .map_err(|error| format!("shm-file-open:{error}"))?;
+    let _ = fs::remove_file(&path);
+
+    let stride = SMITHAY_SMOKE_WIDTH as usize * 4;
+    let byte_len = stride * SMITHAY_SMOKE_HEIGHT as usize;
+    file.set_len(byte_len as u64)
+        .map_err(|error| format!("shm-file-len:{error}"))?;
+
+    for y in 0..SMITHAY_SMOKE_HEIGHT {
+        for x in 0..SMITHAY_SMOKE_WIDTH {
+            let alpha = 0xffu8;
+            let red = ((x * 255) / SMITHAY_SMOKE_WIDTH) as u8;
+            let green = ((y * 255) / SMITHAY_SMOKE_HEIGHT) as u8;
+            let blue = 0x66u8;
+            file.write_all(&[blue, green, red, alpha])
+                .map_err(|error| format!("shm-file-write:{error}"))?;
+        }
+    }
+    file.flush()
+        .map_err(|error| format!("shm-file-flush:{error}"))?;
+    file.seek(SeekFrom::Start(0))
+        .map_err(|error| format!("shm-file-rewind:{error}"))?;
+    Ok(file)
 }
 
 #[cfg(all(feature = "smithay-backend", target_os = "linux"))]
@@ -2537,8 +2676,11 @@ impl wayland_client::Dispatch<wayland_client::protocol::wl_registry::WlRegistry,
                 state.init_xdg_toplevel(qh);
             }
             "wl_shm" if !state.shm_bound => {
-                let _shm = registry.bind::<wl_shm::WlShm, _, _>(name, 1, qh, ());
+                let shm = registry.bind::<wl_shm::WlShm, _, _>(name, 1, qh, ());
+                state.shm = Some(shm);
                 state.shm_bound = true;
+                state.init_shm_buffer(qh);
+                state.attach_shm_buffer_if_configured();
             }
             "xdg_wm_base" if !state.xdg_wm_base_bound => {
                 let wm_base = registry.bind::<xdg_wm_base::XdgWmBase, _, _>(name, 1, qh, ());
@@ -2588,10 +2730,7 @@ impl wayland_client::Dispatch<wayland_protocols::xdg::shell::client::xdg_surface
             state.xdg_surface_configure_serial = Some(serial);
             xdg_surface.ack_configure(serial);
             state.configure_acked = true;
-            if let Some(base_surface) = state.base_surface.as_ref() {
-                base_surface.commit();
-                state.surface_committed = true;
-            }
+            state.attach_shm_buffer_if_configured();
         }
     }
 }
@@ -2625,6 +2764,12 @@ wayland_client::delegate_noop!(WaylandClientEventState: ignore wayland_client::p
 wayland_client::delegate_noop!(WaylandClientEventState: ignore wayland_client::protocol::wl_shm::WlShm);
 
 #[cfg(all(feature = "smithay-backend", target_os = "linux"))]
+wayland_client::delegate_noop!(WaylandClientEventState: ignore wayland_client::protocol::wl_shm_pool::WlShmPool);
+
+#[cfg(all(feature = "smithay-backend", target_os = "linux"))]
+wayland_client::delegate_noop!(WaylandClientEventState: ignore wayland_client::protocol::wl_buffer::WlBuffer);
+
+#[cfg(all(feature = "smithay-backend", target_os = "linux"))]
 impl SmithayCompositorState {
     fn new(display: &smithay::reexports::wayland_server::DisplayHandle) -> Self {
         let compositor_state = smithay::wayland::compositor::CompositorState::new::<Self>(display);
@@ -2645,8 +2790,14 @@ impl SmithayCompositorState {
             xdg_popup_count: 0,
             title_changed_count: 0,
             app_id_changed_count: 0,
+            observed_title: None,
+            observed_app_id: None,
             title_matched: false,
             app_id_matched: false,
+            shm_buffer_commit_count: 0,
+            shm_buffer_width: 0,
+            shm_buffer_height: 0,
+            shm_buffer_pixels: 0,
         }
     }
 }
@@ -2669,10 +2820,37 @@ impl smithay::wayland::compositor::CompositorHandler for SmithayCompositorState 
 
     fn commit(
         &mut self,
-        _surface: &smithay::reexports::wayland_server::protocol::wl_surface::WlSurface,
+        surface: &smithay::reexports::wayland_server::protocol::wl_surface::WlSurface,
     ) {
         self.surface_commit_count += 1;
+        if let Some((width, height)) = smithay_committed_buffer_dimensions(surface) {
+            self.shm_buffer_commit_count += 1;
+            self.shm_buffer_width = width;
+            self.shm_buffer_height = height;
+            self.shm_buffer_pixels = width * height;
+        }
+        smithay::backend::renderer::utils::on_commit_buffer_handler::<Self>(surface);
     }
+}
+
+#[cfg(all(feature = "smithay-backend", target_os = "linux"))]
+fn smithay_committed_buffer_dimensions(
+    surface: &smithay::reexports::wayland_server::protocol::wl_surface::WlSurface,
+) -> Option<(u64, u64)> {
+    smithay::wayland::compositor::with_states(surface, |states| {
+        let mut guard = states
+            .cached_state
+            .get::<smithay::wayland::compositor::SurfaceAttributes>();
+        let attributes = guard.current();
+        let Some(smithay::wayland::compositor::BufferAssignment::NewBuffer(buffer)) =
+            attributes.buffer.as_ref()
+        else {
+            return None;
+        };
+
+        smithay::backend::renderer::buffer_dimensions(buffer)
+            .map(|size| (size.w.max(0) as u64, size.h.max(0) as u64))
+    })
 }
 
 #[cfg(all(feature = "smithay-backend", target_os = "linux"))]
@@ -2742,6 +2920,9 @@ impl smithay::wayland::shell::xdg::XdgShellHandler for SmithayCompositorState {
     fn title_changed(&mut self, surface: smithay::wayland::shell::xdg::ToplevelSurface) {
         self.title_changed_count += 1;
         let (title, _app_id) = smithay_toplevel_metadata(&surface);
+        if let Some(title) = title.as_ref() {
+            self.observed_title = Some(title.clone());
+        }
         if title.as_deref() == Some(SMITHAY_SMOKE_TITLE) {
             self.title_matched = true;
         }
@@ -2750,6 +2931,9 @@ impl smithay::wayland::shell::xdg::XdgShellHandler for SmithayCompositorState {
     fn app_id_changed(&mut self, surface: smithay::wayland::shell::xdg::ToplevelSurface) {
         self.app_id_changed_count += 1;
         let (_title, app_id) = smithay_toplevel_metadata(&surface);
+        if let Some(app_id) = app_id.as_ref() {
+            self.observed_app_id = Some(app_id.clone());
+        }
         if app_id.as_deref() == Some(SMITHAY_SMOKE_APP_ID) {
             self.app_id_matched = true;
         }
@@ -2857,12 +3041,16 @@ impl SmithayCompositorRuntime {
                 &mut event_queue,
                 &mut client_state,
             )?;
+            if let Some(error) = client_state.failure.as_ref() {
+                return Err(SmithayRuntimeError(error.clone()));
+            }
             if client_state.registry_announced()
                 && client_state.configure_acked
                 && client_state.surface_committed
                 && self.state.surface_commit_count >= 2
                 && self.state.title_matched
                 && self.state.app_id_matched
+                && self.state.shm_buffer_commit_count >= 1
             {
                 break;
             }
@@ -2874,6 +3062,8 @@ impl SmithayCompositorRuntime {
             registry_announced: client_state.registry_announced(),
             compositor_bound: client_state.compositor_bound,
             shm_bound: client_state.shm_bound,
+            shm_buffer_created: client_state.shm_buffer_created,
+            shm_buffer_attached: client_state.shm_buffer_attached,
             xdg_wm_base_bound: client_state.xdg_wm_base_bound,
             surface_created: client_state.surface_created,
             xdg_toplevel_created: client_state.xdg_toplevel_created
@@ -2891,8 +3081,14 @@ impl SmithayCompositorRuntime {
             xdg_popup_count: self.state.xdg_popup_count,
             title_changed_count: self.state.title_changed_count,
             app_id_changed_count: self.state.app_id_changed_count,
+            observed_title: self.state.observed_title.clone().unwrap_or_default(),
+            observed_app_id: self.state.observed_app_id.clone().unwrap_or_default(),
             title_matched: self.state.title_matched,
             app_id_matched: self.state.app_id_matched,
+            shm_buffer_commit_count: self.state.shm_buffer_commit_count,
+            shm_buffer_width: self.state.shm_buffer_width,
+            shm_buffer_height: self.state.shm_buffer_height,
+            shm_buffer_pixels: self.state.shm_buffer_pixels,
         };
 
         Ok(report)

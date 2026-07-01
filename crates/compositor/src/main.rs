@@ -92,6 +92,14 @@ fn run() -> Result<(), String> {
                 ("compositor_bound", FieldValue::Bool(smoke.compositor_bound)),
                 ("shm_bound", FieldValue::Bool(smoke.shm_bound)),
                 (
+                    "shm_buffer_created",
+                    FieldValue::Bool(smoke.shm_buffer_created),
+                ),
+                (
+                    "shm_buffer_attached",
+                    FieldValue::Bool(smoke.shm_buffer_attached),
+                ),
+                (
                     "xdg_wm_base_bound",
                     FieldValue::Bool(smoke.xdg_wm_base_bound),
                 ),
@@ -138,8 +146,54 @@ fn run() -> Result<(), String> {
                     "app_id_changed_count",
                     FieldValue::U64(smoke.app_id_changed_count),
                 ),
+                (
+                    "observed_title",
+                    FieldValue::Str(smoke.observed_title.as_str()),
+                ),
+                (
+                    "observed_app_id",
+                    FieldValue::Str(smoke.observed_app_id.as_str()),
+                ),
                 ("title_matched", FieldValue::Bool(smoke.title_matched)),
                 ("app_id_matched", FieldValue::Bool(smoke.app_id_matched)),
+                (
+                    "shm_buffer_commit_count",
+                    FieldValue::U64(smoke.shm_buffer_commit_count),
+                ),
+                ("shm_buffer_width", FieldValue::U64(smoke.shm_buffer_width)),
+                (
+                    "shm_buffer_height",
+                    FieldValue::U64(smoke.shm_buffer_height),
+                ),
+                (
+                    "shm_buffer_pixels",
+                    FieldValue::U64(smoke.shm_buffer_pixels),
+                ),
+                (
+                    "policy_window_mapped",
+                    FieldValue::Bool(smoke.policy_window_mapped),
+                ),
+                (
+                    "policy_app_id_preserved",
+                    FieldValue::Bool(smoke.policy_app_id_preserved),
+                ),
+                (
+                    "policy_focused_after_map",
+                    FieldValue::Bool(smoke.policy_focused_after_map),
+                ),
+                (
+                    "policy_geometry_preserved",
+                    FieldValue::Bool(smoke.policy_geometry_preserved),
+                ),
+                ("policy_windows", FieldValue::U64(smoke.policy_windows)),
+                (
+                    "policy_backend_surface_presented",
+                    FieldValue::Bool(smoke.policy_backend_surface_presented),
+                ),
+                (
+                    "policy_presented_pixels",
+                    FieldValue::U64(smoke.policy_presented_pixels),
+                ),
             ],
         );
 
@@ -1338,7 +1392,7 @@ fn poll_socket_clients<B: CompositorRuntime>(
     Ok(())
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 struct SmithayClientSmoke {
     runtime_backend: &'static str,
     smithay_protocol_globals: u64,
@@ -1346,6 +1400,8 @@ struct SmithayClientSmoke {
     registry_announced: bool,
     compositor_bound: bool,
     shm_bound: bool,
+    shm_buffer_created: bool,
+    shm_buffer_attached: bool,
     xdg_wm_base_bound: bool,
     surface_created: bool,
     xdg_toplevel_created: bool,
@@ -1360,18 +1416,33 @@ struct SmithayClientSmoke {
     xdg_popup_count: u64,
     title_changed_count: u64,
     app_id_changed_count: u64,
+    observed_title: String,
+    observed_app_id: String,
     title_matched: bool,
     app_id_matched: bool,
+    shm_buffer_commit_count: u64,
+    shm_buffer_width: u64,
+    shm_buffer_height: u64,
+    shm_buffer_pixels: u64,
+    policy_window_mapped: bool,
+    policy_app_id_preserved: bool,
+    policy_focused_after_map: bool,
+    policy_geometry_preserved: bool,
+    policy_windows: u64,
+    policy_backend_surface_presented: bool,
+    policy_presented_pixels: u64,
 }
 
 impl SmithayClientSmoke {
-    fn passed(self) -> bool {
+    fn passed(&self) -> bool {
         self.runtime_backend == "smithay-compositor-runtime"
             && self.smithay_protocol_globals >= 4
             && self.registry_global_count >= 4
             && self.registry_announced
             && self.compositor_bound
             && self.shm_bound
+            && self.shm_buffer_created
+            && self.shm_buffer_attached
             && self.xdg_wm_base_bound
             && self.surface_created
             && self.xdg_toplevel_created
@@ -1387,7 +1458,32 @@ impl SmithayClientSmoke {
             && self.app_id_changed_count >= 1
             && self.title_matched
             && self.app_id_matched
+            && !self.observed_title.is_empty()
+            && !self.observed_app_id.is_empty()
+            && self.shm_buffer_commit_count >= 1
+            && self.shm_buffer_width == 320
+            && self.shm_buffer_height == 240
+            && self.shm_buffer_pixels == 320 * 240
+            && self.policy_window_mapped
+            && self.policy_app_id_preserved
+            && self.policy_focused_after_map
+            && self.policy_geometry_preserved
+            && self.policy_windows == 1
+            && self.policy_backend_surface_presented
+            && self.policy_presented_pixels == self.shm_buffer_pixels
     }
+}
+
+#[cfg(all(feature = "smithay-backend", target_os = "linux"))]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+struct SmithayPolicySurfaceSmoke {
+    window_mapped: bool,
+    app_id_preserved: bool,
+    focused_after_map: bool,
+    geometry_preserved: bool,
+    windows: u64,
+    backend_surface_presented: bool,
+    presented_pixels: u64,
 }
 
 #[cfg(all(feature = "smithay-backend", target_os = "linux"))]
@@ -1403,6 +1499,7 @@ fn run_smithay_client_smoke_for_config(config: &RunConfig) -> Result<SmithayClie
     let report = runtime
         .run_wayland_client_smoke()
         .map_err(|error| error.to_string())?;
+    let policy = map_smithay_smoke_into_policy(&mut runtime, &report);
 
     Ok(SmithayClientSmoke {
         runtime_backend,
@@ -1411,6 +1508,8 @@ fn run_smithay_client_smoke_for_config(config: &RunConfig) -> Result<SmithayClie
         registry_announced: report.registry_announced,
         compositor_bound: report.compositor_bound,
         shm_bound: report.shm_bound,
+        shm_buffer_created: report.shm_buffer_created,
+        shm_buffer_attached: report.shm_buffer_attached,
         xdg_wm_base_bound: report.xdg_wm_base_bound,
         surface_created: report.surface_created,
         xdg_toplevel_created: report.xdg_toplevel_created,
@@ -1425,9 +1524,75 @@ fn run_smithay_client_smoke_for_config(config: &RunConfig) -> Result<SmithayClie
         xdg_popup_count: report.xdg_popup_count,
         title_changed_count: report.title_changed_count,
         app_id_changed_count: report.app_id_changed_count,
+        observed_title: report.observed_title,
+        observed_app_id: report.observed_app_id,
         title_matched: report.title_matched,
         app_id_matched: report.app_id_matched,
+        shm_buffer_commit_count: report.shm_buffer_commit_count,
+        shm_buffer_width: report.shm_buffer_width,
+        shm_buffer_height: report.shm_buffer_height,
+        shm_buffer_pixels: report.shm_buffer_pixels,
+        policy_window_mapped: policy.window_mapped,
+        policy_app_id_preserved: policy.app_id_preserved,
+        policy_focused_after_map: policy.focused_after_map,
+        policy_geometry_preserved: policy.geometry_preserved,
+        policy_windows: policy.windows,
+        policy_backend_surface_presented: policy.backend_surface_presented,
+        policy_presented_pixels: policy.presented_pixels,
     })
+}
+
+#[cfg(all(feature = "smithay-backend", target_os = "linux"))]
+fn map_smithay_smoke_into_policy(
+    runtime: &mut SmithayCompositorRuntime,
+    report: &backlit_compositor_backend::SmithayWaylandClientSmokeReport,
+) -> SmithayPolicySurfaceSmoke {
+    let width = report.shm_buffer_width as i32;
+    let height = report.shm_buffer_height as i32;
+    let mut manager = SurfaceManager::new(OutputLayout::new(800, 520, 42));
+    let surface = if report.passed() && width > 0 && height > 0 {
+        map_scripted_app_toplevel(
+            &mut manager,
+            report.observed_title.as_str(),
+            report.observed_app_id.as_str(),
+            width,
+            height,
+        )
+        .ok()
+    } else {
+        None
+    };
+    let window_id = surface.and_then(|surface| manager.surface(surface)?.window_id);
+    let policy_window = window_id.and_then(|window_id| manager.policy().window(window_id));
+    let backend_client = runtime.connect_client("real-wayland-policy-mirror");
+    let backend_surface_presented = if report.passed() && width > 0 && height > 0 {
+        runtime
+            .submit_surface(
+                backend_client,
+                report.observed_title.as_str(),
+                report.shm_buffer_width as u32,
+                report.shm_buffer_height as u32,
+            )
+            .is_ok()
+    } else {
+        false
+    };
+    let frame = runtime.present();
+
+    SmithayPolicySurfaceSmoke {
+        window_mapped: window_id.is_some(),
+        app_id_preserved: policy_window.and_then(|window| window.app_id.as_deref())
+            == Some(report.observed_app_id.as_str()),
+        focused_after_map: window_id
+            .map(|window_id| manager.policy().focused() == Some(window_id))
+            .unwrap_or(false),
+        geometry_preserved: policy_window
+            .map(|window| window.geometry.width == width && window.geometry.height == height)
+            .unwrap_or(false),
+        windows: manager.policy().windows().len() as u64,
+        backend_surface_presented,
+        presented_pixels: frame.total_pixels,
+    }
 }
 
 #[cfg(not(all(feature = "smithay-backend", target_os = "linux")))]

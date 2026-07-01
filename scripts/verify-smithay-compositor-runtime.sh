@@ -91,6 +91,8 @@ write_blocked_manifest() {
     "smithay_core_protocol_globals": false,
     "smithay_real_wayland_client": false,
     "smithay_real_wayland_metadata": false,
+    "smithay_real_shm_buffer": false,
+    "smithay_real_wayland_policy_window": false,
     "smithay_event_loop_runtime": false,
     "smithay_service_ready": false,
     "smithay_service_socket": false,
@@ -192,6 +194,8 @@ require_line_contains_all "$client_smoke_log" \
   '"registry_announced":true' \
   '"compositor_bound":true' \
   '"shm_bound":true' \
+  '"shm_buffer_created":true' \
+  '"shm_buffer_attached":true' \
   '"xdg_wm_base_bound":true' \
   '"surface_created":true' \
   '"xdg_toplevel_created":true' \
@@ -202,8 +206,21 @@ require_line_contains_all "$client_smoke_log" \
   '"xdg_toplevel_count":1' \
   '"title_changed_count":1' \
   '"app_id_changed_count":1' \
+  '"observed_title":"Backlit Smithay smoke"' \
+  '"observed_app_id":"org.backlit.SmithaySmoke"' \
   '"title_matched":true' \
-  '"app_id_matched":true'
+  '"app_id_matched":true' \
+  '"shm_buffer_commit_count":1' \
+  '"shm_buffer_width":320' \
+  '"shm_buffer_height":240' \
+  '"shm_buffer_pixels":76800' \
+  '"policy_window_mapped":true' \
+  '"policy_app_id_preserved":true' \
+  '"policy_focused_after_map":true' \
+  '"policy_geometry_preserved":true' \
+  '"policy_windows":1' \
+  '"policy_backend_surface_presented":true' \
+  '"policy_presented_pixels":76800'
 
 runtime_dir="${XDG_RUNTIME_DIR:-}"
 test -n "$runtime_dir" || fail "XDG_RUNTIME_DIR missing on launch-ready Linux host"
@@ -388,6 +405,8 @@ cat > "$out_dir/manifest.json" <<EOF
     "smithay_core_protocol_globals": true,
     "smithay_real_wayland_client": true,
     "smithay_real_wayland_metadata": true,
+    "smithay_real_shm_buffer": true,
+    "smithay_real_wayland_policy_window": true,
     "smithay_event_loop_runtime": true,
     "smithay_service_ready": true,
     "smithay_service_socket": true,
