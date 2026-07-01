@@ -315,6 +315,7 @@ host_session_replay_manifest="$host_out_dir/session-replay-manifest.json"
 host_drm_session_smoke_manifest="$host_out_dir/drm-session-smoke-manifest.json"
 host_drm_master_boundary_manifest="$host_out_dir/drm-master-boundary-manifest.json"
 host_dedicated_drm_session_manifest="$host_out_dir/dedicated-drm-session-manifest.json"
+host_dedicated_drm_handoff="$host_out_dir/dedicated-drm-handoff.sh"
 host_debian_package_build_manifest="$host_out_dir/debian-package-build-manifest.json"
 host_debian_package_install_manifest="$host_out_dir/debian-package-install-manifest.json"
 host_debian_package_install_replay_manifest="$host_out_dir/debian-package-install-session-replay-manifest.json"
@@ -342,6 +343,7 @@ rm -f \
   "$host_drm_session_smoke_manifest" \
   "$host_drm_master_boundary_manifest" \
   "$host_dedicated_drm_session_manifest" \
+  "$host_dedicated_drm_handoff" \
   "$host_debian_package_build_manifest" \
   "$host_debian_package_install_manifest" \
   "$host_debian_package_install_replay_manifest" \
@@ -368,6 +370,8 @@ download_file "$guest_e2e_dir/session-replay/manifest.json" "$host_session_repla
 download_file "$guest_e2e_dir/drm-session-smoke/manifest.json" "$host_drm_session_smoke_manifest"
 download_file "$guest_e2e_dir/drm-master-boundary/manifest.json" "$host_drm_master_boundary_manifest"
 download_file "$guest_e2e_dir/dedicated-drm-session/manifest.json" "$host_dedicated_drm_session_manifest"
+download_file "$guest_e2e_dir/dedicated-drm-session/dedicated-drm-handoff.sh" "$host_dedicated_drm_handoff"
+chmod +x "$host_dedicated_drm_handoff"
 download_file "$guest_e2e_dir/debian-package-build/manifest.json" "$host_debian_package_build_manifest"
 download_file "$guest_e2e_dir/debian-package-install/manifest.json" "$host_debian_package_install_manifest"
 download_file "$guest_e2e_dir/debian-package-install/session-replay/manifest.json" "$host_debian_package_install_replay_manifest"
@@ -464,6 +468,7 @@ require_contains "$host_guest_manifest" '"smithay_compositor_runtime": true'
 require_contains "$host_guest_manifest" '"drm_master_boundary": true'
 require_contains "$host_guest_manifest" '"drm_session_smoke": true'
 require_contains "$host_guest_manifest" '"dedicated_drm_session": true'
+require_contains "$host_guest_manifest" '"dedicated_drm_handoff": true'
 require_contains "$host_guest_manifest" '"nested_wayland": true'
 require_contains "$host_guest_manifest" '"mvp1_contract": true'
 require_contains "$host_gui_smoke_manifest" '"golden_checksum": true'
@@ -623,6 +628,13 @@ require_contains "$host_drm_master_boundary_manifest" '"dedicated_session_requir
 require_contains "$host_drm_master_boundary_manifest" '"current_session_can_present": false'
 require_contains "$host_drm_master_boundary_manifest" '"mutating_handoff_attempted": false'
 require_contains "$host_dedicated_drm_session_manifest" '"name": "backlit-dedicated-drm-session"'
+require_contains "$host_dedicated_drm_session_manifest" '"dedicated_handoff_plan": true'
+require_contains "$host_dedicated_drm_session_manifest" '"dedicated_handoff_script":'
+require_contains "$host_dedicated_drm_session_manifest" '"mutating_handoff_attempted": false'
+test -x "$host_dedicated_drm_handoff" || {
+  echo "Parallels E2E export verification failed: missing executable $host_dedicated_drm_handoff" >&2
+  exit 1
+}
 require_contains "$host_dedicated_drm_session_manifest" '"expected_blocked": true'
 require_contains "$host_dedicated_drm_session_manifest" '"reason": "drm-master-unavailable"'
 require_contains "$host_dedicated_drm_session_manifest" '"dedicated_session_acceptance": false'
@@ -709,6 +721,7 @@ cat > "$host_out_dir/manifest.json" <<EOF
     "drm_session_smoke_manifest": "$host_drm_session_smoke_manifest",
     "drm_master_boundary_manifest": "$host_drm_master_boundary_manifest",
     "dedicated_drm_session_manifest": "$host_dedicated_drm_session_manifest",
+    "dedicated_drm_handoff": "$host_dedicated_drm_handoff",
     "debian_package_build_manifest": "$host_debian_package_build_manifest",
     "debian_package_install_manifest": "$host_debian_package_install_manifest",
     "debian_package_install_replay_manifest": "$host_debian_package_install_replay_manifest",

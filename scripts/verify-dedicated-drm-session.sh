@@ -14,6 +14,7 @@ session_log="$out_dir/session.jsonl"
 session_err="$out_dir/session.stderr"
 session_screenshot="$out_dir/dedicated-session.ppm"
 service_log_dir="$out_dir/session-services"
+handoff_plan="$out_dir/dedicated-drm-handoff.sh"
 expected_checksum="15888844850457870477"
 expected_ppm_bytes="1248015"
 
@@ -36,6 +37,22 @@ bool_has() {
   else
     printf false
   fi
+}
+
+write_handoff_plan() {
+  cat > "$handoff_plan" <<'EOF'
+#!/usr/bin/env sh
+set -eu
+
+repo_root="$(git rev-parse --show-toplevel 2>/dev/null || pwd)"
+cd "$repo_root"
+
+out_dir="${1:-target/dedicated-drm-session-acceptance}"
+BACKLIT_REQUIRE_DEDICATED_DRM_SESSION=1 \
+BACKLIT_REQUIRE_DRM_MASTER_PRESENT=1 \
+  ./scripts/verify-dedicated-drm-session.sh "$out_dir"
+EOF
+  chmod +x "$handoff_plan"
 }
 
 write_manifest() {
@@ -71,9 +88,16 @@ write_manifest() {
     "session_log": "$session_log",
     "session_stderr": "$session_err",
     "session_screenshot": "$session_screenshot",
-    "session_services_dir": "$service_log_dir"
+    "session_services_dir": "$service_log_dir",
+    "dedicated_handoff_script": "$handoff_plan"
+  },
+  "handoff": {
+    "command": "BACKLIT_REQUIRE_DEDICATED_DRM_SESSION=1 BACKLIT_REQUIRE_DRM_MASTER_PRESENT=1 ./scripts/verify-dedicated-drm-session.sh target/dedicated-drm-session-acceptance",
+    "requires": "seat-owner-tty-or-display-manager-session",
+    "mutating_handoff_attempted": false
   },
   "checks": {
+    "dedicated_handoff_plan": true,
     "dedicated_session_acceptance": $dedicated_session_acceptance,
     "drm_master_boundary": true,
     "drm_launch_ready": $drm_launch_ready,
@@ -104,6 +128,8 @@ if [ "${BACKLIT_REQUIRE_DEDICATED_DRM_SESSION:-0}" = "1" ] \
   || [ "${BACKLIT_REQUIRE_DRM_MASTER_PRESENT:-0}" = "1" ]; then
   require_dedicated_session=true
 fi
+
+write_handoff_plan
 
 ./scripts/verify-drm-master-boundary.sh "$boundary_dir"
 

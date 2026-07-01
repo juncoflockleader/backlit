@@ -128,6 +128,7 @@ cat > "$out_dir/manifest.json" <<EOF
     "session_clean_exit_manifest": "$session_clean_exit_dir/manifest.json",
     "drm_session_smoke_manifest": "$drm_session_smoke_dir/manifest.json",
     "dedicated_drm_session_manifest": "$dedicated_drm_session_dir/manifest.json",
+    "dedicated_drm_handoff": "$dedicated_drm_session_dir/dedicated-drm-handoff.sh",
     "mvp0_contract_manifest": "$mvp0_contract_dir/manifest.json",
     "mvp1_contract_manifest": "$mvp1_contract_dir/manifest.json",
     "nested_wayland_manifest": "$nested_wayland_manifest"
@@ -166,6 +167,7 @@ cat > "$out_dir/manifest.json" <<EOF
     "session_clean_exit": true,
     "drm_session_smoke": true,
     "dedicated_drm_session": true,
+    "dedicated_drm_handoff": true,
     "mvp0_contract": true,
     "mvp1_contract": true,
     "nested_wayland": $nested_wayland

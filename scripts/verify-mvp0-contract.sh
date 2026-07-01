@@ -149,6 +149,7 @@ require_contains scripts/verify-drm-master-boundary.sh '"compositor_service_smit
 require_contains scripts/verify-drm-master-boundary.sh '"dedicated_session_model": "seat-owner-tty-or-display-manager-session"'
 require_contains scripts/verify-dedicated-drm-session.sh '"name": "backlit-dedicated-drm-session"'
 require_contains scripts/verify-dedicated-drm-session.sh '--require-drm-master-present'
+require_contains scripts/verify-dedicated-drm-session.sh '"dedicated_handoff_plan": true'
 require_contains scripts/verify-dedicated-drm-session.sh '"dedicated_session_acceptance": $dedicated_session_acceptance'
 require_contains scripts/verify-smithay-compositor-runtime.sh '--features smithay-backend'
 require_contains scripts/verify-smithay-compositor-runtime.sh '--runtime=smithay'
@@ -205,6 +206,7 @@ require_contains scripts/verify-linux-e2e.sh './scripts/verify-staged-session-in
 require_contains scripts/verify-linux-e2e.sh './scripts/verify-systemd-activation.sh'
 require_contains scripts/verify-linux-e2e.sh './scripts/verify-drm-session-smoke.sh'
 require_contains scripts/verify-linux-e2e.sh './scripts/verify-dedicated-drm-session.sh'
+require_contains scripts/verify-linux-e2e.sh '"dedicated_drm_handoff": true'
 require_contains scripts/verify-linux-e2e.sh './scripts/verify-session-replay.sh'
 require_contains scripts/verify-linux-e2e.sh './scripts/verify-session-clean-exit.sh'
 require_contains scripts/verify-linux-e2e.sh './scripts/verify-mvp1-contract.sh'
@@ -824,6 +826,9 @@ if [ -n "$artifact_root" ] && [ -d "$artifact_root" ]; then
 
   require_contains "$artifact_root/dedicated-drm-session/manifest.json" '"name": "backlit-dedicated-drm-session"'
   require_contains "$artifact_root/dedicated-drm-session/manifest.json" '"drm_master_boundary": true'
+  require_contains "$artifact_root/dedicated-drm-session/manifest.json" '"dedicated_handoff_plan": true'
+  require_contains "$artifact_root/dedicated-drm-session/manifest.json" '"dedicated_handoff_script":'
+  require_contains "$artifact_root/dedicated-drm-session/manifest.json" '"mutating_handoff_attempted": false'
   if grep '"expected_blocked": false' "$artifact_root/dedicated-drm-session/manifest.json" >/dev/null; then
     require_contains "$artifact_root/dedicated-drm-session/manifest.json" '"dedicated_session_acceptance": true'
     require_contains "$artifact_root/dedicated-drm-session/manifest.json" '"first_present_commit_succeeded": true'
