@@ -1595,11 +1595,11 @@ fn smithay_kms_runtime_probe(
                             probe.kms_framebuffer_added = true;
                             let framebuffer_handle = *framebuffer.as_ref();
                             let mut raw_buffer = *dumb_buffer.handle();
+                            let stride = raw_buffer.pitch() as usize;
+                            let visible_bytes_per_row = framebuffer_width as usize * 4;
+                            let row_count = framebuffer_height as usize;
                             match surface.device_fd().map_dumb_buffer(&mut raw_buffer) {
                                 Ok(mut mapping) => {
-                                    let stride = raw_buffer.pitch() as usize;
-                                    let visible_bytes_per_row = framebuffer_width as usize * 4;
-                                    let row_count = framebuffer_height as usize;
                                     let visible_len = stride
                                         .checked_mul(row_count.saturating_sub(1))
                                         .and_then(|base| base.checked_add(visible_bytes_per_row));
