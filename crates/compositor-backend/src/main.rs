@@ -3,8 +3,8 @@ use std::process;
 
 use backlit_common::metrics::{event_json, FieldValue};
 use backlit_compositor_backend::{
-    backend_launch_plan, preflight_backend_with_environment, BackendKind, BackendLaunchPlan,
-    BackendPreflightEnvironment,
+    backend_launch_plan, preflight_backend_with_environment, smithay_runtime_probe, BackendKind,
+    BackendLaunchPlan, BackendPreflightEnvironment, SmithayRuntimeProbe,
 };
 
 fn main() {
@@ -133,6 +133,16 @@ fn run() -> Result<(), String> {
     );
     emit_launch_plan(&launch_plan);
 
+    if config.verify_smithay_runtime {
+        let probe = smithay_runtime_probe(&environment);
+        emit_smithay_runtime_probe(&probe);
+        if config.verify && report.ready && !probe.passed() {
+            return Err(String::from(
+                "DRM backend preflight is ready but Smithay runtime probe did not pass",
+            ));
+        }
+    }
+
     if config.verify && !report.ready {
         return Err(format!(
             "{} backend preflight failed: {}",
@@ -142,6 +152,59 @@ fn run() -> Result<(), String> {
     }
 
     Ok(())
+}
+
+fn emit_smithay_runtime_probe(probe: &SmithayRuntimeProbe) {
+    let primary_drm_card = probe.primary_drm_card.as_deref().unwrap_or("");
+    let primary_drm_render_node = probe.primary_drm_render_node.as_deref().unwrap_or("");
+    let primary_input_event = probe.primary_input_event.as_deref().unwrap_or("");
+    let components = probe.components.join(",");
+
+    println!(
+        "{}",
+        event_json(
+            "backend.smithay_runtime_probe",
+            &[
+                ("backend", FieldValue::Str(probe.backend.as_str())),
+                ("feature_enabled", FieldValue::Bool(probe.feature_enabled),),
+                ("compiled", FieldValue::Bool(probe.compiled)),
+                ("launch_ready", FieldValue::Bool(probe.launch_ready)),
+                ("passed", FieldValue::Bool(probe.passed())),
+                ("target_os", FieldValue::Str(probe.target_os.as_str())),
+                ("runtime_backend", FieldValue::Str(probe.runtime_backend),),
+                ("display_driver", FieldValue::Str(probe.display_driver)),
+                ("input_driver", FieldValue::Str(probe.input_driver)),
+                ("session_driver", FieldValue::Str(probe.session_driver)),
+                ("event_loop", FieldValue::Str(probe.event_loop)),
+                (
+                    "drm_card_selected",
+                    FieldValue::Bool(probe.drm_card_selected),
+                ),
+                (
+                    "drm_render_selected",
+                    FieldValue::Bool(probe.drm_render_selected),
+                ),
+                (
+                    "input_event_selected",
+                    FieldValue::Bool(probe.input_event_selected),
+                ),
+                ("uses_logind", FieldValue::Bool(probe.uses_logind)),
+                ("uses_libseat", FieldValue::Bool(probe.uses_libseat)),
+                ("uses_libinput", FieldValue::Bool(probe.uses_libinput)),
+                ("primary_drm_card", FieldValue::Str(primary_drm_card)),
+                (
+                    "primary_drm_render_node",
+                    FieldValue::Str(primary_drm_render_node),
+                ),
+                ("primary_input_event", FieldValue::Str(primary_input_event)),
+                (
+                    "component_count",
+                    FieldValue::U64(probe.components.len() as u64),
+                ),
+                ("components", FieldValue::Str(components.as_str())),
+            ],
+        )
+    );
 }
 
 fn emit_launch_plan(plan: &BackendLaunchPlan) {
@@ -201,6 +264,7 @@ fn emit_launch_plan(plan: &BackendLaunchPlan) {
 struct Config {
     backend: BackendKind,
     verify: bool,
+    verify_smithay_runtime: bool,
     help: bool,
 }
 
@@ -209,6 +273,7 @@ impl Default for Config {
         Self {
             backend: BackendKind::Headless,
             verify: false,
+            verify_smithay_runtime: false,
             help: false,
         }
     }
@@ -228,6 +293,8 @@ impl Config {
                 config.help = true;
             } else if arg == "--verify" {
                 config.verify = true;
+            } else if arg == "--verify-smithay-runtime" {
+                config.verify_smithay_runtime = true;
             } else if let Some(value) = arg.strip_prefix("--backend=") {
                 config.backend = parse_backend(value)?;
             } else if arg == "--backend" {
@@ -256,11 +323,13 @@ fn print_help() {
 backlit-compositor-backend
 
 Usage:
-  backlit-compositor-backend [--backend=headless|wayland|drm] [--verify]
+  backlit-compositor-backend [--backend=headless|wayland|drm] [--verify] [--verify-smithay-runtime]
 
 Flags:
   --backend  Backend to preflight. Defaults to headless.
   --verify   Exit non-zero when the requested backend is not ready.
+  --verify-smithay-runtime
+             Emit a Smithay DRM/libinput/libseat/calloop runtime probe event.
 
 The JSON event includes runtime, DRM, input, and session hints used by
 launch-readiness verification.

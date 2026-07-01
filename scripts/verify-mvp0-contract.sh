@@ -53,6 +53,7 @@ require_executable scripts/verify-debian-package-build.sh
 require_executable scripts/verify-debian-package-install.sh
 require_executable scripts/verify-debian-system-install.sh
 require_executable scripts/verify-staged-session-install.sh
+require_executable scripts/verify-smithay-runtime-probe.sh
 require_executable scripts/verify-nested-wayland-smoke.sh
 require_executable scripts/verify-session-replay.sh
 require_executable scripts/verify-session-clean-exit.sh
@@ -123,6 +124,10 @@ require_contains scripts/verify-compositor-runtime.sh '"runtime_backend_contract
 require_contains scripts/verify-compositor-runtime.sh '"runtime_backend": "headless-compositor"'
 require_contains scripts/verify-compositor-runtime.sh '"runtime_trait": true'
 require_contains scripts/verify-linux-e2e.sh './scripts/verify-compositor-socket.sh'
+require_contains scripts/verify-linux-e2e.sh './scripts/verify-smithay-runtime-probe.sh'
+require_contains scripts/verify-smithay-runtime-probe.sh '--features smithay-backend'
+require_contains scripts/verify-smithay-runtime-probe.sh '"smithay_dependency_compiled": true'
+require_contains scripts/verify-smithay-runtime-probe.sh '"smithay_runtime_probe": $smithay_runtime_probe'
 require_contains scripts/verify-compositor-socket.sh '"demo_client_socket_launch": true'
 require_contains scripts/verify-compositor-socket.sh '"demo_client_surface_mapped": true'
 require_contains scripts/verify-compositor-socket.sh '"demo_client_surface_damaged": true'
@@ -245,6 +250,7 @@ if [ -n "$artifact_root" ] && [ -d "$artifact_root" ]; then
   require_file "$artifact_root/debian-package-install/manifest.json"
   require_file "$artifact_root/debian-system-install/manifest.json"
   require_file "$artifact_root/staged-session-install/manifest.json"
+  require_file "$artifact_root/smithay-runtime-probe/manifest.json"
   require_file "$artifact_root/launch-readiness/manifest.json"
   require_file "$artifact_root/session-clean-exit/manifest.json"
   require_file "$artifact_root/drm-session-smoke/manifest.json"
@@ -326,6 +332,22 @@ if [ -n "$artifact_root" ] && [ -d "$artifact_root" ]; then
   require_contains "$artifact_root/compositor-runtime/manifest.json" '"surface_close_damage": true'
   require_contains "$artifact_root/compositor-runtime/manifest.json" '"client_disconnect_cleanup": true'
   require_contains "$artifact_root/compositor-runtime/manifest.json" '"service_mode_runtime": true'
+  require_contains "$artifact_root/smithay-runtime-probe/manifest.json" '"name": "backlit-smithay-runtime-probe"'
+  if grep '"checked": true' "$artifact_root/smithay-runtime-probe/manifest.json" >/dev/null; then
+    require_contains "$artifact_root/smithay-runtime-probe/manifest.json" '"smithay_dependency_compiled": true'
+    require_contains "$artifact_root/smithay-runtime-probe/manifest.json" '"smithay_backend_feature": true'
+    require_contains "$artifact_root/smithay-runtime-probe/manifest.json" '"smithay_drm_component": true'
+    require_contains "$artifact_root/smithay-runtime-probe/manifest.json" '"smithay_libinput_component": true'
+    require_contains "$artifact_root/smithay-runtime-probe/manifest.json" '"smithay_libseat_session_component": true'
+    require_contains "$artifact_root/smithay-runtime-probe/manifest.json" '"smithay_calloop_component": true'
+    if grep '"drm_launch_ready": true' "$artifact_root/smithay-runtime-probe/manifest.json" >/dev/null; then
+      require_contains "$artifact_root/smithay-runtime-probe/manifest.json" '"smithay_runtime_probe": true'
+    else
+      require_contains "$artifact_root/smithay-runtime-probe/manifest.json" '"expected_blocked": true'
+    fi
+  else
+    require_contains "$artifact_root/smithay-runtime-probe/manifest.json" '"expected_blocked": true'
+  fi
   if grep '"session_socket_bound": true' "$artifact_root/compositor-socket/manifest.json" >/dev/null; then
     require_contains "$artifact_root/compositor-socket/manifest.json" '"socket_accepts_client_connection": true'
     require_contains "$artifact_root/compositor-socket/manifest.json" '"demo_client_socket_launch": true'
@@ -558,6 +580,7 @@ cat > "$out_dir/manifest.json" <<EOF
     "resource_budget": true,
     "compositor_runtime": true,
     "compositor_runtime_trait": true,
+    "smithay_runtime_probe": true,
     "compositor_socket": true,
     "compositor_service_ready": true,
     "notification_daemon": true,

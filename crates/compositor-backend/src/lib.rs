@@ -323,6 +323,121 @@ pub struct BackendLaunchPlan {
     pub session_type: Option<String>,
 }
 
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct SmithayRuntimeProbe {
+    pub feature_enabled: bool,
+    pub compiled: bool,
+    pub launch_ready: bool,
+    pub target_os: String,
+    pub backend: BackendKind,
+    pub runtime_backend: &'static str,
+    pub display_driver: &'static str,
+    pub input_driver: &'static str,
+    pub session_driver: &'static str,
+    pub event_loop: &'static str,
+    pub drm_card_selected: bool,
+    pub drm_render_selected: bool,
+    pub input_event_selected: bool,
+    pub uses_logind: bool,
+    pub uses_libseat: bool,
+    pub uses_libinput: bool,
+    pub primary_drm_card: Option<String>,
+    pub primary_drm_render_node: Option<String>,
+    pub primary_input_event: Option<String>,
+    pub components: Vec<&'static str>,
+}
+
+impl SmithayRuntimeProbe {
+    pub fn passed(&self) -> bool {
+        self.feature_enabled
+            && self.compiled
+            && self.launch_ready
+            && self.backend == BackendKind::Drm
+            && self.runtime_backend == "smithay-drm-probe"
+            && self.display_driver == "smithay-drm-kms"
+            && self.input_driver == "smithay-libinput"
+            && self.session_driver == "smithay-libseat-logind"
+            && self.event_loop == "calloop"
+            && self.drm_card_selected
+            && self.input_event_selected
+            && self.uses_logind
+            && self.uses_libseat
+            && self.uses_libinput
+    }
+}
+
+pub fn smithay_runtime_probe(environment: &BackendPreflightEnvironment) -> SmithayRuntimeProbe {
+    let feature_enabled = cfg!(feature = "smithay-backend");
+    let compiled = cfg!(all(feature = "smithay-backend", target_os = "linux"));
+    let launch_ready = compiled
+        && environment.target_os == "linux"
+        && environment.drm_card_access_ready()
+        && environment.input_broker_ready()
+        && environment.primary_drm_card.is_some()
+        && environment.primary_input_event.is_some();
+
+    SmithayRuntimeProbe {
+        feature_enabled,
+        compiled,
+        launch_ready,
+        target_os: environment.target_os.clone(),
+        backend: BackendKind::Drm,
+        runtime_backend: if compiled {
+            "smithay-drm-probe"
+        } else {
+            "smithay-uncompiled"
+        },
+        display_driver: if compiled {
+            "smithay-drm-kms"
+        } else {
+            "unavailable"
+        },
+        input_driver: if compiled {
+            "smithay-libinput"
+        } else {
+            "unavailable"
+        },
+        session_driver: if compiled {
+            "smithay-libseat-logind"
+        } else {
+            "unavailable"
+        },
+        event_loop: if compiled { "calloop" } else { "unavailable" },
+        drm_card_selected: environment.primary_drm_card.is_some(),
+        drm_render_selected: environment.primary_drm_render_node.is_some(),
+        input_event_selected: environment.primary_input_event.is_some(),
+        uses_logind: environment.logind_session_verified || environment.logind_available,
+        uses_libseat: environment.input_broker_mode() == "logind-libseat",
+        uses_libinput: environment.input_broker_ready(),
+        primary_drm_card: environment.primary_drm_card.clone(),
+        primary_drm_render_node: environment.primary_drm_render_node.clone(),
+        primary_input_event: environment.primary_input_event.clone(),
+        components: smithay_runtime_components(),
+    }
+}
+
+#[cfg(all(feature = "smithay-backend", target_os = "linux"))]
+fn smithay_runtime_components() -> Vec<&'static str> {
+    let _ = std::any::type_name::<smithay::backend::drm::DrmNode>();
+    let _ = std::any::type_name::<smithay::backend::libinput::LibinputInputBackend>();
+    let _ = std::any::type_name::<smithay::backend::session::Event>();
+    let _ = std::any::type_name::<smithay::reexports::calloop::LoopSignal>();
+    let _ = std::any::type_name::<smithay::reexports::wayland_server::DisplayHandle>();
+
+    vec![
+        "smithay::backend::drm",
+        "smithay::backend::libinput",
+        "smithay::backend::session",
+        "smithay::reexports::calloop",
+        "smithay::reexports::wayland_server",
+    ]
+}
+
+#[cfg(not(all(feature = "smithay-backend", target_os = "linux")))]
+fn smithay_runtime_components() -> Vec<&'static str> {
+    Vec::new()
+}
+
 pub fn backend_launch_plan(
     backend: BackendKind,
     report: &BackendPreflightReport,
@@ -1588,6 +1703,40 @@ mod tests {
             .unwrap_err();
 
         assert_eq!(error.to_string(), "unknown headless client 99");
+    }
+
+    #[test]
+    fn smithay_runtime_probe_tracks_feature_and_launch_environment() {
+        let environment = BackendPreflightEnvironment::for_target("linux")
+            .with_xdg_runtime_dir("/run/user/1000")
+            .with_drm_nodes(1, 1)
+            .with_drm_card_access(1, 1)
+            .with_drm_render_access(1, 1)
+            .with_input_event_nodes(1)
+            .with_input_event_access(0)
+            .with_primary_drm_card("/dev/dri/card0")
+            .with_primary_drm_render_node("/dev/dri/renderD128")
+            .with_primary_input_event("/dev/input/event0")
+            .with_seat_broker_tools(true, true, true)
+            .with_active_local_session("3", "seat0", "wayland");
+        let probe = super::smithay_runtime_probe(&environment);
+
+        assert_eq!(probe.feature_enabled, cfg!(feature = "smithay-backend"));
+        if cfg!(all(feature = "smithay-backend", target_os = "linux")) {
+            assert!(probe.compiled, "{probe:?}");
+            assert!(probe.launch_ready, "{probe:?}");
+            assert!(probe.passed(), "{probe:?}");
+            assert_eq!(probe.runtime_backend, "smithay-drm-probe");
+            assert_eq!(probe.display_driver, "smithay-drm-kms");
+            assert_eq!(probe.input_driver, "smithay-libinput");
+            assert_eq!(probe.session_driver, "smithay-libseat-logind");
+            assert_eq!(probe.event_loop, "calloop");
+            assert_eq!(probe.components.len(), 5);
+        } else {
+            assert!(!probe.compiled, "{probe:?}");
+            assert!(!probe.passed(), "{probe:?}");
+            assert!(probe.components.is_empty());
+        }
     }
 
     #[test]

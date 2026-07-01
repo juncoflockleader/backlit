@@ -26,6 +26,7 @@ debian_package_install_dir="$out_dir/debian-package-install"
 debian_system_install_dir="$out_dir/debian-system-install"
 staged_install_dir="$out_dir/staged-session-install"
 systemd_activation_dir="$out_dir/systemd-activation"
+smithay_runtime_probe_dir="$out_dir/smithay-runtime-probe"
 launch_readiness_dir="$out_dir/launch-readiness"
 session_launch_dir="$out_dir/session-launch"
 session_replay_dir="$out_dir/session-replay"
@@ -64,6 +65,7 @@ cargo clippy --workspace --all-targets -- -D warnings
 ./scripts/verify-debian-system-install.sh "$debian_system_install_dir" "$debian_package_build_dir"
 ./scripts/verify-staged-session-install.sh "$staged_install_dir"
 ./scripts/verify-systemd-activation.sh "$systemd_activation_dir"
+./scripts/verify-smithay-runtime-probe.sh "$smithay_runtime_probe_dir"
 ./scripts/verify-launch-readiness.sh "$launch_readiness_dir"
 ./scripts/verify-session-launch.sh "$session_launch_dir"
 ./scripts/verify-session-replay.sh "$session_replay_dir"
@@ -111,6 +113,7 @@ cat > "$out_dir/manifest.json" <<EOF
     "debian_system_install_manifest": "$debian_system_install_dir/manifest.json",
     "staged_session_install_manifest": "$staged_install_dir/manifest.json",
     "systemd_activation_manifest": "$systemd_activation_dir/manifest.json",
+    "smithay_runtime_probe_manifest": "$smithay_runtime_probe_dir/manifest.json",
     "launch_readiness_manifest": "$launch_readiness_dir/manifest.json",
     "session_launch_manifest": "$session_launch_dir/manifest.json",
     "session_replay_manifest": "$session_replay_dir/manifest.json",
@@ -145,6 +148,7 @@ cat > "$out_dir/manifest.json" <<EOF
     "debian_system_install": true,
     "staged_session_install": true,
     "systemd_activation": true,
+    "smithay_runtime_probe": true,
     "launch_readiness": true,
     "session_launch": true,
     "session_replay": true,

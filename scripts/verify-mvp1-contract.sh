@@ -39,6 +39,7 @@ require_executable scripts/verify-debian-package-install.sh
 require_executable scripts/verify-debian-system-install.sh
 require_executable scripts/verify-launch-performance.sh
 require_executable scripts/verify-resource-budget.sh
+require_executable scripts/verify-smithay-runtime-probe.sh
 require_executable scripts/verify-linux-e2e.sh
 
 require_contains docs/architecture/mvp-1.md 'MVP 1 is the bare graphical session'
@@ -90,6 +91,10 @@ require_contains scripts/verify-launcher-desktop-discovery.sh '"fixture_desktop_
 require_contains scripts/verify-compositor-runtime.sh '"runtime_backend_contract": true'
 require_contains scripts/verify-compositor-runtime.sh '"runtime_backend": "headless-compositor"'
 require_contains scripts/verify-compositor-runtime.sh '"runtime_trait": true'
+require_contains scripts/verify-smithay-runtime-probe.sh '--features smithay-backend'
+require_contains scripts/verify-smithay-runtime-probe.sh '"smithay_dependency_compiled": true'
+require_contains scripts/verify-smithay-runtime-probe.sh '"smithay_runtime_probe": $smithay_runtime_probe'
+require_contains scripts/verify-linux-e2e.sh './scripts/verify-smithay-runtime-probe.sh'
 require_contains scripts/verify-linux-e2e.sh './scripts/verify-drm-session-smoke.sh'
 require_contains scripts/verify-linux-e2e.sh './scripts/verify-mvp1-contract.sh'
 
@@ -100,6 +105,7 @@ debian_package_install_replay_artifact=false
 debian_system_install_replay_artifact=false
 nested_wayland_artifact=false
 compositor_socket_artifact=false
+smithay_runtime_probe_artifact=false
 
 if [ -n "$artifact_root" ] && [ -d "$artifact_root" ]; then
   artifact_manifests_checked=true
@@ -112,6 +118,7 @@ if [ -n "$artifact_root" ] && [ -d "$artifact_root" ]; then
   require_file "$artifact_root/resource-budget/manifest.json"
   require_file "$artifact_root/compositor-runtime/manifest.json"
   require_file "$artifact_root/compositor-socket/manifest.json"
+  require_file "$artifact_root/smithay-runtime-probe/manifest.json"
   require_file "$artifact_root/launcher-desktop-discovery/manifest.json"
   require_file "$artifact_root/debian-package-install/manifest.json"
   require_file "$artifact_root/debian-system-install/manifest.json"
@@ -212,6 +219,23 @@ if [ -n "$artifact_root" ] && [ -d "$artifact_root" ]; then
   require_contains "$artifact_root/compositor-runtime/manifest.json" '"surface_policy_preview": true'
   require_contains "$artifact_root/compositor-runtime/manifest.json" '"targeted_surface_damage": true'
   require_contains "$artifact_root/compositor-runtime/manifest.json" '"client_disconnect_cleanup": true'
+  require_contains "$artifact_root/smithay-runtime-probe/manifest.json" '"name": "backlit-smithay-runtime-probe"'
+  if grep '"checked": true' "$artifact_root/smithay-runtime-probe/manifest.json" >/dev/null; then
+    require_contains "$artifact_root/smithay-runtime-probe/manifest.json" '"smithay_dependency_compiled": true'
+    require_contains "$artifact_root/smithay-runtime-probe/manifest.json" '"smithay_backend_feature": true'
+    require_contains "$artifact_root/smithay-runtime-probe/manifest.json" '"smithay_drm_component": true'
+    require_contains "$artifact_root/smithay-runtime-probe/manifest.json" '"smithay_libinput_component": true'
+    require_contains "$artifact_root/smithay-runtime-probe/manifest.json" '"smithay_libseat_session_component": true'
+    require_contains "$artifact_root/smithay-runtime-probe/manifest.json" '"smithay_calloop_component": true'
+    if grep '"drm_launch_ready": true' "$artifact_root/smithay-runtime-probe/manifest.json" >/dev/null; then
+      require_contains "$artifact_root/smithay-runtime-probe/manifest.json" '"smithay_runtime_probe": true'
+      smithay_runtime_probe_artifact=true
+    else
+      require_contains "$artifact_root/smithay-runtime-probe/manifest.json" '"expected_blocked": true'
+    fi
+  else
+    require_contains "$artifact_root/smithay-runtime-probe/manifest.json" '"expected_blocked": true'
+  fi
   require_contains "$artifact_root/launcher-desktop-discovery/manifest.json" '"fixture_desktop_discovery": true'
   require_contains "$artifact_root/launcher-desktop-discovery/manifest.json" '"fixture_desktop_spawn": true'
   require_contains "$artifact_root/launcher-desktop-discovery/manifest.json" '"fixture_desktop_exec_args": 2'
@@ -281,6 +305,8 @@ cat > "$manifest" <<EOF
     "package_install_contract": true,
     "resource_budget_contract": true,
     "compositor_runtime_trait_contract": true,
+    "smithay_runtime_probe_contract": true,
+    "smithay_runtime_probe_artifact": $smithay_runtime_probe_artifact,
     "compositor_socket_contract": true,
     "compositor_socket_artifact": $compositor_socket_artifact,
     "drm_launch_ready_artifact": $drm_launch_ready_artifact,

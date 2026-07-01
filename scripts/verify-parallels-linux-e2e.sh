@@ -290,6 +290,7 @@ host_gui_smoke_manifest="$host_out_dir/gui-smoke-manifest.json"
 host_gui_preview_manifest="$host_out_dir/gui-preview-manifest.json"
 host_compositor_runtime_manifest="$host_out_dir/compositor-runtime-manifest.json"
 host_compositor_socket_manifest="$host_out_dir/compositor-socket-manifest.json"
+host_smithay_runtime_probe_manifest="$host_out_dir/smithay-runtime-probe-manifest.json"
 host_launch_readiness_manifest="$host_out_dir/launch-readiness-manifest.json"
 host_session_replay_manifest="$host_out_dir/session-replay-manifest.json"
 host_drm_session_smoke_manifest="$host_out_dir/drm-session-smoke-manifest.json"
@@ -313,6 +314,7 @@ rm -f \
   "$host_gui_preview_manifest" \
   "$host_compositor_runtime_manifest" \
   "$host_compositor_socket_manifest" \
+  "$host_smithay_runtime_probe_manifest" \
   "$host_launch_readiness_manifest" \
   "$host_session_replay_manifest" \
   "$host_drm_session_smoke_manifest" \
@@ -335,6 +337,7 @@ download_file "$guest_e2e_dir/gui-smoke/manifest.json" "$host_gui_smoke_manifest
 download_file "$guest_e2e_dir/gui-preview/manifest.json" "$host_gui_preview_manifest"
 download_file "$guest_e2e_dir/compositor-runtime/manifest.json" "$host_compositor_runtime_manifest"
 download_file "$guest_e2e_dir/compositor-socket/manifest.json" "$host_compositor_socket_manifest"
+download_file "$guest_e2e_dir/smithay-runtime-probe/manifest.json" "$host_smithay_runtime_probe_manifest"
 download_file "$guest_e2e_dir/launch-readiness/manifest.json" "$host_launch_readiness_manifest"
 download_file "$guest_e2e_dir/session-replay/manifest.json" "$host_session_replay_manifest"
 download_file "$guest_e2e_dir/drm-session-smoke/manifest.json" "$host_drm_session_smoke_manifest"
@@ -450,6 +453,14 @@ require_contains "$host_compositor_socket_manifest" '"socket_accepts_client_conn
 require_contains "$host_compositor_socket_manifest" '"demo_client_socket_launch": true'
 require_contains "$host_compositor_socket_manifest" '"demo_client_surface_mapped": true'
 require_contains "$host_compositor_socket_manifest" '"session_socket_cleanup": true'
+require_contains "$host_smithay_runtime_probe_manifest" '"smithay_dependency_compiled": true'
+require_contains "$host_smithay_runtime_probe_manifest" '"smithay_backend_feature": true'
+require_contains "$host_smithay_runtime_probe_manifest" '"smithay_drm_component": true'
+require_contains "$host_smithay_runtime_probe_manifest" '"smithay_libinput_component": true'
+require_contains "$host_smithay_runtime_probe_manifest" '"smithay_libseat_session_component": true'
+require_contains "$host_smithay_runtime_probe_manifest" '"smithay_calloop_component": true'
+require_contains "$host_smithay_runtime_probe_manifest" '"drm_launch_ready": true'
+require_contains "$host_smithay_runtime_probe_manifest" '"smithay_runtime_probe": true'
 require_contains "$host_session_replay_manifest" '"session_replay_event": true'
 require_contains "$host_session_replay_manifest" '"frame_count": 9'
 require_contains "$host_session_replay_manifest" '"launcher_overlay_frame": true'
@@ -525,6 +536,7 @@ cat > "$host_out_dir/manifest.json" <<EOF
     "gui_preview_manifest": "$host_gui_preview_manifest",
     "compositor_runtime_manifest": "$host_compositor_runtime_manifest",
     "compositor_socket_manifest": "$host_compositor_socket_manifest",
+    "smithay_runtime_probe_manifest": "$host_smithay_runtime_probe_manifest",
     "launch_readiness_manifest": "$host_launch_readiness_manifest",
     "session_replay_manifest": "$host_session_replay_manifest",
     "drm_session_smoke_manifest": "$host_drm_session_smoke_manifest",
@@ -552,6 +564,7 @@ cat > "$host_out_dir/manifest.json" <<EOF
     "compositor_runtime": true,
     "compositor_runtime_policy_preview": true,
     "compositor_socket": true,
+    "smithay_runtime_probe": true,
     "launch_readiness": true,
     "drm_launch_plan": true,
     "session_replay": true,
