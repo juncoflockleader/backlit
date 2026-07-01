@@ -404,6 +404,10 @@ fn emit_smithay_runtime_probe(probe: &SmithayRuntimeProbe) {
                     FieldValue::Bool(probe.kms_framebuffer_test_state_succeeded),
                 ),
                 (
+                    "kms_framebuffer_test_state_permission_denied",
+                    FieldValue::Bool(probe.kms_framebuffer_test_state_permission_denied),
+                ),
+                (
                     "kms_framebuffer_test_allow_modeset",
                     FieldValue::Bool(probe.kms_framebuffer_test_allow_modeset),
                 ),

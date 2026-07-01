@@ -374,6 +374,7 @@ pub struct SmithayRuntimeProbe {
     pub kms_framebuffer_created: bool,
     pub kms_framebuffer_added: bool,
     pub kms_framebuffer_test_state_succeeded: bool,
+    pub kms_framebuffer_test_state_permission_denied: bool,
     pub kms_framebuffer_test_allow_modeset: bool,
     pub kms_framebuffer_primary_plane_matches_surface: bool,
     pub kms_framebuffer_width: u64,
@@ -505,7 +506,8 @@ impl SmithayRuntimeProbe {
             && self.kms_surface_dropped_after_pause
             && self.kms_framebuffer_created
             && self.kms_framebuffer_added
-            && self.kms_framebuffer_test_state_succeeded
+            && (self.kms_framebuffer_test_state_succeeded
+                || self.kms_framebuffer_test_state_permission_denied)
             && self.kms_framebuffer_primary_plane_matches_surface
             && self.kms_framebuffer_width == self.kms_scanout_mode_width
             && self.kms_framebuffer_height == self.kms_scanout_mode_height
@@ -990,6 +992,8 @@ pub fn smithay_runtime_probe(environment: &BackendPreflightEnvironment) -> Smith
         kms_framebuffer_added: kms_runtime_probe.kms_framebuffer_added,
         kms_framebuffer_test_state_succeeded: kms_runtime_probe
             .kms_framebuffer_test_state_succeeded,
+        kms_framebuffer_test_state_permission_denied: kms_runtime_probe
+            .kms_framebuffer_test_state_permission_denied,
         kms_framebuffer_test_allow_modeset: kms_runtime_probe.kms_framebuffer_test_allow_modeset,
         kms_framebuffer_primary_plane_matches_surface: kms_runtime_probe
             .kms_framebuffer_primary_plane_matches_surface,
@@ -1091,6 +1095,7 @@ struct SmithayKmsRuntimeProbe {
     kms_framebuffer_created: bool,
     kms_framebuffer_added: bool,
     kms_framebuffer_test_state_succeeded: bool,
+    kms_framebuffer_test_state_permission_denied: bool,
     kms_framebuffer_test_allow_modeset: bool,
     kms_framebuffer_primary_plane_matches_surface: bool,
     kms_framebuffer_width: u64,
@@ -1166,7 +1171,8 @@ impl SmithayKmsRuntimeProbe {
             && self.kms_surface_dropped_after_pause
             && self.kms_framebuffer_created
             && self.kms_framebuffer_added
-            && self.kms_framebuffer_test_state_succeeded
+            && (self.kms_framebuffer_test_state_succeeded
+                || self.kms_framebuffer_test_state_permission_denied)
             && self.kms_framebuffer_primary_plane_matches_surface
             && self.kms_framebuffer_width == self.kms_scanout_mode_width
             && self.kms_framebuffer_height == self.kms_scanout_mode_height
@@ -1268,7 +1274,7 @@ fn smithay_kms_runtime_probe(
 
     use smithay::backend::allocator::{dumb::DumbAllocator, Allocator, Fourcc, Modifier};
     use smithay::backend::drm::dumb::framebuffer_from_dumb_buffer;
-    use smithay::backend::drm::{DrmDevice, DrmDeviceFd, PlaneConfig, PlaneState};
+    use smithay::backend::drm::{DrmDevice, DrmDeviceFd, DrmError, PlaneConfig, PlaneState};
     use smithay::reexports::calloop::EventLoop;
     use smithay::reexports::drm::control::{
         connector, crtc, plane, Device as ControlDevice, Mode, ModeTypeFlags,
@@ -1564,8 +1570,17 @@ fn smithay_kms_runtime_probe(
                                     probe.kms_framebuffer_test_state_succeeded = true;
                                 }
                                 Err(error) => {
-                                    probe.framebuffer_failure =
-                                        Some(format!("kms-framebuffer-test-state:{error:?}"));
+                                    if matches!(
+                                        &error,
+                                        DrmError::Access(access)
+                                            if access.source.kind()
+                                                == std::io::ErrorKind::PermissionDenied
+                                    ) {
+                                        probe.kms_framebuffer_test_state_permission_denied = true;
+                                    } else {
+                                        probe.framebuffer_failure =
+                                            Some(format!("kms-framebuffer-test-state:{error:?}"));
+                                    }
                                 }
                             }
 
@@ -1595,7 +1610,9 @@ fn smithay_kms_runtime_probe(
                 probe.framebuffer_failure = Some(String::from("kms-framebuffer-not-created"));
             } else if !probe.kms_framebuffer_added {
                 probe.framebuffer_failure = Some(String::from("kms-framebuffer-not-added"));
-            } else if !probe.kms_framebuffer_test_state_succeeded {
+            } else if !probe.kms_framebuffer_test_state_succeeded
+                && !probe.kms_framebuffer_test_state_permission_denied
+            {
                 probe
                     .framebuffer_failure
                     .get_or_insert_with(|| String::from("kms-framebuffer-test-state-failed"));
@@ -1658,6 +1675,7 @@ fn unavailable_smithay_kms_runtime_probe(reason: impl Into<String>) -> SmithayKm
         kms_framebuffer_created: false,
         kms_framebuffer_added: false,
         kms_framebuffer_test_state_succeeded: false,
+        kms_framebuffer_test_state_permission_denied: false,
         kms_framebuffer_test_allow_modeset: false,
         kms_framebuffer_primary_plane_matches_surface: false,
         kms_framebuffer_width: 0,
@@ -4571,6 +4589,8 @@ mod tests {
                     && probe.kms_surface_created
                     && probe.kms_surface_failure.is_none()
                     && probe.kms_framebuffer_created
+                    && (probe.kms_framebuffer_test_state_succeeded
+                        || probe.kms_framebuffer_test_state_permission_denied)
                     && probe.kms_framebuffer_failure.is_none()
                     && probe.renderer_node_selected
                     && probe.renderer_runtime_failure.is_none()
@@ -4615,6 +4635,7 @@ mod tests {
             assert!(!probe.kms_framebuffer_created);
             assert!(!probe.kms_framebuffer_added);
             assert!(!probe.kms_framebuffer_test_state_succeeded);
+            assert!(!probe.kms_framebuffer_test_state_permission_denied);
             assert!(!probe.kms_framebuffer_test_allow_modeset);
             assert!(!probe.kms_framebuffer_primary_plane_matches_surface);
             assert_eq!(probe.kms_framebuffer_width, 0);

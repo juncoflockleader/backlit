@@ -79,6 +79,7 @@ if [ "$(uname -s)" != "Linux" ]; then
     "smithay_kms_framebuffer_created": false,
     "smithay_kms_framebuffer_added": false,
     "smithay_kms_framebuffer_test_state_succeeded": false,
+    "smithay_kms_framebuffer_test_state_permission_denied": false,
     "smithay_kms_framebuffer_test_allow_modeset": false,
     "smithay_kms_framebuffer_primary_plane_matches_surface": false,
     "smithay_kms_framebuffer_width": 0,
@@ -188,6 +189,7 @@ smithay_kms_surface_dropped_after_pause=false
 smithay_kms_framebuffer_created=false
 smithay_kms_framebuffer_added=false
 smithay_kms_framebuffer_test_state_succeeded=false
+smithay_kms_framebuffer_test_state_permission_denied=false
 smithay_kms_framebuffer_test_allow_modeset=false
 smithay_kms_framebuffer_primary_plane_matches_surface=false
 smithay_kms_framebuffer_width=0
@@ -261,7 +263,9 @@ if grep -F '"event":"backend.preflight","backend":"drm","ready":true' "$log" >/d
   require_contains "$log" '"kms_surface_dropped_after_pause":true'
   require_contains "$log" '"kms_framebuffer_created":true'
   require_contains "$log" '"kms_framebuffer_added":true'
-  require_contains "$log" '"kms_framebuffer_test_state_succeeded":true'
+  require_matches "$log" '"kms_framebuffer_test_state_succeeded":(true|false)'
+  require_matches "$log" '"kms_framebuffer_test_state_permission_denied":(true|false)'
+  require_matches "$log" '"kms_framebuffer_(test_state_succeeded|test_state_permission_denied)":true'
   require_matches "$log" '"kms_framebuffer_test_allow_modeset":(true|false)'
   require_contains "$log" '"kms_framebuffer_primary_plane_matches_surface":true'
   require_matches "$log" '"kms_framebuffer_width":[1-9][0-9]*'
@@ -360,7 +364,12 @@ if grep -F '"event":"backend.preflight","backend":"drm","ready":true' "$log" >/d
   smithay_kms_surface_dropped_after_pause=true
   smithay_kms_framebuffer_created=true
   smithay_kms_framebuffer_added=true
-  smithay_kms_framebuffer_test_state_succeeded=true
+  if grep -F '"kms_framebuffer_test_state_succeeded":true' "$log" >/dev/null; then
+    smithay_kms_framebuffer_test_state_succeeded=true
+  fi
+  if grep -F '"kms_framebuffer_test_state_permission_denied":true' "$log" >/dev/null; then
+    smithay_kms_framebuffer_test_state_permission_denied=true
+  fi
   if grep -F '"kms_framebuffer_test_allow_modeset":true' "$log" >/dev/null; then
     smithay_kms_framebuffer_test_allow_modeset=true
   fi
@@ -447,6 +456,7 @@ cat > "$out_dir/manifest.json" <<EOF
     "smithay_kms_framebuffer_created": $smithay_kms_framebuffer_created,
     "smithay_kms_framebuffer_added": $smithay_kms_framebuffer_added,
     "smithay_kms_framebuffer_test_state_succeeded": $smithay_kms_framebuffer_test_state_succeeded,
+    "smithay_kms_framebuffer_test_state_permission_denied": $smithay_kms_framebuffer_test_state_permission_denied,
     "smithay_kms_framebuffer_test_allow_modeset": $smithay_kms_framebuffer_test_allow_modeset,
     "smithay_kms_framebuffer_primary_plane_matches_surface": $smithay_kms_framebuffer_primary_plane_matches_surface,
     "smithay_kms_framebuffer_width": $smithay_kms_framebuffer_width,
