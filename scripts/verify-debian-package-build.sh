@@ -252,6 +252,7 @@ for verifier in \
   verify-drm-master-boundary.sh \
   verify-dedicated-drm-session.sh \
   verify-parallels-ubuntu-health.sh \
+  verify-parallels-post-repair-readiness.sh \
   verify-parallels-mvp-e2e.sh \
   verify-parallels-dedicated-drm-e2e.sh \
   verify-mvp-complete.sh \
@@ -304,6 +305,7 @@ require_deb_contains fastgui-dev-tools usr/lib/backlit/dev-tools/verify-session-
 require_deb_contains fastgui-dev-tools usr/lib/backlit/dev-tools/verify-drm-master-boundary.sh
 require_deb_contains fastgui-dev-tools usr/lib/backlit/dev-tools/verify-dedicated-drm-session.sh
 require_deb_contains fastgui-dev-tools usr/lib/backlit/dev-tools/verify-parallels-ubuntu-health.sh
+require_deb_contains fastgui-dev-tools usr/lib/backlit/dev-tools/verify-parallels-post-repair-readiness.sh
 require_deb_contains fastgui-dev-tools usr/lib/backlit/dev-tools/verify-parallels-mvp-e2e.sh
 require_deb_contains fastgui-dev-tools usr/lib/backlit/dev-tools/verify-parallels-dedicated-drm-e2e.sh
 require_deb_contains fastgui-dev-tools usr/lib/backlit/dev-tools/verify-mvp-complete.sh

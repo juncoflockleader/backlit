@@ -53,6 +53,7 @@ require_executable scripts/verify-smithay-compositor-runtime.sh
 require_executable scripts/verify-nested-wayland-smoke.sh
 require_executable scripts/verify-linux-e2e.sh
 require_executable scripts/verify-parallels-ubuntu-health.sh
+require_executable scripts/verify-parallels-post-repair-readiness.sh
 require_executable scripts/verify-parallels-mvp-e2e.sh
 require_executable scripts/verify-parallels-dedicated-drm-e2e.sh
 require_executable scripts/verify-mvp-complete.sh
@@ -164,6 +165,11 @@ require_contains scripts/verify-parallels-ubuntu-health.sh 'guest-root-read-only
 require_contains scripts/verify-parallels-ubuntu-health.sh 'verify-parallels-linux-e2e.sh'
 require_contains scripts/verify-parallels-ubuntu-health.sh 'verify-parallels-dedicated-drm-e2e.sh'
 require_contains scripts/verify-parallels-ubuntu-health.sh 'docs/runbooks/parallels-ubuntu-readonly.md'
+require_contains scripts/verify-parallels-post-repair-readiness.sh '"name": "backlit-parallels-post-repair-readiness"'
+require_contains scripts/verify-parallels-post-repair-readiness.sh '"ready_for_parallels_mvp_e2e": $(json_bool "$passed")'
+require_contains scripts/verify-parallels-post-repair-readiness.sh './scripts/verify-parallels-ubuntu-health.sh "$dir"'
+require_contains scripts/verify-parallels-post-repair-readiness.sh './scripts/verify-parallels-mvp-e2e.sh'
+require_contains scripts/verify-parallels-post-repair-readiness.sh 'docs/runbooks/parallels-ubuntu-readonly.md'
 require_contains scripts/verify-parallels-mvp-e2e.sh '"name": "backlit-parallels-mvp-e2e"'
 require_contains scripts/verify-parallels-mvp-e2e.sh '"source_tree_ready": $(json_bool "$source_tree_ready")'
 require_contains scripts/verify-parallels-mvp-e2e.sh './scripts/render-gui-preview.sh "$local_gui_dir"'
