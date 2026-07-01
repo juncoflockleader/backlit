@@ -65,6 +65,10 @@ write_blocked_manifest() {
 	    "demo_client_socket_launch": false,
 	    "demo_client_surface_mapped": false,
 	    "demo_client_app_id_preserved": false,
+	    "demo_client_surface_damaged": false,
+	    "demo_client_surface_closed": false,
+	    "demo_client_window_removed": false,
+	    "demo_client_disconnected": false,
 	    "bounded_service_exit": false,
     "session_socket_cleanup": false,
     "socket_permission_denied": true
@@ -119,6 +123,7 @@ XDG_RUNTIME_DIR="$runtime_dir" target/debug/backlit-demo-client \
 	  --connect-socket "$socket_name" \
 	  --connect-title socket-demo \
 	  --connect-app-id org.backlit.SocketDemo \
+	  --connect-lifecycle \
 	  --connect-only \
   --width 640 \
   --height 480 > "$demo_client_log"
@@ -140,6 +145,7 @@ require_contains "$compositor_log" "\"socket_path\":\"$socket_path\""
 require_contains "$compositor_log" '"event":"compositor.service_running"'
 require_contains "$compositor_log" '"event":"compositor.socket_client"'
 require_contains "$compositor_log" '"message_valid":true'
+require_contains "$compositor_log" '"action":"surface"'
 require_contains "$compositor_log" '"title":"socket-demo"'
 require_contains "$compositor_log" '"app_id":"org.backlit.SocketDemo"'
 require_contains "$compositor_log" '"width":640'
@@ -150,6 +156,17 @@ require_contains "$compositor_log" '"policy_app_id_preserved":true'
 require_contains "$compositor_log" '"policy_windows":1'
 require_contains "$compositor_log" '"visible_windows":1'
 require_contains "$compositor_log" '"focused_window":true'
+require_contains "$compositor_log" '"action":"damage"'
+require_contains "$compositor_log" '"backend_surface_damaged":true'
+require_contains "$compositor_log" '"damaged_surfaces":1'
+require_contains "$compositor_log" '"action":"close"'
+require_contains "$compositor_log" '"backend_surface_closed":true'
+require_contains "$compositor_log" '"policy_window_closed":true'
+require_contains "$compositor_log" '"client_disconnected":true'
+require_contains "$compositor_log" '"backend_clients":0'
+require_contains "$compositor_log" '"backend_surfaces":0'
+require_contains "$compositor_log" '"policy_windows":0'
+require_contains "$compositor_log" '"visible_windows":0'
 require_contains "$compositor_log" '"event":"compositor.socket_unbound"'
 require_contains "$compositor_log" '"removed":true'
 require_contains "$compositor_log" '"event":"compositor.service_exit"'
@@ -160,7 +177,9 @@ require_contains "$demo_client_log" '"title":"socket-demo"'
 require_contains "$demo_client_log" '"app_id":"org.backlit.SocketDemo"'
 require_contains "$demo_client_log" '"width":640'
 require_contains "$demo_client_log" '"height":480'
+require_contains "$demo_client_log" '"lifecycle":true'
 require_contains "$demo_client_log" '"connected":true'
+require_contains "$demo_client_log" '"messages_written":3'
 
 cat > "$out_dir/manifest.json" <<EOF
 {
@@ -183,6 +202,10 @@ cat > "$out_dir/manifest.json" <<EOF
 	    "demo_client_socket_launch": true,
 	    "demo_client_surface_mapped": true,
 	    "demo_client_app_id_preserved": true,
+	    "demo_client_surface_damaged": true,
+	    "demo_client_surface_closed": true,
+	    "demo_client_window_removed": true,
+	    "demo_client_disconnected": true,
 	    "bounded_service_exit": true,
     "session_socket_cleanup": true
   }

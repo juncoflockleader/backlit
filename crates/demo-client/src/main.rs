@@ -38,8 +38,10 @@ fn run() -> Result<(), String> {
                     ("app_id", FieldValue::Str(config.connect_app_id.as_str())),
                     ("width", FieldValue::U64(config.width as u64)),
                     ("height", FieldValue::U64(config.height as u64)),
+                    ("lifecycle", FieldValue::Bool(config.connect_lifecycle),),
                     ("connected", FieldValue::Bool(report.connected)),
                     ("bytes_written", FieldValue::U64(report.bytes_written)),
+                    ("messages_written", FieldValue::U64(report.messages_written),),
                 ],
             )
         );
@@ -102,6 +104,7 @@ struct SocketConnectReport {
     socket_path: String,
     connected: bool,
     bytes_written: u64,
+    messages_written: u64,
 }
 
 fn connect_to_compositor_socket(
@@ -111,13 +114,22 @@ fn connect_to_compositor_socket(
     let socket_path = resolve_socket_path(socket_name)?;
     let mut stream = UnixStream::connect(&socket_path)
         .map_err(|error| format!("failed to connect to {}: {error}", socket_path.display()))?;
-    let message = format!(
+    let surface_message = format!(
         "BACKLIT_DEMO_CLIENT surface title={} app_id={} width={} height={}\n",
         protocol_token(config.connect_title.as_str()),
         protocol_token(config.connect_app_id.as_str()),
         config.width.max(1),
         config.height.max(1),
     );
+    let message = if config.connect_lifecycle {
+        format!(
+            "{surface_message}BACKLIT_DEMO_CLIENT damage app_id={}\nBACKLIT_DEMO_CLIENT close app_id={}\n",
+            protocol_token(config.connect_app_id.as_str()),
+            protocol_token(config.connect_app_id.as_str()),
+        )
+    } else {
+        surface_message
+    };
     stream.write_all(message.as_bytes()).map_err(|error| {
         format!(
             "failed to write demo surface to {}: {error}",
@@ -129,6 +141,7 @@ fn connect_to_compositor_socket(
         socket_path: socket_path.display().to_string(),
         connected: true,
         bytes_written: message.len() as u64,
+        messages_written: message.lines().count() as u64,
     })
 }
 
@@ -170,6 +183,7 @@ struct Config {
     connect_socket: Option<String>,
     connect_title: String,
     connect_app_id: String,
+    connect_lifecycle: bool,
     connect_only: bool,
     help: bool,
 }
@@ -184,6 +198,7 @@ impl Default for Config {
             connect_socket: None,
             connect_title: String::from("demo-client"),
             connect_app_id: String::from("org.backlit.DemoClient"),
+            connect_lifecycle: false,
             connect_only: false,
             help: false,
         }
@@ -245,6 +260,8 @@ impl Config {
                     .ok_or_else(|| String::from("missing value for --connect-app-id"))?;
             } else if arg == "--connect-only" {
                 config.connect_only = true;
+            } else if arg == "--connect-lifecycle" {
+                config.connect_lifecycle = true;
             } else {
                 return Err(format!("unknown flag: {arg}"));
             }
@@ -266,7 +283,7 @@ fn print_help() {
 backlit-demo-client
 
 Usage:
-  backlit-demo-client [--output=target/backlit-demo-client.ppm] [--width=800] [--height=520] [--verify] [--connect-socket=backlit-0] [--connect-app-id=org.backlit.DemoClient] [--connect-only]
+  backlit-demo-client [--output=target/backlit-demo-client.ppm] [--width=800] [--height=520] [--verify] [--connect-socket=backlit-0] [--connect-app-id=org.backlit.DemoClient] [--connect-lifecycle] [--connect-only]
 
 Flags:
   --output          PPM screenshot output path.
@@ -276,6 +293,8 @@ Flags:
   --connect-socket  Connect to a compositor Unix socket and announce a demo surface.
   --connect-title   Surface title to announce when connecting.
   --connect-app-id  Application id to announce when connecting.
+  --connect-lifecycle
+                   Announce, damage, and close the demo surface.
   --connect-only    Skip screenshot rendering after the socket announcement.
 "
     );
@@ -292,6 +311,7 @@ mod tests {
             "backlit-test",
             "--connect-title=hello world",
             "--connect-app-id=org.backlit.HelloWorld",
+            "--connect-lifecycle",
             "--connect-only",
             "--width=640",
             "--height=480",
@@ -301,6 +321,7 @@ mod tests {
         assert_eq!(config.connect_socket.as_deref(), Some("backlit-test"));
         assert_eq!(config.connect_title, "hello world");
         assert_eq!(config.connect_app_id, "org.backlit.HelloWorld");
+        assert!(config.connect_lifecycle);
         assert!(config.connect_only);
         assert_eq!(config.width, 640);
         assert_eq!(config.height, 480);

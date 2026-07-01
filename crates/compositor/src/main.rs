@@ -14,7 +14,8 @@ use std::time::Instant;
 use backlit_common::metrics::{event_json, FieldValue};
 use backlit_compositor_backend::{
     parse_args, preflight_backend_with_environment, BackendPreflightEnvironment,
-    BackendPreflightReport, HeadlessCompositor, RunConfig, SurfaceOptions,
+    BackendPreflightReport, ClientId, HeadlessCompositor, RunConfig, SurfaceId as BackendSurfaceId,
+    SurfaceOptions,
 };
 use backlit_demo_client::{render_policy_gui, verify_policy_gui};
 use backlit_surface::{SurfaceManager, SurfacePhase, SurfaceRole};
@@ -423,6 +424,7 @@ fn bind_session_socket_in_runtime(
 struct SocketClientRuntime {
     backend: HeadlessCompositor,
     manager: SurfaceManager,
+    clients: Vec<SocketClientRecord>,
 }
 
 impl SocketClientRuntime {
@@ -430,32 +432,54 @@ impl SocketClientRuntime {
         Self {
             backend: HeadlessCompositor::default(),
             manager: SurfaceManager::new(OutputLayout::new(1400, 900, 42)),
+            clients: Vec::new(),
         }
     }
 
-    fn handle_message(&mut self, message: &str) -> SocketClientReport {
-        let Some(request) = DemoSurfaceRequest::parse(message) else {
+    fn handle_stream(&mut self, message: &str) -> Vec<SocketClientReport> {
+        let reports: Vec<_> = message
+            .lines()
+            .filter(|line| !line.trim().is_empty())
+            .map(|line| self.handle_command(line))
+            .collect();
+
+        if reports.is_empty() {
+            vec![SocketClientReport::invalid()]
+        } else {
+            reports
+        }
+    }
+
+    fn handle_command(&mut self, message: &str) -> SocketClientReport {
+        let Some(command) = DemoSocketCommand::parse(message) else {
             return SocketClientReport::invalid();
         };
 
+        match command.action {
+            DemoSocketAction::Surface => self.map_surface(command),
+            DemoSocketAction::Damage => self.damage_surface(command),
+            DemoSocketAction::Close => self.close_surface(command),
+            DemoSocketAction::Invalid => SocketClientReport::invalid(),
+        }
+    }
+
+    fn map_surface(&mut self, command: DemoSocketCommand) -> SocketClientReport {
         let client = self
             .backend
-            .connect_client(format!("socket-client-{}", request.app_id));
-        let backend_surface_presented = self
-            .backend
-            .submit_surface(
-                client,
-                request.title.as_str(),
-                request.width,
-                request.height,
-            )
-            .is_ok();
+            .connect_client(format!("socket-client-{}", command.app_id));
+        let backend_surface = self.backend.submit_surface(
+            client,
+            command.title.as_str(),
+            command.width,
+            command.height,
+        );
+        let backend_surface_presented = backend_surface.is_ok();
         let policy_window = map_scripted_app_toplevel(
             &mut self.manager,
-            request.title.as_str(),
-            request.app_id.as_str(),
-            request.width as i32,
-            request.height as i32,
+            command.title.as_str(),
+            command.app_id.as_str(),
+            command.width as i32,
+            command.height as i32,
         )
         .ok()
         .and_then(|surface| {
@@ -466,39 +490,172 @@ impl SocketClientRuntime {
         let policy_window_mapped = policy_window.is_some();
         let policy_app_id_preserved = policy_window
             .and_then(|window| self.manager.policy().window(window))
-            .map(|window| window.app_id.as_deref() == Some(request.app_id.as_str()))
+            .map(|window| window.app_id.as_deref() == Some(command.app_id.as_str()))
             .unwrap_or(false);
+        if let Some((backend_surface, policy_surface)) = backend_surface
+            .ok()
+            .zip(self.find_policy_surface(policy_window))
+        {
+            self.clients.push(SocketClientRecord {
+                app_id: command.app_id.clone(),
+                title: command.title.clone(),
+                client,
+                backend_surface,
+                policy_surface,
+            });
+        }
         let frame = self.backend.present();
 
         SocketClientReport {
             message_valid: true,
-            title: request.title,
-            app_id: request.app_id,
-            width: request.width,
-            height: request.height,
+            action: DemoSocketAction::Surface,
+            title: command.title,
+            app_id: command.app_id,
+            width: command.width,
+            height: command.height,
             backend_surface_presented,
+            backend_surface_damaged: false,
+            backend_surface_closed: false,
             policy_window_mapped,
             policy_app_id_preserved,
+            policy_window_closed: false,
+            client_disconnected: false,
             frame: frame.frame,
+            damaged_surfaces: frame.damaged_surfaces,
+            backend_clients: frame.client_count,
             backend_surfaces: frame.surface_count,
             policy_windows: self.manager.policy().windows().len() as u64,
             visible_windows: self.manager.policy().visible_windows().count() as u64,
             focused_window: self.manager.policy().focused().is_some(),
         }
     }
+
+    fn damage_surface(&mut self, command: DemoSocketCommand) -> SocketClientReport {
+        let backend_surface = self
+            .find_client(command.app_id.as_str(), command.title.as_str())
+            .map(|record| record.backend_surface);
+        let backend_surface_damaged = backend_surface
+            .map(|surface| self.backend.mark_damaged(surface).is_ok())
+            .unwrap_or(false);
+        let frame = self.backend.present();
+
+        SocketClientReport {
+            message_valid: true,
+            action: DemoSocketAction::Damage,
+            title: command.title,
+            app_id: command.app_id,
+            width: command.width,
+            height: command.height,
+            backend_surface_presented: false,
+            backend_surface_damaged: backend_surface_damaged && frame.damaged_surfaces == 1,
+            backend_surface_closed: false,
+            policy_window_mapped: false,
+            policy_app_id_preserved: false,
+            policy_window_closed: false,
+            client_disconnected: false,
+            frame: frame.frame,
+            damaged_surfaces: frame.damaged_surfaces,
+            backend_clients: frame.client_count,
+            backend_surfaces: frame.surface_count,
+            policy_windows: self.manager.policy().windows().len() as u64,
+            visible_windows: self.manager.policy().visible_windows().count() as u64,
+            focused_window: self.manager.policy().focused().is_some(),
+        }
+    }
+
+    fn close_surface(&mut self, command: DemoSocketCommand) -> SocketClientReport {
+        let record_index = self.find_client_index(command.app_id.as_str(), command.title.as_str());
+        let record = record_index.map(|index| self.clients.remove(index));
+        let backend_surface_closed = record
+            .as_ref()
+            .map(|record| self.backend.close_surface(record.backend_surface).is_ok())
+            .unwrap_or(false);
+        let policy_window_closed = record
+            .as_ref()
+            .map(|record| {
+                self.manager.close(record.policy_surface)
+                    && self
+                        .manager
+                        .surface(record.policy_surface)
+                        .map(|surface| surface.phase == SurfacePhase::Closed)
+                        .unwrap_or(false)
+            })
+            .unwrap_or(false);
+        let client_disconnected = record
+            .as_ref()
+            .map(|record| self.backend.disconnect_client(record.client).is_ok())
+            .unwrap_or(false);
+        let frame = self.backend.present();
+
+        SocketClientReport {
+            message_valid: true,
+            action: DemoSocketAction::Close,
+            title: command.title,
+            app_id: command.app_id,
+            width: command.width,
+            height: command.height,
+            backend_surface_presented: false,
+            backend_surface_damaged: false,
+            backend_surface_closed,
+            policy_window_mapped: false,
+            policy_app_id_preserved: false,
+            policy_window_closed,
+            client_disconnected,
+            frame: frame.frame,
+            damaged_surfaces: frame.damaged_surfaces,
+            backend_clients: frame.client_count,
+            backend_surfaces: frame.surface_count,
+            policy_windows: self.manager.policy().windows().len() as u64,
+            visible_windows: self.manager.policy().visible_windows().count() as u64,
+            focused_window: self.manager.policy().focused().is_some(),
+        }
+    }
+
+    fn find_client(&self, app_id: &str, title: &str) -> Option<&SocketClientRecord> {
+        self.clients
+            .iter()
+            .find(|record| record.app_id == app_id || record.title == title)
+    }
+
+    fn find_client_index(&self, app_id: &str, title: &str) -> Option<usize> {
+        self.clients
+            .iter()
+            .position(|record| record.app_id == app_id || record.title == title)
+    }
+
+    fn find_policy_surface(
+        &self,
+        policy_window: Option<backlit_window_policy::WindowId>,
+    ) -> Option<backlit_surface::SurfaceId> {
+        let policy_window = policy_window?;
+        self.manager.policy().window(policy_window)?;
+        self.manager.surface_ids().find(|surface| {
+            self.manager
+                .surface(*surface)
+                .map(|known| known.window_id == Some(policy_window))
+                .unwrap_or(false)
+        })
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 struct SocketClientReport {
     message_valid: bool,
+    action: DemoSocketAction,
     title: String,
     app_id: String,
     width: u32,
     height: u32,
     backend_surface_presented: bool,
+    backend_surface_damaged: bool,
+    backend_surface_closed: bool,
     policy_window_mapped: bool,
     policy_app_id_preserved: bool,
+    policy_window_closed: bool,
+    client_disconnected: bool,
     frame: u64,
+    damaged_surfaces: u64,
+    backend_clients: u64,
     backend_surfaces: u64,
     policy_windows: u64,
     visible_windows: u64,
@@ -509,14 +666,21 @@ impl SocketClientReport {
     fn invalid() -> Self {
         Self {
             message_valid: false,
+            action: DemoSocketAction::Invalid,
             title: String::new(),
             app_id: String::new(),
             width: 0,
             height: 0,
             backend_surface_presented: false,
+            backend_surface_damaged: false,
+            backend_surface_closed: false,
             policy_window_mapped: false,
             policy_app_id_preserved: false,
+            policy_window_closed: false,
+            client_disconnected: false,
             frame: 0,
+            damaged_surfaces: 0,
+            backend_clients: 0,
             backend_surfaces: 0,
             policy_windows: 0,
             visible_windows: 0,
@@ -525,20 +689,55 @@ impl SocketClientReport {
     }
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum DemoSocketAction {
+    Surface,
+    Damage,
+    Close,
+    Invalid,
+}
+
+impl DemoSocketAction {
+    const fn as_str(self) -> &'static str {
+        match self {
+            Self::Surface => "surface",
+            Self::Damage => "damage",
+            Self::Close => "close",
+            Self::Invalid => "invalid",
+        }
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Eq)]
-struct DemoSurfaceRequest {
+struct SocketClientRecord {
+    app_id: String,
+    title: String,
+    client: ClientId,
+    backend_surface: BackendSurfaceId,
+    policy_surface: backlit_surface::SurfaceId,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct DemoSocketCommand {
+    action: DemoSocketAction,
     title: String,
     app_id: String,
     width: u32,
     height: u32,
 }
 
-impl DemoSurfaceRequest {
+impl DemoSocketCommand {
     fn parse(message: &str) -> Option<Self> {
         let mut tokens = message.split_whitespace();
-        if tokens.next()? != "BACKLIT_DEMO_CLIENT" || tokens.next()? != "surface" {
+        if tokens.next()? != "BACKLIT_DEMO_CLIENT" {
             return None;
         }
+        let action = match tokens.next()? {
+            "surface" => DemoSocketAction::Surface,
+            "damage" => DemoSocketAction::Damage,
+            "close" => DemoSocketAction::Close,
+            _ => return None,
+        };
 
         let mut title = None;
         let mut app_id = None;
@@ -557,16 +756,19 @@ impl DemoSurfaceRequest {
             }
         }
 
-        let title = title.filter(|title| !title.is_empty())?;
+        let title = title
+            .filter(|title| !title.is_empty())
+            .or_else(|| app_id.clone())?;
         let app_id = app_id
             .filter(|app_id| !app_id.is_empty())
             .unwrap_or_else(|| title.clone());
 
         Some(Self {
+            action,
             title,
             app_id,
-            width: width?.max(1),
-            height: height?.max(1),
+            width: width.unwrap_or(1).max(1),
+            height: height.unwrap_or(1).max(1),
         })
     }
 }
@@ -601,8 +803,9 @@ fn poll_socket_clients(
     };
 
     for message in socket.accept_messages()? {
-        let report = runtime.handle_message(message.as_str());
-        emit_socket_client(config, &report);
+        for report in runtime.handle_stream(message.as_str()) {
+            emit_socket_client(config, &report);
+        }
     }
 
     Ok(())
@@ -1439,6 +1642,7 @@ fn emit_socket_client(config: &RunConfig, report: &SocketClientReport) {
         config,
         &[
             ("message_valid", FieldValue::Bool(report.message_valid)),
+            ("action", FieldValue::Str(report.action.as_str())),
             ("title", FieldValue::Str(report.title.as_str())),
             ("app_id", FieldValue::Str(report.app_id.as_str())),
             ("width", FieldValue::U64(report.width as u64)),
@@ -1448,6 +1652,14 @@ fn emit_socket_client(config: &RunConfig, report: &SocketClientReport) {
                 FieldValue::Bool(report.backend_surface_presented),
             ),
             (
+                "backend_surface_damaged",
+                FieldValue::Bool(report.backend_surface_damaged),
+            ),
+            (
+                "backend_surface_closed",
+                FieldValue::Bool(report.backend_surface_closed),
+            ),
+            (
                 "policy_window_mapped",
                 FieldValue::Bool(report.policy_window_mapped),
             ),
@@ -1455,7 +1667,17 @@ fn emit_socket_client(config: &RunConfig, report: &SocketClientReport) {
                 "policy_app_id_preserved",
                 FieldValue::Bool(report.policy_app_id_preserved),
             ),
+            (
+                "policy_window_closed",
+                FieldValue::Bool(report.policy_window_closed),
+            ),
+            (
+                "client_disconnected",
+                FieldValue::Bool(report.client_disconnected),
+            ),
             ("frame", FieldValue::U64(report.frame)),
+            ("damaged_surfaces", FieldValue::U64(report.damaged_surfaces)),
+            ("backend_clients", FieldValue::U64(report.backend_clients)),
             ("backend_surfaces", FieldValue::U64(report.backend_surfaces)),
             ("policy_windows", FieldValue::U64(report.policy_windows)),
             ("visible_windows", FieldValue::U64(report.visible_windows)),
@@ -1494,8 +1716,8 @@ Backend launch preflight runs before smoke or service readiness events.
 #[cfg(test)]
 mod tests {
     use super::{
-        run_compositor_surface_smoke, run_scripted_client_runtime, DemoSurfaceRequest,
-        SocketClientRuntime,
+        run_compositor_surface_smoke, run_scripted_client_runtime, DemoSocketAction,
+        DemoSocketCommand, SocketClientRuntime,
     };
     use std::fs;
     use std::os::unix::fs::FileTypeExt;
@@ -1574,39 +1796,87 @@ mod tests {
 
     #[test]
     fn demo_surface_request_parses_socket_message() {
-        let request = DemoSurfaceRequest::parse(
+        let request = DemoSocketCommand::parse(
             "BACKLIT_DEMO_CLIENT surface title=socket-demo app_id=org.backlit.SocketDemo width=640 height=480\n",
         )
         .unwrap();
 
+        assert_eq!(request.action, DemoSocketAction::Surface);
         assert_eq!(request.title, "socket-demo");
         assert_eq!(request.app_id, "org.backlit.SocketDemo");
         assert_eq!(request.width, 640);
         assert_eq!(request.height, 480);
 
-        let legacy = DemoSurfaceRequest::parse(
+        let damage =
+            DemoSocketCommand::parse("BACKLIT_DEMO_CLIENT damage app_id=org.backlit.SocketDemo\n")
+                .unwrap();
+        assert_eq!(damage.action, DemoSocketAction::Damage);
+        assert_eq!(damage.title, "org.backlit.SocketDemo");
+        assert_eq!(damage.app_id, "org.backlit.SocketDemo");
+        assert_eq!(damage.width, 1);
+        assert_eq!(damage.height, 1);
+
+        let close =
+            DemoSocketCommand::parse("BACKLIT_DEMO_CLIENT close title=socket-demo\n").unwrap();
+        assert_eq!(close.action, DemoSocketAction::Close);
+        assert_eq!(close.title, "socket-demo");
+        assert_eq!(close.app_id, "socket-demo");
+
+        let legacy = DemoSocketCommand::parse(
             "BACKLIT_DEMO_CLIENT surface title=legacy-demo width=320 height=240\n",
         )
         .unwrap();
         assert_eq!(legacy.app_id, "legacy-demo");
 
-        assert!(DemoSurfaceRequest::parse("garbage").is_none());
+        assert!(DemoSocketCommand::parse("garbage").is_none());
     }
 
     #[test]
     fn socket_client_runtime_preserves_app_id_in_policy_window() {
         let mut runtime = SocketClientRuntime::new();
-        let report = runtime.handle_message(
+        let reports = runtime.handle_stream(
             "BACKLIT_DEMO_CLIENT surface title=socket-demo app_id=org.backlit.SocketDemo width=640 height=480\n",
         );
+        let report = &reports[0];
 
         assert!(report.message_valid);
+        assert_eq!(report.action, DemoSocketAction::Surface);
         assert!(report.backend_surface_presented);
         assert!(report.policy_window_mapped);
         assert!(report.policy_app_id_preserved);
         assert_eq!(report.app_id, "org.backlit.SocketDemo");
+        assert_eq!(report.backend_clients, 1);
         assert_eq!(report.policy_windows, 1);
         assert_eq!(report.visible_windows, 1);
         assert!(report.focused_window);
+    }
+
+    #[test]
+    fn socket_client_runtime_damages_and_closes_policy_window() {
+        let mut runtime = SocketClientRuntime::new();
+        let reports = runtime.handle_stream(
+            "\
+BACKLIT_DEMO_CLIENT surface title=socket-demo app_id=org.backlit.SocketDemo width=640 height=480
+BACKLIT_DEMO_CLIENT damage app_id=org.backlit.SocketDemo
+BACKLIT_DEMO_CLIENT close app_id=org.backlit.SocketDemo
+",
+        );
+
+        assert_eq!(reports.len(), 3);
+        assert_eq!(reports[0].action, DemoSocketAction::Surface);
+        assert!(reports[0].policy_window_mapped);
+        assert_eq!(reports[0].policy_windows, 1);
+        assert_eq!(reports[1].action, DemoSocketAction::Damage);
+        assert!(reports[1].backend_surface_damaged);
+        assert_eq!(reports[1].damaged_surfaces, 1);
+        assert_eq!(reports[1].policy_windows, 1);
+        assert_eq!(reports[2].action, DemoSocketAction::Close);
+        assert!(reports[2].backend_surface_closed);
+        assert!(reports[2].policy_window_closed);
+        assert!(reports[2].client_disconnected);
+        assert_eq!(reports[2].backend_clients, 0);
+        assert_eq!(reports[2].backend_surfaces, 0);
+        assert_eq!(reports[2].policy_windows, 0);
+        assert_eq!(reports[2].visible_windows, 0);
     }
 }

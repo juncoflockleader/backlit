@@ -68,6 +68,10 @@ require_contains scripts/verify-compositor-socket.sh '"session_socket_bound": tr
 require_contains scripts/verify-compositor-socket.sh '"socket_accepts_client_connection": true'
 require_contains scripts/verify-compositor-socket.sh '"demo_client_socket_launch": true'
 require_contains scripts/verify-compositor-socket.sh '"demo_client_surface_mapped": true'
+require_contains scripts/verify-compositor-socket.sh '"demo_client_surface_damaged": true'
+require_contains scripts/verify-compositor-socket.sh '"demo_client_surface_closed": true'
+require_contains scripts/verify-compositor-socket.sh '"demo_client_window_removed": true'
+require_contains scripts/verify-compositor-socket.sh '"demo_client_disconnected": true'
 require_contains scripts/verify-launcher-desktop-discovery.sh '--desktop-entry=org.backlit.SpawnProbe.desktop'
 require_contains scripts/verify-launcher-desktop-discovery.sh '"fixture_desktop_spawn": true'
 require_contains scripts/verify-linux-e2e.sh './scripts/verify-drm-session-smoke.sh'
@@ -158,6 +162,10 @@ if [ -n "$artifact_root" ] && [ -d "$artifact_root" ]; then
     require_contains "$artifact_root/compositor-socket/manifest.json" '"socket_accepts_client_connection": true'
     require_contains "$artifact_root/compositor-socket/manifest.json" '"demo_client_socket_launch": true'
     require_contains "$artifact_root/compositor-socket/manifest.json" '"demo_client_surface_mapped": true'
+    require_contains "$artifact_root/compositor-socket/manifest.json" '"demo_client_surface_damaged": true'
+    require_contains "$artifact_root/compositor-socket/manifest.json" '"demo_client_surface_closed": true'
+    require_contains "$artifact_root/compositor-socket/manifest.json" '"demo_client_window_removed": true'
+    require_contains "$artifact_root/compositor-socket/manifest.json" '"demo_client_disconnected": true'
     require_contains "$artifact_root/compositor-socket/manifest.json" '"session_socket_cleanup": true'
     compositor_socket_artifact=true
   else

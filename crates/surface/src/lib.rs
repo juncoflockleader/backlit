@@ -344,6 +344,10 @@ impl SurfaceManager {
         self.surfaces.iter().find(|surface| surface.id == id)
     }
 
+    pub fn surface_ids(&self) -> impl Iterator<Item = SurfaceId> + '_ {
+        self.surfaces.iter().map(|surface| surface.id)
+    }
+
     pub fn policy(&self) -> &WindowPolicy {
         &self.policy
     }
