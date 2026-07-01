@@ -36,6 +36,7 @@ cargo run -p backlit-notification-daemon -- --verify > "$out_dir/notification-da
 cargo run -p backlit-settings-daemon -- --verify > "$out_dir/settings-daemon.jsonl"
 cargo run -p backlit-settings -- --verify > "$out_dir/settings-app.jsonl"
 cargo run -p backlit-portal-backend -- --verify > "$out_dir/portal.jsonl"
+cargo build -p backlit-demo-client
 cargo run -p backlit-session -- \
   --backend=headless \
   --socket=backlit-0 \

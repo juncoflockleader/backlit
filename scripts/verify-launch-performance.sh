@@ -51,6 +51,7 @@ require_le() {
 cargo build \
   -p backlit-session \
   -p backlit-compositor \
+  -p backlit-demo-client \
   -p backlit-shell \
   -p backlit-notification-daemon \
   -p backlit-settings-daemon

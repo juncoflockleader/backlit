@@ -176,10 +176,11 @@ drm_session_smoke_blocked_expected=false
 drm_session_clean_exit=false
 
 if [ "$drm_expected_ready" = true ]; then
-  cargo build \
-    -p backlit-session \
-    -p backlit-compositor \
-    -p backlit-shell \
+	  cargo build \
+	    -p backlit-session \
+	    -p backlit-compositor \
+	    -p backlit-demo-client \
+	    -p backlit-shell \
     -p backlit-notification-daemon \
     -p backlit-settings-daemon
   target/debug/backlit-session \
