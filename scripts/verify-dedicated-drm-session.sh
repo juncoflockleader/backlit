@@ -17,6 +17,11 @@ service_log_dir="$out_dir/session-services"
 handoff_plan="$out_dir/dedicated-drm-handoff.sh"
 expected_checksum="15888844850457870477"
 expected_ppm_bytes="1248015"
+session_bin="${BACKLIT_DEDICATED_DRM_SESSION_BIN:-target/debug/backlit-session}"
+system_session_binary=false
+if [ "$session_bin" = "/usr/bin/backlit-session" ]; then
+  system_session_binary=true
+fi
 
 fail() {
   echo "Dedicated DRM session verification failed: $*" >&2
@@ -27,6 +32,10 @@ require_matches() {
   file="$1"
   value="$2"
   grep -E "$value" "$file" >/dev/null || fail "missing pattern in $file: $value"
+}
+
+require_executable() {
+  test -x "$1" || fail "missing executable $1"
 }
 
 bool_has() {
@@ -92,6 +101,7 @@ write_manifest() {
   "reason": "$reason",
   "artifacts": {
     "drm_master_boundary_manifest": "$boundary_manifest",
+    "session_binary": "$session_bin",
     "session_log": "$session_log",
     "session_stderr": "$session_err",
     "session_screenshot": "$session_screenshot",
@@ -123,6 +133,7 @@ write_manifest() {
     "first_present_vblank_event_received": $first_present_vblank_event_received,
     "first_present_blocked_by_drm_master": $first_present_blocked_by_drm_master,
     "session_drm_first_present_probe": $session_drm_first_present_probe,
+    "system_session_binary": $system_session_binary,
     "session_gui_verified": $session_gui_verified,
     "session_services": $session_services,
     "session_desktop_launch": $session_desktop_launch,
@@ -199,15 +210,19 @@ fi
 
 BACKLIT_REQUIRE_DRM_MASTER_PRESENT=1 ./scripts/verify-drm-master-boundary.sh "$boundary_dir"
 
-cargo build -p backlit-session --features smithay-backend
-cargo build -p backlit-compositor --features smithay-backend
-cargo build \
-  -p backlit-demo-client \
-  -p backlit-shell \
-  -p backlit-notification-daemon \
-  -p backlit-settings-daemon
+if [ "$session_bin" = "target/debug/backlit-session" ] || [ "$session_bin" = "./target/debug/backlit-session" ]; then
+  cargo build -p backlit-session --features smithay-backend
+  cargo build -p backlit-compositor --features smithay-backend
+  cargo build \
+    -p backlit-demo-client \
+    -p backlit-shell \
+    -p backlit-notification-daemon \
+    -p backlit-settings-daemon
+fi
 
-target/debug/backlit-session \
+require_executable "$session_bin"
+
+"$session_bin" \
   --backend=drm \
   --socket=backlit-dedicated-session \
   --screenshot="$session_screenshot" \

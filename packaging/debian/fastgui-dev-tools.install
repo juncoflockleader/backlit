@@ -13,5 +13,6 @@ usr/lib/backlit/dev-tools/verify-session-replay.sh
 usr/lib/backlit/dev-tools/verify-drm-session-smoke.sh
 usr/lib/backlit/dev-tools/verify-drm-master-boundary.sh
 usr/lib/backlit/dev-tools/verify-dedicated-drm-session.sh
+usr/lib/backlit/dev-tools/verify-parallels-dedicated-drm-e2e.sh
 usr/lib/backlit/dev-tools/verify-mvp1-contract.sh
 usr/lib/backlit/dev-tools/verify-linux-e2e.sh

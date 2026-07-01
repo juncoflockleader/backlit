@@ -182,6 +182,55 @@ retry_guest_command runuser -u "\$guest_user" -- git -C "\$repo_dir" fetch origi
 runuser -u "\$guest_user" -- git -C "\$repo_dir" checkout "\$branch"
 runuser -u "\$guest_user" -- git -C "\$repo_dir" reset --hard "origin/\$branch"
 
+package_build_dir="\$guest_out_dir/package-build"
+debs_dir="\$repo_dir/\$package_build_dir/debs"
+dpkg_install_log="\$repo_dir/\$guest_out_dir/system-dpkg-install.log"
+dpkg_purge_log="\$repo_dir/\$guest_out_dir/system-dpkg-purge.log"
+packages="fastgui-compositor fastgui-shell fastgui-settings fastgui-session fastgui-core"
+purge_packages="fastgui-dev-tools fastgui-desktop fastgui-core fastgui-portal fastgui-session fastgui-settings fastgui-shell fastgui-compositor"
+installed_packages=false
+
+cleanup_packages() {
+  if [ "\$installed_packages" = true ]; then
+    dpkg --purge \$purge_packages >> "\$dpkg_purge_log" 2>&1 || true
+  fi
+}
+
+mkdir -p "\$repo_dir/\$guest_out_dir"
+chown -R "\$guest_user:\$guest_user" "\$repo_dir/\$guest_out_dir"
+
+runuser -u "\$guest_user" -- bash -lc "
+set -euo pipefail
+source \"\\\$HOME/.cargo/env\"
+cd \"\$repo_dir\"
+scripts/verify-debian-package-build.sh \"\$package_build_dir\"
+"
+
+: > "\$dpkg_install_log"
+: > "\$dpkg_purge_log"
+dpkg --purge \$purge_packages >> "\$dpkg_purge_log" 2>&1 || true
+
+install_debs=""
+for package in \$packages; do
+  deb="\$(find "\$debs_dir" -maxdepth 1 -name "\${package}_*.deb" -type f | sort | sed -n '1p')"
+  if [ -z "\$deb" ]; then
+    echo "Missing deb for \$package in \$debs_dir" >&2
+    exit 1
+  fi
+  install_debs="\$install_debs \$deb"
+done
+
+installed_packages=true
+dpkg --install \$install_debs > "\$dpkg_install_log" 2>&1
+
+for package in \$packages; do
+  status="\$(dpkg-query -W -f='\${Status}' "\$package" 2>/dev/null || true)"
+  if [ "\$status" != "install ok installed" ]; then
+    echo "Package not installed: \$package (\$status)" >&2
+    exit 1
+  fi
+done
+
 cat > "\$inner_runner" <<INNER
 #!/usr/bin/env bash
 set -euo pipefail
@@ -194,6 +243,7 @@ if [ -n "\\\${XDG_SESSION_ID-}" ]; then
   loginctl show-session "\\\$XDG_SESSION_ID" -p Name -p User -p Seat -p TTY -p Type -p State -p Remote -p Class --no-pager || true
 fi
 
+BACKLIT_DEDICATED_DRM_SESSION_BIN=/usr/bin/backlit-session \\
 BACKLIT_REQUIRE_DEDICATED_DRM_SESSION=1 \\
 BACKLIT_REQUIRE_DRM_MASTER_PRESENT=1 \\
   ./scripts/verify-dedicated-drm-session.sh "\$guest_out_dir"
@@ -206,7 +256,12 @@ before_tty="\$(fgconsole 2>/dev/null || printf 2)"
 restore_tty() {
   chvt "\$before_tty" 2>/dev/null || chvt 2 2>/dev/null || true
 }
-trap restore_tty EXIT
+
+cleanup_run() {
+  restore_tty
+  cleanup_packages
+}
+trap cleanup_run EXIT
 
 chvt "\$tty_number" 2>/dev/null || true
 
@@ -224,8 +279,10 @@ status="\$?"
 set -e
 
 restore_tty
+cleanup_packages
+installed_packages=false
 trap - EXIT
-chown "\$guest_user:\$guest_user" "\$unit_log" 2>/dev/null || true
+chown "\$guest_user:\$guest_user" "\$unit_log" "\$dpkg_install_log" "\$dpkg_purge_log" 2>/dev/null || true
 if [ -d "\$repo_dir/\$guest_out_dir" ]; then
   chown -R "\$guest_user:\$guest_user" "\$repo_dir/\$guest_out_dir"
 fi
@@ -250,6 +307,9 @@ host_session_stderr="$host_out_dir/session.stderr"
 host_compositor_log="$host_out_dir/compositor-service.jsonl"
 host_compositor_stderr="$host_out_dir/compositor-service.stderr"
 host_runner_log="$host_out_dir/runner.log"
+host_package_build_manifest="$host_out_dir/package-build-manifest.json"
+host_dpkg_install_log="$host_out_dir/system-dpkg-install.log"
+host_dpkg_purge_log="$host_out_dir/system-dpkg-purge.log"
 host_ppm="$host_out_dir/dedicated-session.ppm"
 host_png="$host_out_dir/dedicated-session.png"
 
@@ -262,6 +322,9 @@ rm -f \
   "$host_compositor_log" \
   "$host_compositor_stderr" \
   "$host_runner_log" \
+  "$host_package_build_manifest" \
+  "$host_dpkg_install_log" \
+  "$host_dpkg_purge_log" \
   "$host_ppm" \
   "$host_png" \
   "$host_out_dir/manifest.json"
@@ -273,6 +336,9 @@ download_file "$guest_dedicated_dir/session.stderr" "$host_session_stderr"
 download_file "$guest_dedicated_dir/session-services/compositor.jsonl" "$host_compositor_log"
 download_file "$guest_dedicated_dir/session-services/compositor.stderr" "$host_compositor_stderr"
 download_file "/tmp/backlit-dedicated-drm-e2e.log" "$host_runner_log"
+download_file "$guest_dedicated_dir/package-build/manifest.json" "$host_package_build_manifest"
+download_file "$guest_dedicated_dir/system-dpkg-install.log" "$host_dpkg_install_log"
+download_file "$guest_dedicated_dir/system-dpkg-purge.log" "$host_dpkg_purge_log"
 download_file "$guest_dedicated_dir/dedicated-session.ppm" "$host_ppm"
 
 preview_image="$host_ppm"
@@ -311,11 +377,14 @@ require_contains "$host_manifest" '"current_session_can_present": true'
 require_contains "$host_manifest" '"first_present_commit_succeeded": true'
 require_contains "$host_manifest" '"first_present_vblank_event_received": true'
 require_contains "$host_manifest" '"session_drm_first_present_probe": true'
+require_contains "$host_manifest" '"session_binary": "/usr/bin/backlit-session"'
+require_contains "$host_manifest" '"system_session_binary": true'
 require_contains "$host_manifest" '"session_gui_verified": true'
 require_contains "$host_manifest" '"session_services": true'
 require_contains "$host_manifest" '"session_desktop_launch": true'
 require_contains "$host_manifest" '"session_compositor_demo_client": true'
 require_contains "$host_manifest" '"session_clean_exit": true'
+require_contains "$host_package_build_manifest" '"debs_built": true'
 require_contains "$host_session_log" '"implementation":"smithay-compositor-runtime"'
 require_contains "$host_session_log" '"kms_first_present_commit_succeeded":true'
 require_contains "$host_session_log" '"kms_first_present_vblank_event_received":true'
@@ -342,10 +411,16 @@ cat > "$host_out_dir/manifest.json" <<EOF
     "compositor_service_log": "$host_compositor_log",
     "compositor_service_stderr": "$host_compositor_stderr",
     "runner_log": "$host_runner_log",
+    "package_build_manifest": "$host_package_build_manifest",
+    "dpkg_install_log": "$host_dpkg_install_log",
+    "dpkg_purge_log": "$host_dpkg_purge_log",
     "gui_preview_ppm": "$host_ppm",
     "gui_preview_image": "$preview_image"
   },
   "checks": {
+    "system_package_dedicated_drm": true,
+    "system_session_binary": true,
+    "debs_built": true,
     "dedicated_session_acceptance": true,
     "drm_first_present_commit": true,
     "drm_first_present_vblank": true,
