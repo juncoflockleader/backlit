@@ -8,6 +8,8 @@ repo_url="${BACKLIT_E2E_REPO_URL:-https://github.com/juncoflockleader/backlit.gi
 branch="${BACKLIT_E2E_BRANCH:-main}"
 host_out_dir="${1:-${BACKLIT_PARALLELS_E2E_HOST_OUT_DIR:-target/linux-e2e-parallels}}"
 e2e_out_dir="${BACKLIT_E2E_OUT_DIR:-$host_out_dir}"
+health_out_dir="$host_out_dir/parallels-ubuntu-health"
+health_manifest="$health_out_dir/manifest.json"
 
 prlctl_bin="${PRLCTL:-}"
 if [ -z "$prlctl_bin" ]; then
@@ -124,6 +126,20 @@ Restart or repair the Ubuntu VM so its root filesystem mounts read-write, then r
   $0 $host_out_dir
 EOF
   exit 2
+}
+
+run_health_preflight() {
+  if "$repo_root/scripts/verify-parallels-ubuntu-health.sh" "$health_out_dir"; then
+    return 0
+  else
+    local status="$?"
+    cat >&2 <<EOF
+Parallels Linux E2E cannot start because the Ubuntu health preflight failed.
+
+Health manifest: $health_manifest
+EOF
+    exit "$status"
+  fi
 }
 
 tmp_dir="$(mktemp -d "${TMPDIR:-/tmp}/backlit-parallels-e2e.XXXXXX")"
@@ -314,6 +330,7 @@ EOF
 chmod 700 "$root_runner"
 
 printf 'Using Parallels VM: %s\n' "$vm_name"
+run_health_preflight
 "$prlctl_bin" list --all | grep -F "$vm_name" >/dev/null
 check_guest_writable
 
@@ -789,6 +806,8 @@ require_contains "$host_mvp1_contract_manifest" '"smithay_compositor_runtime_art
 require_contains "$host_mvp1_contract_manifest" '"resource_budget_contract": true'
 require_contains "$host_mvp1_contract_manifest" '"debian_package_install_replay_artifact": true'
 require_contains "$host_mvp1_contract_manifest" '"debian_system_install_replay_artifact": true'
+require_contains "$health_manifest" '"passed": true'
+require_contains "$health_manifest" '"e2e_ready": true'
 
 cat > "$host_out_dir/manifest.json" <<EOF
 {
@@ -799,6 +818,7 @@ cat > "$host_out_dir/manifest.json" <<EOF
   "guest_repo": "$repo_dir",
   "guest_e2e_dir": "$e2e_out_dir",
   "artifacts": {
+    "parallels_ubuntu_health_manifest": "$health_manifest",
     "guest_manifest": "$host_guest_manifest",
     "gui_smoke_manifest": "$host_gui_smoke_manifest",
     "gui_preview_manifest": "$host_gui_preview_manifest",
@@ -829,6 +849,8 @@ cat > "$host_out_dir/manifest.json" <<EOF
     "compositor_runtime_preview_image": "$compositor_preview_image"
   },
   "checks": {
+    "parallels_ubuntu_health": true,
+    "guest_root_filesystem_writable": true,
     "guest_e2e_passed": true,
     "guest_commit_matches_manifest": true,
     "guest_artifacts_exported": true,

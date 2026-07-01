@@ -9,7 +9,9 @@ parallels_e2e_dir="${2:-target/linux-e2e-parallels}"
 dedicated_e2e_dir="${3:-target/parallels-dedicated-drm-e2e}"
 manifest="$out_dir/manifest.json"
 parallels_manifest="$parallels_e2e_dir/manifest.json"
+parallels_health_manifest="$parallels_e2e_dir/parallels-ubuntu-health/manifest.json"
 dedicated_manifest="$dedicated_e2e_dir/manifest.json"
+dedicated_health_manifest="$dedicated_e2e_dir/parallels-ubuntu-health/manifest.json"
 dedicated_session_manifest="$dedicated_e2e_dir/dedicated-drm-session-manifest.json"
 package_build_manifest="$dedicated_e2e_dir/package-build-manifest.json"
 dedicated_dpkg_install_log="$dedicated_e2e_dir/system-dpkg-install.log"
@@ -38,6 +40,7 @@ semantic_gui_evidence=false
 mvp1_acceptance=false
 launch_performance_evidence=false
 resource_budget_evidence=false
+parallels_health_evidence=false
 
 write_manifest() {
   passed="$1"
@@ -57,10 +60,12 @@ write_manifest() {
   },
   "artifacts": {
     "parallels_linux_e2e_manifest": "$parallels_manifest",
+    "parallels_linux_health_manifest": "$parallels_health_manifest",
     "parallels_launch_performance_manifest": "$launch_performance_manifest",
     "parallels_resource_budget_manifest": "$resource_budget_manifest",
     "parallels_linux_gui_preview": "$parallels_preview",
     "parallels_dedicated_drm_manifest": "$dedicated_manifest",
+    "parallels_dedicated_health_manifest": "$dedicated_health_manifest",
     "parallels_dedicated_drm_session_manifest": "$dedicated_session_manifest",
     "parallels_dedicated_package_build_manifest": "$package_build_manifest",
     "parallels_dedicated_dpkg_install_log": "$dedicated_dpkg_install_log",
@@ -78,7 +83,8 @@ write_manifest() {
     "semantic_gui_evidence": $semantic_gui_evidence,
     "mvp1_acceptance": $mvp1_acceptance,
     "launch_performance_evidence": $launch_performance_evidence,
-    "resource_budget_evidence": $resource_budget_evidence
+    "resource_budget_evidence": $resource_budget_evidence,
+    "parallels_health_evidence": $parallels_health_evidence
   }
 }
 EOF
@@ -155,11 +161,23 @@ source_tree_ready=true
 require_file "$parallels_manifest" missing-parallels-linux-e2e-manifest
 require_file "$launch_performance_manifest" missing-parallels-launch-performance-manifest
 require_file "$resource_budget_manifest" missing-parallels-resource-budget-manifest
+require_file "$parallels_health_manifest" missing-parallels-linux-health-manifest
 require_file "$dedicated_manifest" missing-parallels-dedicated-drm-manifest
 require_file "$dedicated_session_manifest" missing-parallels-dedicated-session-manifest
 require_file "$package_build_manifest" missing-parallels-dedicated-package-build-manifest
+require_file "$dedicated_health_manifest" missing-parallels-dedicated-health-manifest
 require_file "$dedicated_dpkg_install_log" missing-parallels-dedicated-dpkg-install-log
 require_file "$dedicated_dpkg_purge_log" missing-parallels-dedicated-dpkg-purge-log
+
+require_contains "$parallels_health_manifest" '"passed": true' parallels-health-evidence
+require_contains "$parallels_health_manifest" '"e2e_ready": true' parallels-health-evidence
+require_contains "$parallels_health_manifest" '"root_filesystem_writable": true' parallels-health-evidence
+require_contains "$parallels_health_manifest" '"tmp_writable": true' parallels-health-evidence
+require_contains "$dedicated_health_manifest" '"passed": true' parallels-health-evidence
+require_contains "$dedicated_health_manifest" '"e2e_ready": true' parallels-health-evidence
+require_contains "$dedicated_health_manifest" '"root_filesystem_writable": true' parallels-health-evidence
+require_contains "$dedicated_health_manifest" '"tmp_writable": true' parallels-health-evidence
+parallels_health_evidence=true
 
 require_contains "$parallels_manifest" '"passed": true' parallels-linux-e2e
 require_contains "$parallels_manifest" "\"guest_commit\": \"$commit\"" current-commit-evidence

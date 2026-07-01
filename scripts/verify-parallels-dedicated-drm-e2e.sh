@@ -9,6 +9,8 @@ branch="${BACKLIT_E2E_BRANCH:-main}"
 host_out_dir="${1:-${BACKLIT_PARALLELS_DEDICATED_DRM_HOST_OUT_DIR:-target/parallels-dedicated-drm-e2e}}"
 guest_out_dir="${BACKLIT_PARALLELS_DEDICATED_DRM_GUEST_OUT_DIR:-target/parallels-dedicated-drm-e2e}"
 dedicated_tty="${BACKLIT_PARALLELS_DEDICATED_TTY:-/dev/tty3}"
+health_out_dir="$host_out_dir/parallels-ubuntu-health"
+health_manifest="$health_out_dir/manifest.json"
 
 prlctl_bin="${PRLCTL:-}"
 if [ -z "$prlctl_bin" ]; then
@@ -116,6 +118,20 @@ Restart or repair the Ubuntu VM so its root filesystem mounts read-write, then r
   $0 $host_out_dir
 EOF
   exit 2
+}
+
+run_health_preflight() {
+  if "$repo_root/scripts/verify-parallels-ubuntu-health.sh" "$health_out_dir"; then
+    return 0
+  else
+    local status="$?"
+    cat >&2 <<EOF
+Parallels dedicated DRM E2E cannot start because the Ubuntu health preflight failed.
+
+Health manifest: $health_manifest
+EOF
+    exit "$status"
+  fi
 }
 
 tmp_dir="$(mktemp -d "${TMPDIR:-/tmp}/backlit-parallels-dedicated-drm.XXXXXX")"
@@ -317,6 +333,7 @@ EOF
 chmod 700 "$root_runner"
 
 printf 'Using Parallels VM: %s\n' "$vm_name"
+run_health_preflight
 "$prlctl_bin" list --all | grep -F "$vm_name" >/dev/null
 check_guest_writable
 
@@ -421,6 +438,8 @@ require_contains "$host_session_log" '"kms_first_present_vblank_event_received":
 require_contains "$host_session_log" '"compositor_smithay_runtime":true'
 require_contains "$host_session_log" '"compositor_smithay_protocol_globals":true'
 require_contains "$host_session_log" '"children_exited_cleanly":true'
+require_contains "$health_manifest" '"passed": true'
+require_contains "$health_manifest" '"e2e_ready": true'
 
 ppm_bytes="$(wc -c < "$host_ppm" | tr -d ' ')"
 
@@ -434,6 +453,7 @@ cat > "$host_out_dir/manifest.json" <<EOF
   "guest_dedicated_dir": "$guest_out_dir",
   "dedicated_tty": "$dedicated_tty",
   "artifacts": {
+    "parallels_ubuntu_health_manifest": "$health_manifest",
     "dedicated_drm_session_manifest": "$host_manifest",
     "drm_master_boundary_manifest": "$host_boundary_manifest",
     "session_log": "$host_session_log",
@@ -448,6 +468,8 @@ cat > "$host_out_dir/manifest.json" <<EOF
     "gui_preview_image": "$preview_image"
   },
   "checks": {
+    "parallels_ubuntu_health": true,
+    "guest_root_filesystem_writable": true,
     "system_package_dedicated_drm": true,
     "system_session_binary": true,
     "debs_built": true,
