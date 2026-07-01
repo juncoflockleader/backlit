@@ -1965,7 +1965,7 @@ impl CompositorRuntime for HeadlessCompositor {
 pub struct SmithayCompositorRuntime {
     inner: HeadlessCompositor,
     display: smithay::reexports::wayland_server::Display<SmithayCompositorState>,
-    event_loop: smithay::reexports::calloop::EventLoop<SmithayCompositorState>,
+    event_loop: smithay::reexports::calloop::EventLoop<'static, SmithayCompositorState>,
     listening_socket: smithay::reexports::wayland_server::ListeningSocket,
     socket_name: String,
     inserted_wayland_clients: u64,
