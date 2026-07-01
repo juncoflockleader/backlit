@@ -238,6 +238,7 @@ fn emit_smithay_runtime_probe(probe: &SmithayRuntimeProbe) {
     let kms_resource_failure = probe.kms_resource_failure.as_deref().unwrap_or("");
     let kms_surface_failure = probe.kms_surface_failure.as_deref().unwrap_or("");
     let kms_framebuffer_failure = probe.kms_framebuffer_failure.as_deref().unwrap_or("");
+    let kms_first_present_failure = probe.kms_first_present_failure.as_deref().unwrap_or("");
     let kms_scanout_connector_name = probe.kms_scanout_connector_name.as_deref().unwrap_or("");
     let renderer_runtime_failure = probe.renderer_runtime_failure.as_deref().unwrap_or("");
     let primary_input_event = probe.primary_input_event.as_deref().unwrap_or("");
@@ -430,6 +431,34 @@ fn emit_smithay_runtime_probe(probe: &SmithayRuntimeProbe) {
                 (
                     "kms_framebuffer_failure",
                     FieldValue::Str(kms_framebuffer_failure),
+                ),
+                (
+                    "kms_first_present_framebuffer_filled",
+                    FieldValue::Bool(probe.kms_first_present_framebuffer_filled),
+                ),
+                (
+                    "kms_first_present_plane_state_ready",
+                    FieldValue::Bool(probe.kms_first_present_plane_state_ready),
+                ),
+                (
+                    "kms_first_present_commit_attempted",
+                    FieldValue::Bool(probe.kms_first_present_commit_attempted),
+                ),
+                (
+                    "kms_first_present_commit_succeeded",
+                    FieldValue::Bool(probe.kms_first_present_commit_succeeded),
+                ),
+                (
+                    "kms_first_present_vblank_event_received",
+                    FieldValue::Bool(probe.kms_first_present_vblank_event_received),
+                ),
+                (
+                    "kms_first_present_blocked_by_drm_master",
+                    FieldValue::Bool(probe.kms_first_present_blocked_by_drm_master),
+                ),
+                (
+                    "kms_first_present_failure",
+                    FieldValue::Str(kms_first_present_failure),
                 ),
                 ("kms_surface_failure", FieldValue::Str(kms_surface_failure),),
                 (

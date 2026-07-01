@@ -529,6 +529,16 @@ require_contains "$host_smithay_runtime_probe_manifest" '"smithay_kms_framebuffe
 require_matches "$host_smithay_runtime_probe_manifest" '"smithay_kms_framebuffer_width": [1-9][0-9]*'
 require_matches "$host_smithay_runtime_probe_manifest" '"smithay_kms_framebuffer_height": [1-9][0-9]*'
 require_contains "$host_smithay_runtime_probe_manifest" '"smithay_kms_framebuffer_released_before_surface_drop": true'
+require_contains "$host_smithay_runtime_probe_manifest" '"smithay_kms_first_present_framebuffer_filled": true'
+require_contains "$host_smithay_runtime_probe_manifest" '"smithay_kms_first_present_plane_state_ready": true'
+require_matches "$host_smithay_runtime_probe_manifest" '"smithay_kms_first_present_commit_attempted": (true|false)'
+require_matches "$host_smithay_runtime_probe_manifest" '"smithay_kms_first_present_commit_succeeded": (true|false)'
+require_matches "$host_smithay_runtime_probe_manifest" '"smithay_kms_first_present_vblank_event_received": (true|false)'
+require_matches "$host_smithay_runtime_probe_manifest" '"smithay_kms_first_present_blocked_by_drm_master": (true|false)'
+require_matches "$host_smithay_runtime_probe_manifest" '"smithay_kms_first_present_(commit_succeeded|blocked_by_drm_master)": true'
+if grep -F '"smithay_kms_first_present_commit_succeeded": true' "$host_smithay_runtime_probe_manifest" >/dev/null; then
+  require_contains "$host_smithay_runtime_probe_manifest" '"smithay_kms_first_present_vblank_event_received": true'
+fi
 require_contains "$host_smithay_runtime_probe_manifest" '"smithay_renderer_node_selected": true'
 require_contains "$host_smithay_runtime_probe_manifest" '"smithay_renderer_node_opened": true'
 require_contains "$host_smithay_runtime_probe_manifest" '"smithay_gbm_device_created": true'

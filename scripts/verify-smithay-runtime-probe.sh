@@ -85,6 +85,12 @@ if [ "$(uname -s)" != "Linux" ]; then
     "smithay_kms_framebuffer_width": 0,
     "smithay_kms_framebuffer_height": 0,
     "smithay_kms_framebuffer_released_before_surface_drop": false,
+    "smithay_kms_first_present_framebuffer_filled": false,
+    "smithay_kms_first_present_plane_state_ready": false,
+    "smithay_kms_first_present_commit_attempted": false,
+    "smithay_kms_first_present_commit_succeeded": false,
+    "smithay_kms_first_present_vblank_event_received": false,
+    "smithay_kms_first_present_blocked_by_drm_master": false,
     "smithay_renderer_node_opened": false,
     "smithay_gbm_device_created": false,
     "smithay_gbm_allocator_created": false,
@@ -195,6 +201,12 @@ smithay_kms_framebuffer_primary_plane_matches_surface=false
 smithay_kms_framebuffer_width=0
 smithay_kms_framebuffer_height=0
 smithay_kms_framebuffer_released_before_surface_drop=false
+smithay_kms_first_present_framebuffer_filled=false
+smithay_kms_first_present_plane_state_ready=false
+smithay_kms_first_present_commit_attempted=false
+smithay_kms_first_present_commit_succeeded=false
+smithay_kms_first_present_vblank_event_received=false
+smithay_kms_first_present_blocked_by_drm_master=false
 smithay_renderer_node_selected=false
 smithay_renderer_node_opened=false
 smithay_gbm_device_created=false
@@ -272,6 +284,17 @@ if grep -F '"event":"backend.preflight","backend":"drm","ready":true' "$log" >/d
   require_matches "$log" '"kms_framebuffer_height":[1-9][0-9]*'
   require_contains "$log" '"kms_framebuffer_released_before_surface_drop":true'
   require_contains "$log" '"kms_framebuffer_failure":""'
+  require_contains "$log" '"kms_first_present_framebuffer_filled":true'
+  require_contains "$log" '"kms_first_present_plane_state_ready":true'
+  require_matches "$log" '"kms_first_present_commit_attempted":(true|false)'
+  require_matches "$log" '"kms_first_present_commit_succeeded":(true|false)'
+  require_matches "$log" '"kms_first_present_vblank_event_received":(true|false)'
+  require_matches "$log" '"kms_first_present_blocked_by_drm_master":(true|false)'
+  require_matches "$log" '"kms_first_present_(commit_succeeded|blocked_by_drm_master)":true'
+  if grep -F '"kms_first_present_commit_succeeded":true' "$log" >/dev/null; then
+    require_contains "$log" '"kms_first_present_vblank_event_received":true'
+  fi
+  require_contains "$log" '"kms_first_present_failure":""'
   require_contains "$log" '"kms_surface_failure":""'
   require_contains "$log" '"kms_resource_failure":""'
   require_contains "$log" '"renderer_node_selected":true'
@@ -377,6 +400,20 @@ if grep -F '"event":"backend.preflight","backend":"drm","ready":true' "$log" >/d
   smithay_kms_framebuffer_width="$(extract_u64 "$log" kms_framebuffer_width)"
   smithay_kms_framebuffer_height="$(extract_u64 "$log" kms_framebuffer_height)"
   smithay_kms_framebuffer_released_before_surface_drop=true
+  smithay_kms_first_present_framebuffer_filled=true
+  smithay_kms_first_present_plane_state_ready=true
+  if grep -F '"kms_first_present_commit_attempted":true' "$log" >/dev/null; then
+    smithay_kms_first_present_commit_attempted=true
+  fi
+  if grep -F '"kms_first_present_commit_succeeded":true' "$log" >/dev/null; then
+    smithay_kms_first_present_commit_succeeded=true
+  fi
+  if grep -F '"kms_first_present_vblank_event_received":true' "$log" >/dev/null; then
+    smithay_kms_first_present_vblank_event_received=true
+  fi
+  if grep -F '"kms_first_present_blocked_by_drm_master":true' "$log" >/dev/null; then
+    smithay_kms_first_present_blocked_by_drm_master=true
+  fi
   smithay_renderer_node_selected=true
   smithay_renderer_node_opened=true
   smithay_gbm_device_created=true
@@ -462,6 +499,12 @@ cat > "$out_dir/manifest.json" <<EOF
     "smithay_kms_framebuffer_width": $smithay_kms_framebuffer_width,
     "smithay_kms_framebuffer_height": $smithay_kms_framebuffer_height,
     "smithay_kms_framebuffer_released_before_surface_drop": $smithay_kms_framebuffer_released_before_surface_drop,
+    "smithay_kms_first_present_framebuffer_filled": $smithay_kms_first_present_framebuffer_filled,
+    "smithay_kms_first_present_plane_state_ready": $smithay_kms_first_present_plane_state_ready,
+    "smithay_kms_first_present_commit_attempted": $smithay_kms_first_present_commit_attempted,
+    "smithay_kms_first_present_commit_succeeded": $smithay_kms_first_present_commit_succeeded,
+    "smithay_kms_first_present_vblank_event_received": $smithay_kms_first_present_vblank_event_received,
+    "smithay_kms_first_present_blocked_by_drm_master": $smithay_kms_first_present_blocked_by_drm_master,
     "smithay_renderer_node_opened": $smithay_renderer_node_opened,
     "smithay_gbm_device_created": $smithay_gbm_device_created,
     "smithay_gbm_allocator_created": $smithay_gbm_allocator_created,

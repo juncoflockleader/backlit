@@ -381,6 +381,13 @@ pub struct SmithayRuntimeProbe {
     pub kms_framebuffer_height: u64,
     pub kms_framebuffer_released_before_surface_drop: bool,
     pub kms_framebuffer_failure: Option<String>,
+    pub kms_first_present_framebuffer_filled: bool,
+    pub kms_first_present_plane_state_ready: bool,
+    pub kms_first_present_commit_attempted: bool,
+    pub kms_first_present_commit_succeeded: bool,
+    pub kms_first_present_vblank_event_received: bool,
+    pub kms_first_present_blocked_by_drm_master: bool,
+    pub kms_first_present_failure: Option<String>,
     pub kms_surface_failure: Option<String>,
     pub kms_resource_failure: Option<String>,
     pub renderer_node_selected: bool,
@@ -513,6 +520,13 @@ impl SmithayRuntimeProbe {
             && self.kms_framebuffer_height == self.kms_scanout_mode_height
             && self.kms_framebuffer_released_before_surface_drop
             && self.kms_framebuffer_failure.is_none()
+            && self.kms_first_present_framebuffer_filled
+            && self.kms_first_present_plane_state_ready
+            && (self.kms_first_present_blocked_by_drm_master
+                || self.kms_first_present_commit_succeeded)
+            && (!self.kms_first_present_commit_succeeded
+                || self.kms_first_present_vblank_event_received)
+            && self.kms_first_present_failure.is_none()
             && self.kms_surface_failure.is_none()
             && self.kms_resource_failure.is_none()
             && self.renderer_node_selected
@@ -1002,6 +1016,16 @@ pub fn smithay_runtime_probe(environment: &BackendPreflightEnvironment) -> Smith
         kms_framebuffer_released_before_surface_drop: kms_runtime_probe
             .kms_framebuffer_released_before_surface_drop,
         kms_framebuffer_failure: kms_runtime_probe.framebuffer_failure,
+        kms_first_present_framebuffer_filled: kms_runtime_probe
+            .kms_first_present_framebuffer_filled,
+        kms_first_present_plane_state_ready: kms_runtime_probe.kms_first_present_plane_state_ready,
+        kms_first_present_commit_attempted: kms_runtime_probe.kms_first_present_commit_attempted,
+        kms_first_present_commit_succeeded: kms_runtime_probe.kms_first_present_commit_succeeded,
+        kms_first_present_vblank_event_received: kms_runtime_probe
+            .kms_first_present_vblank_event_received,
+        kms_first_present_blocked_by_drm_master: kms_runtime_probe
+            .kms_first_present_blocked_by_drm_master,
+        kms_first_present_failure: kms_runtime_probe.first_present_failure,
         kms_surface_failure: kms_runtime_probe.surface_failure,
         kms_resource_failure: kms_runtime_probe.failure,
         renderer_node_selected,
@@ -1101,6 +1125,13 @@ struct SmithayKmsRuntimeProbe {
     kms_framebuffer_width: u64,
     kms_framebuffer_height: u64,
     kms_framebuffer_released_before_surface_drop: bool,
+    kms_first_present_framebuffer_filled: bool,
+    kms_first_present_plane_state_ready: bool,
+    kms_first_present_commit_attempted: bool,
+    kms_first_present_commit_succeeded: bool,
+    kms_first_present_vblank_event_received: bool,
+    kms_first_present_blocked_by_drm_master: bool,
+    first_present_failure: Option<String>,
     framebuffer_failure: Option<String>,
     surface_failure: Option<String>,
     failure: Option<String>,
@@ -1177,6 +1208,13 @@ impl SmithayKmsRuntimeProbe {
             && self.kms_framebuffer_width == self.kms_scanout_mode_width
             && self.kms_framebuffer_height == self.kms_scanout_mode_height
             && self.kms_framebuffer_released_before_surface_drop
+            && self.kms_first_present_framebuffer_filled
+            && self.kms_first_present_plane_state_ready
+            && (self.kms_first_present_blocked_by_drm_master
+                || self.kms_first_present_commit_succeeded)
+            && (!self.kms_first_present_commit_succeeded
+                || self.kms_first_present_vblank_event_received)
+            && self.first_present_failure.is_none()
             && self.framebuffer_failure.is_none()
             && self.surface_failure.is_none()
             && self.failure.is_none()
@@ -1274,12 +1312,21 @@ fn smithay_kms_runtime_probe(
 
     use smithay::backend::allocator::{dumb::DumbAllocator, Allocator, Fourcc, Modifier};
     use smithay::backend::drm::dumb::framebuffer_from_dumb_buffer;
-    use smithay::backend::drm::{DrmDevice, DrmDeviceFd, DrmError, PlaneConfig, PlaneState};
+    use smithay::backend::drm::{
+        DrmDevice, DrmDeviceFd, DrmError, DrmEvent, PlaneConfig, PlaneState,
+    };
     use smithay::reexports::calloop::EventLoop;
+    use smithay::reexports::drm::buffer::Buffer as DrmBuffer;
     use smithay::reexports::drm::control::{
         connector, crtc, plane, Device as ControlDevice, Mode, ModeTypeFlags,
     };
     use smithay::utils::{DeviceFd, Rectangle, Transform};
+
+    #[derive(Default)]
+    struct KmsEventState {
+        vblank_count: u64,
+        error_count: u64,
+    }
 
     let mut probe = SmithayKmsRuntimeProbe {
         failure: None,
@@ -1434,7 +1481,7 @@ fn smithay_kms_runtime_probe(
         }
     }
 
-    let mut event_loop = match EventLoop::<()>::try_new() {
+    let mut event_loop = match EventLoop::<KmsEventState>::try_new() {
         Ok(event_loop) => event_loop,
         Err(error) => {
             probe.failure = Some(format!("kms-event-loop-new:{error}"));
@@ -1445,7 +1492,10 @@ fn smithay_kms_runtime_probe(
 
     probe.kms_event_source_inserted = event_loop
         .handle()
-        .insert_source(notifier, |_event, _metadata, _data| {})
+        .insert_source(notifier, |event, _metadata, data| match event {
+            DrmEvent::VBlank(_) => data.vblank_count += 1,
+            DrmEvent::Error(_) => data.error_count += 1,
+        })
         .is_ok();
     if !probe.kms_event_source_inserted {
         probe.failure = Some(String::from("kms-event-source-insert"));
@@ -1453,7 +1503,7 @@ fn smithay_kms_runtime_probe(
         return probe;
     }
 
-    let mut data = ();
+    let mut data = KmsEventState::default();
     probe.kms_event_loop_dispatched = event_loop
         .dispatch(Some(Duration::from_millis(0)), &mut data)
         .is_ok();
@@ -1544,7 +1594,39 @@ fn smithay_kms_runtime_probe(
                         Ok(framebuffer) => {
                             probe.kms_framebuffer_added = true;
                             let framebuffer_handle = *framebuffer.as_ref();
-                            let plane_state = PlaneState {
+                            let mut raw_buffer = *dumb_buffer.handle();
+                            match surface.device_fd().map_dumb_buffer(&mut raw_buffer) {
+                                Ok(mut mapping) => {
+                                    let stride = raw_buffer.pitch() as usize;
+                                    let visible_bytes_per_row = framebuffer_width as usize * 4;
+                                    let row_count = framebuffer_height as usize;
+                                    let visible_len = stride
+                                        .checked_mul(row_count.saturating_sub(1))
+                                        .and_then(|base| base.checked_add(visible_bytes_per_row));
+                                    let bytes: &mut [u8] = mapping.as_mut();
+                                    if visible_len.is_some_and(|len| len <= bytes.len()) {
+                                        for y in 0..row_count {
+                                            let row_start = y * stride;
+                                            let row_end = row_start + visible_bytes_per_row;
+                                            for pixel in
+                                                bytes[row_start..row_end].chunks_exact_mut(4)
+                                            {
+                                                pixel.copy_from_slice(&[0x9a, 0x64, 0x25, 0xff]);
+                                            }
+                                        }
+                                        probe.kms_first_present_framebuffer_filled = true;
+                                    } else {
+                                        probe.first_present_failure =
+                                            Some(String::from("kms-first-present-fill-bounds"));
+                                    }
+                                }
+                                Err(error) => {
+                                    probe.first_present_failure =
+                                        Some(format!("kms-first-present-map:{error}"));
+                                }
+                            }
+
+                            let build_plane_state = || PlaneState {
                                 handle: surface.plane(),
                                 config: Some(PlaneConfig {
                                     src: Rectangle::from_size(
@@ -1563,12 +1645,71 @@ fn smithay_kms_runtime_probe(
                                     fence: None,
                                 }),
                             };
+                            probe.kms_first_present_plane_state_ready = true;
 
-                            match surface
-                                .test_state([plane_state], probe.kms_framebuffer_test_allow_modeset)
-                            {
+                            match surface.test_state(
+                                [build_plane_state()],
+                                probe.kms_framebuffer_test_allow_modeset,
+                            ) {
                                 Ok(()) => {
                                     probe.kms_framebuffer_test_state_succeeded = true;
+                                    if probe.kms_first_present_framebuffer_filled {
+                                        let previous_vblank_count = data.vblank_count;
+                                        let previous_error_count = data.error_count;
+                                        probe.kms_first_present_commit_attempted = true;
+                                        match surface.commit([build_plane_state()], true) {
+                                            Ok(()) => {
+                                                probe.kms_first_present_commit_succeeded = true;
+                                                match event_loop.dispatch(
+                                                    Some(Duration::from_millis(100)),
+                                                    &mut data,
+                                                ) {
+                                                    Ok(())
+                                                        if data.vblank_count
+                                                            > previous_vblank_count =>
+                                                    {
+                                                        probe.kms_first_present_vblank_event_received =
+                                                            true;
+                                                    }
+                                                    Ok(())
+                                                        if data.error_count
+                                                            > previous_error_count =>
+                                                    {
+                                                        probe.first_present_failure =
+                                                            Some(String::from(
+                                                                "kms-first-present-event-error",
+                                                            ));
+                                                    }
+                                                    Ok(()) => {
+                                                        probe.first_present_failure =
+                                                            Some(String::from(
+                                                                "kms-first-present-vblank-timeout",
+                                                            ));
+                                                    }
+                                                    Err(error) => {
+                                                        probe.first_present_failure = Some(format!(
+                                                            "kms-first-present-event-dispatch:{error}"
+                                                        ));
+                                                    }
+                                                }
+                                            }
+                                            Err(error) => {
+                                                if matches!(
+                                                    &error,
+                                                    DrmError::Access(access)
+                                                        if access.source.kind()
+                                                            == std::io::ErrorKind::PermissionDenied
+                                                ) {
+                                                    probe.kms_first_present_blocked_by_drm_master =
+                                                        true;
+                                                } else {
+                                                    probe.first_present_failure = Some(format!(
+                                                        "kms-first-present-commit:{error:?}"
+                                                    ));
+                                                }
+                                            }
+                                        }
+                                    }
                                 }
                                 Err(error) => {
                                     if matches!(
@@ -1578,6 +1719,7 @@ fn smithay_kms_runtime_probe(
                                                 == std::io::ErrorKind::PermissionDenied
                                     ) {
                                         probe.kms_framebuffer_test_state_permission_denied = true;
+                                        probe.kms_first_present_blocked_by_drm_master = true;
                                     } else {
                                         probe.framebuffer_failure =
                                             Some(format!("kms-framebuffer-test-state:{error:?}"));
@@ -1682,6 +1824,13 @@ fn unavailable_smithay_kms_runtime_probe(reason: impl Into<String>) -> SmithayKm
         kms_framebuffer_width: 0,
         kms_framebuffer_height: 0,
         kms_framebuffer_released_before_surface_drop: false,
+        kms_first_present_framebuffer_filled: false,
+        kms_first_present_plane_state_ready: false,
+        kms_first_present_commit_attempted: false,
+        kms_first_present_commit_succeeded: false,
+        kms_first_present_vblank_event_received: false,
+        kms_first_present_blocked_by_drm_master: false,
+        first_present_failure: Some(reason.clone()),
         framebuffer_failure: Some(reason.clone()),
         surface_failure: Some(reason.clone()),
         failure: Some(reason),
@@ -4593,6 +4742,13 @@ mod tests {
                     && (probe.kms_framebuffer_test_state_succeeded
                         || probe.kms_framebuffer_test_state_permission_denied)
                     && probe.kms_framebuffer_failure.is_none()
+                    && probe.kms_first_present_framebuffer_filled
+                    && probe.kms_first_present_plane_state_ready
+                    && (probe.kms_first_present_blocked_by_drm_master
+                        || probe.kms_first_present_commit_succeeded)
+                    && (!probe.kms_first_present_commit_succeeded
+                        || probe.kms_first_present_vblank_event_received)
+                    && probe.kms_first_present_failure.is_none()
                     && probe.renderer_node_selected
                     && probe.renderer_runtime_failure.is_none()
                     && probe.input_runtime_failure.is_none()
@@ -4643,6 +4799,13 @@ mod tests {
             assert_eq!(probe.kms_framebuffer_height, 0);
             assert!(!probe.kms_framebuffer_released_before_surface_drop);
             assert!(probe.kms_framebuffer_failure.is_some());
+            assert!(!probe.kms_first_present_framebuffer_filled);
+            assert!(!probe.kms_first_present_plane_state_ready);
+            assert!(!probe.kms_first_present_commit_attempted);
+            assert!(!probe.kms_first_present_commit_succeeded);
+            assert!(!probe.kms_first_present_vblank_event_received);
+            assert!(!probe.kms_first_present_blocked_by_drm_master);
+            assert!(probe.kms_first_present_failure.is_some());
             assert!(probe.kms_surface_failure.is_some());
             assert!(probe.kms_resource_failure.is_some());
             assert!(!probe.renderer_node_selected);
