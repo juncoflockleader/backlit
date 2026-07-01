@@ -236,6 +236,7 @@ fn emit_smithay_runtime_probe(probe: &SmithayRuntimeProbe) {
     let libseat_session_seat = probe.libseat_session_seat.as_deref().unwrap_or("");
     let input_runtime_failure = probe.input_runtime_failure.as_deref().unwrap_or("");
     let kms_resource_failure = probe.kms_resource_failure.as_deref().unwrap_or("");
+    let kms_surface_failure = probe.kms_surface_failure.as_deref().unwrap_or("");
     let kms_scanout_connector_name = probe.kms_scanout_connector_name.as_deref().unwrap_or("");
     let renderer_runtime_failure = probe.renderer_runtime_failure.as_deref().unwrap_or("");
     let primary_input_event = probe.primary_input_event.as_deref().unwrap_or("");
@@ -353,6 +354,43 @@ fn emit_smithay_runtime_probe(probe: &SmithayRuntimeProbe) {
                     "kms_scanout_mode_preferred",
                     FieldValue::Bool(probe.kms_scanout_mode_preferred),
                 ),
+                (
+                    "kms_surface_created",
+                    FieldValue::Bool(probe.kms_surface_created),
+                ),
+                (
+                    "kms_surface_legacy",
+                    FieldValue::Bool(probe.kms_surface_legacy),
+                ),
+                (
+                    "kms_surface_crtc_matches_plan",
+                    FieldValue::Bool(probe.kms_surface_crtc_matches_plan),
+                ),
+                (
+                    "kms_surface_primary_plane_matches_plan",
+                    FieldValue::Bool(probe.kms_surface_primary_plane_matches_plan),
+                ),
+                (
+                    "kms_surface_pending_connector_count",
+                    FieldValue::U64(probe.kms_surface_pending_connector_count),
+                ),
+                (
+                    "kms_surface_current_connector_count",
+                    FieldValue::U64(probe.kms_surface_current_connector_count),
+                ),
+                (
+                    "kms_surface_pending_mode_matches_plan",
+                    FieldValue::Bool(probe.kms_surface_pending_mode_matches_plan),
+                ),
+                (
+                    "kms_surface_commit_pending",
+                    FieldValue::Bool(probe.kms_surface_commit_pending),
+                ),
+                (
+                    "kms_surface_dropped_after_pause",
+                    FieldValue::Bool(probe.kms_surface_dropped_after_pause),
+                ),
+                ("kms_surface_failure", FieldValue::Str(kms_surface_failure),),
                 (
                     "kms_resource_failure",
                     FieldValue::Str(kms_resource_failure),

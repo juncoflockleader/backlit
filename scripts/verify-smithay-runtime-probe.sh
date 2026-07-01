@@ -67,6 +67,15 @@ if [ "$(uname -s)" != "Linux" ]; then
     "smithay_kms_scanout_mode_height": 0,
     "smithay_kms_scanout_mode_refresh_hz": 0,
     "smithay_kms_scanout_mode_preferred": false,
+    "smithay_kms_surface_created": false,
+    "smithay_kms_surface_legacy": false,
+    "smithay_kms_surface_crtc_matches_plan": false,
+    "smithay_kms_surface_primary_plane_matches_plan": false,
+    "smithay_kms_surface_pending_connector_count": 0,
+    "smithay_kms_surface_current_connector_count": 0,
+    "smithay_kms_surface_pending_mode_matches_plan": false,
+    "smithay_kms_surface_commit_pending": false,
+    "smithay_kms_surface_dropped_after_pause": false,
     "smithay_renderer_node_opened": false,
     "smithay_gbm_device_created": false,
     "smithay_gbm_allocator_created": false,
@@ -159,6 +168,15 @@ smithay_kms_scanout_mode_width=0
 smithay_kms_scanout_mode_height=0
 smithay_kms_scanout_mode_refresh_hz=0
 smithay_kms_scanout_mode_preferred=false
+smithay_kms_surface_created=false
+smithay_kms_surface_legacy=false
+smithay_kms_surface_crtc_matches_plan=false
+smithay_kms_surface_primary_plane_matches_plan=false
+smithay_kms_surface_pending_connector_count=0
+smithay_kms_surface_current_connector_count=0
+smithay_kms_surface_pending_mode_matches_plan=false
+smithay_kms_surface_commit_pending=false
+smithay_kms_surface_dropped_after_pause=false
 smithay_renderer_node_selected=false
 smithay_renderer_node_opened=false
 smithay_gbm_device_created=false
@@ -216,6 +234,16 @@ if grep -F '"event":"backend.preflight","backend":"drm","ready":true' "$log" >/d
   require_matches "$log" '"kms_scanout_mode_height":[1-9][0-9]*'
   require_matches "$log" '"kms_scanout_mode_refresh_hz":[1-9][0-9]*'
   require_matches "$log" '"kms_scanout_mode_preferred":(true|false)'
+  require_contains "$log" '"kms_surface_created":true'
+  require_matches "$log" '"kms_surface_legacy":(true|false)'
+  require_contains "$log" '"kms_surface_crtc_matches_plan":true'
+  require_contains "$log" '"kms_surface_primary_plane_matches_plan":true'
+  require_matches "$log" '"kms_surface_pending_connector_count":[1-9][0-9]*'
+  require_matches "$log" '"kms_surface_current_connector_count":[0-9][0-9]*'
+  require_contains "$log" '"kms_surface_pending_mode_matches_plan":true'
+  require_matches "$log" '"kms_surface_commit_pending":(true|false)'
+  require_contains "$log" '"kms_surface_dropped_after_pause":true'
+  require_contains "$log" '"kms_surface_failure":""'
   require_contains "$log" '"kms_resource_failure":""'
   require_contains "$log" '"renderer_node_selected":true'
   require_contains "$log" '"renderer_node_path":"/dev/dri/renderD'
@@ -292,6 +320,19 @@ if grep -F '"event":"backend.preflight","backend":"drm","ready":true' "$log" >/d
   if grep -F '"kms_scanout_mode_preferred":true' "$log" >/dev/null; then
     smithay_kms_scanout_mode_preferred=true
   fi
+  smithay_kms_surface_created=true
+  if grep -F '"kms_surface_legacy":true' "$log" >/dev/null; then
+    smithay_kms_surface_legacy=true
+  fi
+  smithay_kms_surface_crtc_matches_plan=true
+  smithay_kms_surface_primary_plane_matches_plan=true
+  smithay_kms_surface_pending_connector_count="$(extract_u64 "$log" kms_surface_pending_connector_count)"
+  smithay_kms_surface_current_connector_count="$(extract_u64 "$log" kms_surface_current_connector_count)"
+  smithay_kms_surface_pending_mode_matches_plan=true
+  if grep -F '"kms_surface_commit_pending":true' "$log" >/dev/null; then
+    smithay_kms_surface_commit_pending=true
+  fi
+  smithay_kms_surface_dropped_after_pause=true
   smithay_renderer_node_selected=true
   smithay_renderer_node_opened=true
   smithay_gbm_device_created=true
@@ -359,6 +400,15 @@ cat > "$out_dir/manifest.json" <<EOF
     "smithay_kms_scanout_mode_height": $smithay_kms_scanout_mode_height,
     "smithay_kms_scanout_mode_refresh_hz": $smithay_kms_scanout_mode_refresh_hz,
     "smithay_kms_scanout_mode_preferred": $smithay_kms_scanout_mode_preferred,
+    "smithay_kms_surface_created": $smithay_kms_surface_created,
+    "smithay_kms_surface_legacy": $smithay_kms_surface_legacy,
+    "smithay_kms_surface_crtc_matches_plan": $smithay_kms_surface_crtc_matches_plan,
+    "smithay_kms_surface_primary_plane_matches_plan": $smithay_kms_surface_primary_plane_matches_plan,
+    "smithay_kms_surface_pending_connector_count": $smithay_kms_surface_pending_connector_count,
+    "smithay_kms_surface_current_connector_count": $smithay_kms_surface_current_connector_count,
+    "smithay_kms_surface_pending_mode_matches_plan": $smithay_kms_surface_pending_mode_matches_plan,
+    "smithay_kms_surface_commit_pending": $smithay_kms_surface_commit_pending,
+    "smithay_kms_surface_dropped_after_pause": $smithay_kms_surface_dropped_after_pause,
     "smithay_renderer_node_opened": $smithay_renderer_node_opened,
     "smithay_gbm_device_created": $smithay_gbm_device_created,
     "smithay_gbm_allocator_created": $smithay_gbm_allocator_created,

@@ -362,6 +362,16 @@ pub struct SmithayRuntimeProbe {
     pub kms_scanout_mode_height: u64,
     pub kms_scanout_mode_refresh_hz: u64,
     pub kms_scanout_mode_preferred: bool,
+    pub kms_surface_created: bool,
+    pub kms_surface_legacy: bool,
+    pub kms_surface_crtc_matches_plan: bool,
+    pub kms_surface_primary_plane_matches_plan: bool,
+    pub kms_surface_pending_connector_count: u64,
+    pub kms_surface_current_connector_count: u64,
+    pub kms_surface_pending_mode_matches_plan: bool,
+    pub kms_surface_commit_pending: bool,
+    pub kms_surface_dropped_after_pause: bool,
+    pub kms_surface_failure: Option<String>,
     pub kms_resource_failure: Option<String>,
     pub renderer_node_selected: bool,
     pub renderer_node_path: Option<String>,
@@ -478,6 +488,13 @@ impl SmithayRuntimeProbe {
             && self.kms_scanout_mode_width > 0
             && self.kms_scanout_mode_height > 0
             && self.kms_scanout_mode_refresh_hz > 0
+            && self.kms_surface_created
+            && self.kms_surface_crtc_matches_plan
+            && self.kms_surface_primary_plane_matches_plan
+            && self.kms_surface_pending_connector_count > 0
+            && self.kms_surface_pending_mode_matches_plan
+            && self.kms_surface_dropped_after_pause
+            && self.kms_surface_failure.is_none()
             && self.kms_resource_failure.is_none()
             && self.renderer_node_selected
             && self.input_event_selected
@@ -941,6 +958,18 @@ pub fn smithay_runtime_probe(environment: &BackendPreflightEnvironment) -> Smith
         kms_scanout_mode_height: kms_runtime_probe.kms_scanout_mode_height,
         kms_scanout_mode_refresh_hz: kms_runtime_probe.kms_scanout_mode_refresh_hz,
         kms_scanout_mode_preferred: kms_runtime_probe.kms_scanout_mode_preferred,
+        kms_surface_created: kms_runtime_probe.kms_surface_created,
+        kms_surface_legacy: kms_runtime_probe.kms_surface_legacy,
+        kms_surface_crtc_matches_plan: kms_runtime_probe.kms_surface_crtc_matches_plan,
+        kms_surface_primary_plane_matches_plan: kms_runtime_probe
+            .kms_surface_primary_plane_matches_plan,
+        kms_surface_pending_connector_count: kms_runtime_probe.kms_surface_pending_connector_count,
+        kms_surface_current_connector_count: kms_runtime_probe.kms_surface_current_connector_count,
+        kms_surface_pending_mode_matches_plan: kms_runtime_probe
+            .kms_surface_pending_mode_matches_plan,
+        kms_surface_commit_pending: kms_runtime_probe.kms_surface_commit_pending,
+        kms_surface_dropped_after_pause: kms_runtime_probe.kms_surface_dropped_after_pause,
+        kms_surface_failure: kms_runtime_probe.surface_failure,
         kms_resource_failure: kms_runtime_probe.failure,
         renderer_node_selected,
         renderer_node_path,
@@ -1021,6 +1050,16 @@ struct SmithayKmsRuntimeProbe {
     kms_scanout_mode_height: u64,
     kms_scanout_mode_refresh_hz: u64,
     kms_scanout_mode_preferred: bool,
+    kms_surface_created: bool,
+    kms_surface_legacy: bool,
+    kms_surface_crtc_matches_plan: bool,
+    kms_surface_primary_plane_matches_plan: bool,
+    kms_surface_pending_connector_count: u64,
+    kms_surface_current_connector_count: u64,
+    kms_surface_pending_mode_matches_plan: bool,
+    kms_surface_commit_pending: bool,
+    kms_surface_dropped_after_pause: bool,
+    surface_failure: Option<String>,
     failure: Option<String>,
 }
 
@@ -1081,6 +1120,13 @@ impl SmithayKmsRuntimeProbe {
             && self.kms_scanout_mode_width > 0
             && self.kms_scanout_mode_height > 0
             && self.kms_scanout_mode_refresh_hz > 0
+            && self.kms_surface_created
+            && self.kms_surface_crtc_matches_plan
+            && self.kms_surface_primary_plane_matches_plan
+            && self.kms_surface_pending_connector_count > 0
+            && self.kms_surface_pending_mode_matches_plan
+            && self.kms_surface_dropped_after_pause
+            && self.surface_failure.is_none()
             && self.failure.is_none()
     }
 }
@@ -1176,11 +1222,14 @@ fn smithay_kms_runtime_probe(
 
     use smithay::backend::drm::{DrmDevice, DrmDeviceFd};
     use smithay::reexports::calloop::EventLoop;
-    use smithay::reexports::drm::control::{connector, Device as ControlDevice, ModeTypeFlags};
+    use smithay::reexports::drm::control::{
+        connector, crtc, plane, Device as ControlDevice, Mode, ModeTypeFlags,
+    };
     use smithay::utils::DeviceFd;
 
     let mut probe = SmithayKmsRuntimeProbe {
         failure: None,
+        surface_failure: None,
         ..unavailable_smithay_kms_runtime_probe("unavailable")
     };
 
@@ -1224,6 +1273,8 @@ fn smithay_kms_runtime_probe(
     probe.kms_crtc_count = device.crtcs().len() as u64;
     probe.kms_connector_count = resources.connectors().len() as u64;
 
+    let mut scanout_surface_target: Option<(connector::Handle, crtc::Handle, plane::Handle, Mode)> =
+        None;
     let mut primary_planes_by_crtc = Vec::new();
     for crtc in device.crtcs() {
         let planes = match device.planes(crtc) {
@@ -1316,6 +1367,12 @@ fn smithay_kms_runtime_probe(
                         probe.kms_scanout_mode_refresh_hz = selected_mode.vrefresh() as u64;
                         probe.kms_scanout_mode_preferred =
                             selected_mode.mode_type().contains(ModeTypeFlags::PREFERRED);
+                        scanout_surface_target = Some((
+                            connector_info.handle(),
+                            selected_crtc,
+                            selected_primary_plane,
+                            selected_mode,
+                        ));
                     }
                 }
             }
@@ -1364,6 +1421,57 @@ fn smithay_kms_runtime_probe(
         probe.failure = Some(String::from("kms-scanout-mode-refresh-zero"));
     }
 
+    if probe.failure.is_none() {
+        let Some((surface_connector, surface_crtc, surface_primary_plane, surface_mode)) =
+            scanout_surface_target
+        else {
+            probe.surface_failure = Some(String::from("kms-surface-missing-target"));
+            device.pause();
+            return probe;
+        };
+
+        let surface = match device.create_surface(surface_crtc, surface_mode, &[surface_connector])
+        {
+            Ok(surface) => surface,
+            Err(error) => {
+                probe.surface_failure = Some(format!("kms-surface-create:{error:?}"));
+                device.pause();
+                return probe;
+            }
+        };
+
+        probe.kms_surface_created = true;
+        probe.kms_surface_legacy = surface.is_legacy();
+        probe.kms_surface_crtc_matches_plan = surface.crtc() == surface_crtc
+            && Into::<u32>::into(surface.crtc()) as u64 == probe.kms_scanout_crtc_id;
+        probe.kms_surface_primary_plane_matches_plan = surface.plane() == surface_primary_plane
+            && Into::<u32>::into(surface.plane()) as u64 == probe.kms_scanout_primary_plane_id;
+        probe.kms_surface_pending_connector_count =
+            surface.pending_connectors().into_iter().count() as u64;
+        probe.kms_surface_current_connector_count =
+            surface.current_connectors().into_iter().count() as u64;
+        probe.kms_surface_pending_mode_matches_plan = surface.pending_mode() == surface_mode
+            && surface.pending_mode().size().0 as u64 == probe.kms_scanout_mode_width
+            && surface.pending_mode().size().1 as u64 == probe.kms_scanout_mode_height
+            && surface.pending_mode().vrefresh() as u64 == probe.kms_scanout_mode_refresh_hz;
+        probe.kms_surface_commit_pending = surface.commit_pending();
+
+        if !probe.kms_surface_crtc_matches_plan {
+            probe.surface_failure = Some(String::from("kms-surface-crtc-mismatch"));
+        } else if !probe.kms_surface_primary_plane_matches_plan {
+            probe.surface_failure = Some(String::from("kms-surface-plane-mismatch"));
+        } else if probe.kms_surface_pending_connector_count == 0 {
+            probe.surface_failure = Some(String::from("kms-surface-no-pending-connectors"));
+        } else if !probe.kms_surface_pending_mode_matches_plan {
+            probe.surface_failure = Some(String::from("kms-surface-pending-mode-mismatch"));
+        }
+
+        device.pause();
+        drop(surface);
+        probe.kms_surface_dropped_after_pause = true;
+        return probe;
+    }
+
     device.pause();
     probe
 }
@@ -1377,6 +1485,7 @@ fn smithay_kms_runtime_probe(
 }
 
 fn unavailable_smithay_kms_runtime_probe(reason: impl Into<String>) -> SmithayKmsRuntimeProbe {
+    let reason = reason.into();
     SmithayKmsRuntimeProbe {
         kms_card_opened: false,
         kms_device_created: false,
@@ -1399,7 +1508,17 @@ fn unavailable_smithay_kms_runtime_probe(reason: impl Into<String>) -> SmithayKm
         kms_scanout_mode_height: 0,
         kms_scanout_mode_refresh_hz: 0,
         kms_scanout_mode_preferred: false,
-        failure: Some(reason.into()),
+        kms_surface_created: false,
+        kms_surface_legacy: false,
+        kms_surface_crtc_matches_plan: false,
+        kms_surface_primary_plane_matches_plan: false,
+        kms_surface_pending_connector_count: 0,
+        kms_surface_current_connector_count: 0,
+        kms_surface_pending_mode_matches_plan: false,
+        kms_surface_commit_pending: false,
+        kms_surface_dropped_after_pause: false,
+        surface_failure: Some(reason.clone()),
+        failure: Some(reason),
     }
 }
 
@@ -4302,6 +4421,8 @@ mod tests {
                 probe.drm_node_resolved
                     && probe.kms_resource_failure.is_none()
                     && probe.kms_scanout_plan_ready
+                    && probe.kms_surface_created
+                    && probe.kms_surface_failure.is_none()
                     && probe.renderer_node_selected
                     && probe.renderer_runtime_failure.is_none()
                     && probe.input_runtime_failure.is_none()
@@ -4333,6 +4454,16 @@ mod tests {
             assert_eq!(probe.kms_scanout_mode_height, 0);
             assert_eq!(probe.kms_scanout_mode_refresh_hz, 0);
             assert!(!probe.kms_scanout_mode_preferred);
+            assert!(!probe.kms_surface_created);
+            assert!(!probe.kms_surface_legacy);
+            assert!(!probe.kms_surface_crtc_matches_plan);
+            assert!(!probe.kms_surface_primary_plane_matches_plan);
+            assert_eq!(probe.kms_surface_pending_connector_count, 0);
+            assert_eq!(probe.kms_surface_current_connector_count, 0);
+            assert!(!probe.kms_surface_pending_mode_matches_plan);
+            assert!(!probe.kms_surface_commit_pending);
+            assert!(!probe.kms_surface_dropped_after_pause);
+            assert!(probe.kms_surface_failure.is_some());
             assert!(probe.kms_resource_failure.is_some());
             assert!(!probe.renderer_node_selected);
             assert!(!probe.gbm_allocator_component);
