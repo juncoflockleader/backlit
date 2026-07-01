@@ -1332,6 +1332,7 @@ fn smithay_kms_runtime_probe(
         failure: None,
         surface_failure: None,
         framebuffer_failure: None,
+        first_present_failure: None,
         ..unavailable_smithay_kms_runtime_probe("unavailable")
     };
 
