@@ -2346,6 +2346,10 @@ struct SmithayCompositorState {
     surface_commit_count: u64,
     xdg_toplevel_count: u64,
     xdg_popup_count: u64,
+    title_changed_count: u64,
+    app_id_changed_count: u64,
+    title_matched: bool,
+    app_id_matched: bool,
 }
 
 #[cfg(all(feature = "smithay-backend", target_os = "linux"))]
@@ -2356,6 +2360,12 @@ struct SmithayClientData {
 
 #[cfg(all(feature = "smithay-backend", target_os = "linux"))]
 impl smithay::reexports::wayland_server::backend::ClientData for SmithayClientData {}
+
+#[cfg(all(feature = "smithay-backend", target_os = "linux"))]
+const SMITHAY_SMOKE_TITLE: &str = "Backlit Smithay smoke";
+
+#[cfg(all(feature = "smithay-backend", target_os = "linux"))]
+const SMITHAY_SMOKE_APP_ID: &str = "org.backlit.SmithaySmoke";
 
 #[cfg(all(feature = "smithay-backend", target_os = "linux"))]
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
@@ -2377,6 +2387,10 @@ pub struct SmithayWaylandClientSmokeReport {
     pub surface_commit_count: u64,
     pub xdg_toplevel_count: u64,
     pub xdg_popup_count: u64,
+    pub title_changed_count: u64,
+    pub app_id_changed_count: u64,
+    pub title_matched: bool,
+    pub app_id_matched: bool,
 }
 
 #[cfg(all(feature = "smithay-backend", target_os = "linux"))]
@@ -2398,6 +2412,10 @@ impl SmithayWaylandClientSmokeReport {
             && self.calloop_dispatch_count >= 3
             && self.surface_commit_count >= 1
             && self.xdg_toplevel_count >= 1
+            && self.title_changed_count >= 1
+            && self.app_id_changed_count >= 1
+            && self.title_matched
+            && self.app_id_matched
     }
 }
 
@@ -2463,7 +2481,8 @@ impl WaylandClientEventState {
 
             let xdg_surface = wm_base.get_xdg_surface(base_surface, qh, ());
             let xdg_toplevel = xdg_surface.get_toplevel(qh, ());
-            xdg_toplevel.set_title(String::from("Backlit Smithay smoke"));
+            xdg_toplevel.set_title(String::from(SMITHAY_SMOKE_TITLE));
+            xdg_toplevel.set_app_id(String::from(SMITHAY_SMOKE_APP_ID));
             base_surface.commit();
             self.xdg_surface = Some(xdg_surface);
             self.xdg_toplevel = Some(xdg_toplevel);
@@ -2624,6 +2643,10 @@ impl SmithayCompositorState {
             surface_commit_count: 0,
             xdg_toplevel_count: 0,
             xdg_popup_count: 0,
+            title_changed_count: 0,
+            app_id_changed_count: 0,
+            title_matched: false,
+            app_id_matched: false,
         }
     }
 }
@@ -2715,6 +2738,38 @@ impl smithay::wayland::shell::xdg::XdgShellHandler for SmithayCompositorState {
     ) {
         surface.send_repositioned(token);
     }
+
+    fn title_changed(&mut self, surface: smithay::wayland::shell::xdg::ToplevelSurface) {
+        self.title_changed_count += 1;
+        let (title, _app_id) = smithay_toplevel_metadata(&surface);
+        if title.as_deref() == Some(SMITHAY_SMOKE_TITLE) {
+            self.title_matched = true;
+        }
+    }
+
+    fn app_id_changed(&mut self, surface: smithay::wayland::shell::xdg::ToplevelSurface) {
+        self.app_id_changed_count += 1;
+        let (_title, app_id) = smithay_toplevel_metadata(&surface);
+        if app_id.as_deref() == Some(SMITHAY_SMOKE_APP_ID) {
+            self.app_id_matched = true;
+        }
+    }
+}
+
+#[cfg(all(feature = "smithay-backend", target_os = "linux"))]
+fn smithay_toplevel_metadata(
+    surface: &smithay::wayland::shell::xdg::ToplevelSurface,
+) -> (Option<String>, Option<String>) {
+    smithay::wayland::compositor::with_states(surface.wl_surface(), |states| {
+        let Some(data) = states
+            .data_map
+            .get::<smithay::wayland::shell::xdg::XdgToplevelSurfaceData>()
+        else {
+            return (None, None);
+        };
+        let attributes = data.lock().unwrap();
+        (attributes.title.clone(), attributes.app_id.clone())
+    })
 }
 
 #[cfg(all(feature = "smithay-backend", target_os = "linux"))]
@@ -2806,6 +2861,8 @@ impl SmithayCompositorRuntime {
                 && client_state.configure_acked
                 && client_state.surface_committed
                 && self.state.surface_commit_count >= 2
+                && self.state.title_matched
+                && self.state.app_id_matched
             {
                 break;
             }
@@ -2832,6 +2889,10 @@ impl SmithayCompositorRuntime {
             surface_commit_count: self.state.surface_commit_count,
             xdg_toplevel_count: self.state.xdg_toplevel_count,
             xdg_popup_count: self.state.xdg_popup_count,
+            title_changed_count: self.state.title_changed_count,
+            app_id_changed_count: self.state.app_id_changed_count,
+            title_matched: self.state.title_matched,
+            app_id_matched: self.state.app_id_matched,
         };
 
         Ok(report)

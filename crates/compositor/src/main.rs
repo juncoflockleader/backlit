@@ -130,6 +130,16 @@ fn run() -> Result<(), String> {
                     FieldValue::U64(smoke.xdg_toplevel_count),
                 ),
                 ("xdg_popup_count", FieldValue::U64(smoke.xdg_popup_count)),
+                (
+                    "title_changed_count",
+                    FieldValue::U64(smoke.title_changed_count),
+                ),
+                (
+                    "app_id_changed_count",
+                    FieldValue::U64(smoke.app_id_changed_count),
+                ),
+                ("title_matched", FieldValue::Bool(smoke.title_matched)),
+                ("app_id_matched", FieldValue::Bool(smoke.app_id_matched)),
             ],
         );
 
@@ -1348,6 +1358,10 @@ struct SmithayClientSmoke {
     surface_commit_count: u64,
     xdg_toplevel_count: u64,
     xdg_popup_count: u64,
+    title_changed_count: u64,
+    app_id_changed_count: u64,
+    title_matched: bool,
+    app_id_matched: bool,
 }
 
 impl SmithayClientSmoke {
@@ -1369,6 +1383,10 @@ impl SmithayClientSmoke {
             && self.calloop_dispatch_count >= 3
             && self.surface_commit_count >= 1
             && self.xdg_toplevel_count >= 1
+            && self.title_changed_count >= 1
+            && self.app_id_changed_count >= 1
+            && self.title_matched
+            && self.app_id_matched
     }
 }
 
@@ -1405,6 +1423,10 @@ fn run_smithay_client_smoke_for_config(config: &RunConfig) -> Result<SmithayClie
         surface_commit_count: report.surface_commit_count,
         xdg_toplevel_count: report.xdg_toplevel_count,
         xdg_popup_count: report.xdg_popup_count,
+        title_changed_count: report.title_changed_count,
+        app_id_changed_count: report.app_id_changed_count,
+        title_matched: report.title_matched,
+        app_id_matched: report.app_id_matched,
     })
 }
 

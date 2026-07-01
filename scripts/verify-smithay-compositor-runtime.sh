@@ -90,6 +90,7 @@ write_blocked_manifest() {
     "smithay_scripted_client": false,
     "smithay_core_protocol_globals": false,
     "smithay_real_wayland_client": false,
+    "smithay_real_wayland_metadata": false,
     "smithay_event_loop_runtime": false,
     "smithay_service_ready": false,
     "smithay_service_socket": false,
@@ -198,7 +199,11 @@ require_line_contains_all "$client_smoke_log" \
   '"configure_acked":true' \
   '"surface_committed":true' \
   '"surface_commit_count":2' \
-  '"xdg_toplevel_count":1'
+  '"xdg_toplevel_count":1' \
+  '"title_changed_count":1' \
+  '"app_id_changed_count":1' \
+  '"title_matched":true' \
+  '"app_id_matched":true'
 
 runtime_dir="${XDG_RUNTIME_DIR:-}"
 test -n "$runtime_dir" || fail "XDG_RUNTIME_DIR missing on launch-ready Linux host"
@@ -382,6 +387,7 @@ cat > "$out_dir/manifest.json" <<EOF
     "smithay_scripted_client": true,
     "smithay_core_protocol_globals": true,
     "smithay_real_wayland_client": true,
+    "smithay_real_wayland_metadata": true,
     "smithay_event_loop_runtime": true,
     "smithay_service_ready": true,
     "smithay_service_socket": true,

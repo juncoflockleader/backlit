@@ -460,6 +460,7 @@ require_contains "$host_smithay_compositor_runtime_manifest" '"smithay_runtime_t
 require_contains "$host_smithay_compositor_runtime_manifest" '"smithay_scripted_client": true'
 require_contains "$host_smithay_compositor_runtime_manifest" '"smithay_core_protocol_globals": true'
 require_contains "$host_smithay_compositor_runtime_manifest" '"smithay_real_wayland_client": true'
+require_contains "$host_smithay_compositor_runtime_manifest" '"smithay_real_wayland_metadata": true'
 require_contains "$host_smithay_compositor_runtime_manifest" '"smithay_event_loop_runtime": true'
 require_contains "$host_smithay_compositor_runtime_manifest" '"smithay_service_ready": true'
 require_contains "$host_smithay_compositor_runtime_manifest" '"smithay_service_socket": true'
