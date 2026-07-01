@@ -123,8 +123,10 @@ fn connect_to_compositor_socket(
     );
     let message = if config.connect_lifecycle {
         format!(
-            "{surface_message}BACKLIT_DEMO_CLIENT damage app_id={}\nBACKLIT_DEMO_CLIENT close app_id={}\n",
+            "{surface_message}BACKLIT_DEMO_CLIENT damage title={} app_id={}\nBACKLIT_DEMO_CLIENT close title={} app_id={}\n",
+            protocol_token(config.connect_title.as_str()),
             protocol_token(config.connect_app_id.as_str()),
+            protocol_token(config.connect_title.as_str()),
             protocol_token(config.connect_app_id.as_str()),
         )
     } else {
