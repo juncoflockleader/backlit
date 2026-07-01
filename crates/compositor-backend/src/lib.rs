@@ -4348,8 +4348,9 @@ impl SmithayCompositorState {
     }
 
     fn dispatch_input_bridge_smoke(&mut self) {
-        self.dispatch_keyboard_key(30, smithay::backend::input::KeyState::Pressed, 0);
-        self.dispatch_keyboard_key(30, smithay::backend::input::KeyState::Released, 1);
+        let keycode = smithay::backend::input::Keycode::from(30u32);
+        self.dispatch_keyboard_key(keycode, smithay::backend::input::KeyState::Pressed, 0);
+        self.dispatch_keyboard_key(keycode, smithay::backend::input::KeyState::Released, 1);
         self.dispatch_pointer_motion(8.0, 6.0, 2);
         self.dispatch_pointer_button(0x110, smithay::backend::input::ButtonState::Pressed, 3);
         self.dispatch_pointer_button(0x110, smithay::backend::input::ButtonState::Released, 4);
