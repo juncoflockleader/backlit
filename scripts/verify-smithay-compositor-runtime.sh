@@ -9,6 +9,8 @@ mkdir -p "$out_dir"
 
 log="$out_dir/smithay-compositor-runtime.jsonl"
 err="$out_dir/smithay-compositor-runtime.stderr"
+client_smoke_log="$out_dir/smithay-wayland-client-smoke.jsonl"
+client_smoke_err="$out_dir/smithay-wayland-client-smoke.stderr"
 service_log="$out_dir/smithay-compositor-service.jsonl"
 service_err="$out_dir/smithay-compositor-service.stderr"
 first_demo_client_log="$out_dir/demo-client-first-socket.jsonl"
@@ -75,6 +77,8 @@ write_blocked_manifest() {
   "artifacts": {
     "compositor_log": "$log",
     "compositor_stderr": "$err",
+    "client_smoke_log": "$client_smoke_log",
+    "client_smoke_stderr": "$client_smoke_err",
     "service_log": "$service_log",
     "service_stderr": "$service_err",
     "first_demo_client_log": "$first_demo_client_log",
@@ -85,6 +89,7 @@ write_blocked_manifest() {
     "smithay_runtime_trait": false,
     "smithay_scripted_client": false,
     "smithay_core_protocol_globals": false,
+    "smithay_real_wayland_client": false,
     "smithay_event_loop_runtime": false,
     "smithay_service_ready": false,
     "smithay_service_socket": false,
@@ -162,6 +167,38 @@ require_line_contains_all "$log" \
   '"calloop_dispatch_count":1'
 require_contains "$log" '"bootstrap_client_connected":true'
 require_contains "$log" '"bootstrap_surface_presented":true'
+
+set +e
+target/debug/backlit-compositor \
+  --backend=drm \
+  --runtime=smithay \
+  --smithay-client-smoke > "$client_smoke_log" 2> "$client_smoke_err"
+client_smoke_status=$?
+set -e
+
+if [ "$client_smoke_status" -ne 0 ]; then
+  cat "$client_smoke_log" >&2 || true
+  cat "$client_smoke_err" >&2 || true
+  fail "Smithay Wayland client smoke exited with status $client_smoke_status on a launch-ready host"
+fi
+
+require_contains "$client_smoke_log" '"event":"compositor.smithay_client_smoke"'
+require_contains "$client_smoke_log" '"passed":true'
+require_contains "$client_smoke_log" '"runtime_backend":"smithay-compositor-runtime"'
+require_line_contains_all "$client_smoke_log" \
+  '"event":"compositor.smithay_client_smoke"' \
+  '"smithay_protocol_globals":4' \
+  '"registry_announced":true' \
+  '"compositor_bound":true' \
+  '"shm_bound":true' \
+  '"xdg_wm_base_bound":true' \
+  '"surface_created":true' \
+  '"xdg_toplevel_created":true' \
+  '"configure_received":true' \
+  '"configure_acked":true' \
+  '"surface_committed":true' \
+  '"surface_commit_count":1' \
+  '"xdg_toplevel_count":1'
 
 runtime_dir="${XDG_RUNTIME_DIR:-}"
 test -n "$runtime_dir" || fail "XDG_RUNTIME_DIR missing on launch-ready Linux host"
@@ -332,6 +369,8 @@ cat > "$out_dir/manifest.json" <<EOF
   "artifacts": {
     "compositor_log": "$log",
     "compositor_stderr": "$err",
+    "client_smoke_log": "$client_smoke_log",
+    "client_smoke_stderr": "$client_smoke_err",
     "service_log": "$service_log",
     "service_stderr": "$service_err",
     "first_demo_client_log": "$first_demo_client_log",
@@ -342,6 +381,7 @@ cat > "$out_dir/manifest.json" <<EOF
     "smithay_runtime_trait": true,
     "smithay_scripted_client": true,
     "smithay_core_protocol_globals": true,
+    "smithay_real_wayland_client": true,
     "smithay_event_loop_runtime": true,
     "smithay_service_ready": true,
     "smithay_service_socket": true,

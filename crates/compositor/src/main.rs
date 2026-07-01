@@ -46,6 +46,10 @@ fn run() -> Result<(), String> {
             ("runtime", FieldValue::Str(config.runtime.as_str())),
             ("smoke_test", FieldValue::Bool(config.smoke_test)),
             ("scripted_client", FieldValue::Bool(config.scripted_client)),
+            (
+                "smithay_client_smoke",
+                FieldValue::Bool(config.smithay_client_smoke),
+            ),
         ],
     );
 
@@ -63,6 +67,91 @@ fn run() -> Result<(), String> {
             preflight_report.backend.as_str(),
             preflight_report.code,
         ));
+    }
+
+    if config.smithay_client_smoke {
+        let smoke = run_smithay_client_smoke_for_config(&config)?;
+        emit(
+            "compositor.smithay_client_smoke",
+            &config,
+            &[
+                ("passed", FieldValue::Bool(smoke.passed())),
+                ("runtime_backend", FieldValue::Str(smoke.runtime_backend)),
+                (
+                    "smithay_protocol_globals",
+                    FieldValue::U64(smoke.smithay_protocol_globals),
+                ),
+                (
+                    "registry_global_count",
+                    FieldValue::U64(smoke.registry_global_count),
+                ),
+                (
+                    "registry_announced",
+                    FieldValue::Bool(smoke.registry_announced),
+                ),
+                ("compositor_bound", FieldValue::Bool(smoke.compositor_bound)),
+                ("shm_bound", FieldValue::Bool(smoke.shm_bound)),
+                (
+                    "xdg_wm_base_bound",
+                    FieldValue::Bool(smoke.xdg_wm_base_bound),
+                ),
+                ("surface_created", FieldValue::Bool(smoke.surface_created)),
+                (
+                    "xdg_toplevel_created",
+                    FieldValue::Bool(smoke.xdg_toplevel_created),
+                ),
+                (
+                    "configure_received",
+                    FieldValue::Bool(smoke.configure_received),
+                ),
+                ("configure_acked", FieldValue::Bool(smoke.configure_acked)),
+                (
+                    "surface_committed",
+                    FieldValue::Bool(smoke.surface_committed),
+                ),
+                (
+                    "inserted_wayland_clients",
+                    FieldValue::U64(smoke.inserted_wayland_clients),
+                ),
+                (
+                    "wayland_dispatch_count",
+                    FieldValue::U64(smoke.wayland_dispatch_count),
+                ),
+                (
+                    "calloop_dispatch_count",
+                    FieldValue::U64(smoke.calloop_dispatch_count),
+                ),
+                (
+                    "surface_commit_count",
+                    FieldValue::U64(smoke.surface_commit_count),
+                ),
+                (
+                    "xdg_toplevel_count",
+                    FieldValue::U64(smoke.xdg_toplevel_count),
+                ),
+                ("xdg_popup_count", FieldValue::U64(smoke.xdg_popup_count)),
+            ],
+        );
+
+        if !smoke.passed() {
+            return Err(String::from("Smithay Wayland client protocol smoke failed"));
+        }
+
+        if !config.scripted_client
+            && !config.smoke_test
+            && !config.serve
+            && config.idle_probe_ms.is_none()
+        {
+            emit(
+                "compositor.exit",
+                &config,
+                &[(
+                    "elapsed_ms",
+                    FieldValue::U64(started.elapsed().as_millis() as u64),
+                )],
+            );
+            return Ok(());
+        }
     }
 
     if config.scripted_client {
@@ -1240,6 +1329,93 @@ fn poll_socket_clients<B: CompositorRuntime>(
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+struct SmithayClientSmoke {
+    runtime_backend: &'static str,
+    smithay_protocol_globals: u64,
+    registry_global_count: u64,
+    registry_announced: bool,
+    compositor_bound: bool,
+    shm_bound: bool,
+    xdg_wm_base_bound: bool,
+    surface_created: bool,
+    xdg_toplevel_created: bool,
+    configure_received: bool,
+    configure_acked: bool,
+    surface_committed: bool,
+    inserted_wayland_clients: u64,
+    wayland_dispatch_count: u64,
+    calloop_dispatch_count: u64,
+    surface_commit_count: u64,
+    xdg_toplevel_count: u64,
+    xdg_popup_count: u64,
+}
+
+impl SmithayClientSmoke {
+    fn passed(self) -> bool {
+        self.runtime_backend == "smithay-compositor-runtime"
+            && self.smithay_protocol_globals >= 4
+            && self.registry_global_count >= 4
+            && self.registry_announced
+            && self.compositor_bound
+            && self.shm_bound
+            && self.xdg_wm_base_bound
+            && self.surface_created
+            && self.xdg_toplevel_created
+            && self.configure_received
+            && self.configure_acked
+            && self.surface_committed
+            && self.inserted_wayland_clients >= 1
+            && self.wayland_dispatch_count >= 3
+            && self.calloop_dispatch_count >= 3
+            && self.surface_commit_count >= 1
+            && self.xdg_toplevel_count >= 1
+    }
+}
+
+#[cfg(all(feature = "smithay-backend", target_os = "linux"))]
+fn run_smithay_client_smoke_for_config(config: &RunConfig) -> Result<SmithayClientSmoke, String> {
+    if config.runtime != RuntimeKind::Smithay {
+        return Err(String::from(
+            "Smithay Wayland client smoke requires --runtime=smithay",
+        ));
+    }
+
+    let mut runtime = SmithayCompositorRuntime::try_new().map_err(|error| error.to_string())?;
+    let runtime_backend = runtime.runtime_name();
+    let report = runtime
+        .run_wayland_client_smoke()
+        .map_err(|error| error.to_string())?;
+
+    Ok(SmithayClientSmoke {
+        runtime_backend,
+        smithay_protocol_globals: report.protocol_globals,
+        registry_global_count: report.registry_global_count,
+        registry_announced: report.registry_announced,
+        compositor_bound: report.compositor_bound,
+        shm_bound: report.shm_bound,
+        xdg_wm_base_bound: report.xdg_wm_base_bound,
+        surface_created: report.surface_created,
+        xdg_toplevel_created: report.xdg_toplevel_created,
+        configure_received: report.configure_received,
+        configure_acked: report.configure_acked,
+        surface_committed: report.surface_committed,
+        inserted_wayland_clients: report.inserted_wayland_clients,
+        wayland_dispatch_count: report.wayland_dispatch_count,
+        calloop_dispatch_count: report.calloop_dispatch_count,
+        surface_commit_count: report.surface_commit_count,
+        xdg_toplevel_count: report.xdg_toplevel_count,
+        xdg_popup_count: report.xdg_popup_count,
+    })
+}
+
+#[cfg(not(all(feature = "smithay-backend", target_os = "linux")))]
+fn run_smithay_client_smoke_for_config(_config: &RunConfig) -> Result<SmithayClientSmoke, String> {
+    Err(String::from(
+        "Smithay Wayland client smoke requires Linux and the smithay-backend feature",
+    ))
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 struct ScriptedClientRuntime {
     runtime_backend: &'static str,
     runtime_trait: bool,
@@ -2361,7 +2537,7 @@ fn print_help() {
 backlit-compositor
 
 Usage:
-  backlit-compositor [--backend=headless|wayland|drm] [--runtime=headless|smithay] [--socket=backlit-0] [--smoke-test] [--scripted-client] [--scripted-client-preview=path] [--serve] [--serve-for-ms=1000] [--idle-probe-ms=1000]
+  backlit-compositor [--backend=headless|wayland|drm] [--runtime=headless|smithay] [--socket=backlit-0] [--smoke-test] [--scripted-client] [--smithay-client-smoke] [--scripted-client-preview=path] [--serve] [--serve-for-ms=1000] [--idle-probe-ms=1000]
 
 Flags:
   --backend      Select compositor backend. Defaults to headless.
@@ -2370,6 +2546,8 @@ Flags:
   --smoke-test   Run the current MVP 0 policy/metrics smoke test and exit.
   --scripted-client
                  Run a deterministic app-client lifecycle through the compositor runtime.
+  --smithay-client-smoke
+                 Run a real Wayland registry/surface/xdg-toplevel protocol smoke through Smithay.
   --scripted-client-preview
                  Write the scripted client policy preview frame to a PPM file.
   --serve        Stay alive after readiness for systemd session service mode.
