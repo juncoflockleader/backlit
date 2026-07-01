@@ -59,6 +59,14 @@ if [ "$(uname -s)" != "Linux" ]; then
     "smithay_kms_primary_plane_count": 0,
     "smithay_kms_cursor_plane_count": 0,
     "smithay_kms_overlay_plane_count": 0,
+    "smithay_kms_scanout_plan_ready": false,
+    "smithay_kms_scanout_connector_id": 0,
+    "smithay_kms_scanout_crtc_id": 0,
+    "smithay_kms_scanout_primary_plane_id": 0,
+    "smithay_kms_scanout_mode_width": 0,
+    "smithay_kms_scanout_mode_height": 0,
+    "smithay_kms_scanout_mode_refresh_hz": 0,
+    "smithay_kms_scanout_mode_preferred": false,
     "smithay_renderer_node_opened": false,
     "smithay_gbm_device_created": false,
     "smithay_gbm_allocator_created": false,
@@ -143,6 +151,14 @@ smithay_kms_mode_count=0
 smithay_kms_primary_plane_count=0
 smithay_kms_cursor_plane_count=0
 smithay_kms_overlay_plane_count=0
+smithay_kms_scanout_plan_ready=false
+smithay_kms_scanout_connector_id=0
+smithay_kms_scanout_crtc_id=0
+smithay_kms_scanout_primary_plane_id=0
+smithay_kms_scanout_mode_width=0
+smithay_kms_scanout_mode_height=0
+smithay_kms_scanout_mode_refresh_hz=0
+smithay_kms_scanout_mode_preferred=false
 smithay_renderer_node_selected=false
 smithay_renderer_node_opened=false
 smithay_gbm_device_created=false
@@ -191,6 +207,15 @@ if grep -F '"event":"backend.preflight","backend":"drm","ready":true' "$log" >/d
   require_matches "$log" '"kms_primary_plane_count":[1-9][0-9]*'
   require_matches "$log" '"kms_cursor_plane_count":[0-9][0-9]*'
   require_matches "$log" '"kms_overlay_plane_count":[0-9][0-9]*'
+  require_contains "$log" '"kms_scanout_plan_ready":true'
+  require_matches "$log" '"kms_scanout_connector_id":[1-9][0-9]*'
+  require_matches "$log" '"kms_scanout_connector_name":"[^"]+"'
+  require_matches "$log" '"kms_scanout_crtc_id":[1-9][0-9]*'
+  require_matches "$log" '"kms_scanout_primary_plane_id":[1-9][0-9]*'
+  require_matches "$log" '"kms_scanout_mode_width":[1-9][0-9]*'
+  require_matches "$log" '"kms_scanout_mode_height":[1-9][0-9]*'
+  require_matches "$log" '"kms_scanout_mode_refresh_hz":[1-9][0-9]*'
+  require_matches "$log" '"kms_scanout_mode_preferred":(true|false)'
   require_contains "$log" '"kms_resource_failure":""'
   require_contains "$log" '"renderer_node_selected":true'
   require_contains "$log" '"renderer_node_path":"/dev/dri/renderD'
@@ -257,6 +282,16 @@ if grep -F '"event":"backend.preflight","backend":"drm","ready":true' "$log" >/d
   smithay_kms_primary_plane_count="$(extract_u64 "$log" kms_primary_plane_count)"
   smithay_kms_cursor_plane_count="$(extract_u64 "$log" kms_cursor_plane_count)"
   smithay_kms_overlay_plane_count="$(extract_u64 "$log" kms_overlay_plane_count)"
+  smithay_kms_scanout_plan_ready=true
+  smithay_kms_scanout_connector_id="$(extract_u64 "$log" kms_scanout_connector_id)"
+  smithay_kms_scanout_crtc_id="$(extract_u64 "$log" kms_scanout_crtc_id)"
+  smithay_kms_scanout_primary_plane_id="$(extract_u64 "$log" kms_scanout_primary_plane_id)"
+  smithay_kms_scanout_mode_width="$(extract_u64 "$log" kms_scanout_mode_width)"
+  smithay_kms_scanout_mode_height="$(extract_u64 "$log" kms_scanout_mode_height)"
+  smithay_kms_scanout_mode_refresh_hz="$(extract_u64 "$log" kms_scanout_mode_refresh_hz)"
+  if grep -F '"kms_scanout_mode_preferred":true' "$log" >/dev/null; then
+    smithay_kms_scanout_mode_preferred=true
+  fi
   smithay_renderer_node_selected=true
   smithay_renderer_node_opened=true
   smithay_gbm_device_created=true
@@ -316,6 +351,14 @@ cat > "$out_dir/manifest.json" <<EOF
     "smithay_kms_primary_plane_count": $smithay_kms_primary_plane_count,
     "smithay_kms_cursor_plane_count": $smithay_kms_cursor_plane_count,
     "smithay_kms_overlay_plane_count": $smithay_kms_overlay_plane_count,
+    "smithay_kms_scanout_plan_ready": $smithay_kms_scanout_plan_ready,
+    "smithay_kms_scanout_connector_id": $smithay_kms_scanout_connector_id,
+    "smithay_kms_scanout_crtc_id": $smithay_kms_scanout_crtc_id,
+    "smithay_kms_scanout_primary_plane_id": $smithay_kms_scanout_primary_plane_id,
+    "smithay_kms_scanout_mode_width": $smithay_kms_scanout_mode_width,
+    "smithay_kms_scanout_mode_height": $smithay_kms_scanout_mode_height,
+    "smithay_kms_scanout_mode_refresh_hz": $smithay_kms_scanout_mode_refresh_hz,
+    "smithay_kms_scanout_mode_preferred": $smithay_kms_scanout_mode_preferred,
     "smithay_renderer_node_opened": $smithay_renderer_node_opened,
     "smithay_gbm_device_created": $smithay_gbm_device_created,
     "smithay_gbm_allocator_created": $smithay_gbm_allocator_created,

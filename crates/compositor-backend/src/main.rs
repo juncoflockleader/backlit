@@ -236,6 +236,7 @@ fn emit_smithay_runtime_probe(probe: &SmithayRuntimeProbe) {
     let libseat_session_seat = probe.libseat_session_seat.as_deref().unwrap_or("");
     let input_runtime_failure = probe.input_runtime_failure.as_deref().unwrap_or("");
     let kms_resource_failure = probe.kms_resource_failure.as_deref().unwrap_or("");
+    let kms_scanout_connector_name = probe.kms_scanout_connector_name.as_deref().unwrap_or("");
     let renderer_runtime_failure = probe.renderer_runtime_failure.as_deref().unwrap_or("");
     let primary_input_event = probe.primary_input_event.as_deref().unwrap_or("");
     let components = probe.components.join(",");
@@ -315,6 +316,42 @@ fn emit_smithay_runtime_probe(probe: &SmithayRuntimeProbe) {
                 (
                     "kms_overlay_plane_count",
                     FieldValue::U64(probe.kms_overlay_plane_count),
+                ),
+                (
+                    "kms_scanout_plan_ready",
+                    FieldValue::Bool(probe.kms_scanout_plan_ready),
+                ),
+                (
+                    "kms_scanout_connector_id",
+                    FieldValue::U64(probe.kms_scanout_connector_id),
+                ),
+                (
+                    "kms_scanout_connector_name",
+                    FieldValue::Str(kms_scanout_connector_name),
+                ),
+                (
+                    "kms_scanout_crtc_id",
+                    FieldValue::U64(probe.kms_scanout_crtc_id),
+                ),
+                (
+                    "kms_scanout_primary_plane_id",
+                    FieldValue::U64(probe.kms_scanout_primary_plane_id),
+                ),
+                (
+                    "kms_scanout_mode_width",
+                    FieldValue::U64(probe.kms_scanout_mode_width),
+                ),
+                (
+                    "kms_scanout_mode_height",
+                    FieldValue::U64(probe.kms_scanout_mode_height),
+                ),
+                (
+                    "kms_scanout_mode_refresh_hz",
+                    FieldValue::U64(probe.kms_scanout_mode_refresh_hz),
+                ),
+                (
+                    "kms_scanout_mode_preferred",
+                    FieldValue::Bool(probe.kms_scanout_mode_preferred),
                 ),
                 (
                     "kms_resource_failure",

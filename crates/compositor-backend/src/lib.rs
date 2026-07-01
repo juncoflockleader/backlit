@@ -353,6 +353,15 @@ pub struct SmithayRuntimeProbe {
     pub kms_primary_plane_count: u64,
     pub kms_cursor_plane_count: u64,
     pub kms_overlay_plane_count: u64,
+    pub kms_scanout_plan_ready: bool,
+    pub kms_scanout_connector_id: u64,
+    pub kms_scanout_connector_name: Option<String>,
+    pub kms_scanout_crtc_id: u64,
+    pub kms_scanout_primary_plane_id: u64,
+    pub kms_scanout_mode_width: u64,
+    pub kms_scanout_mode_height: u64,
+    pub kms_scanout_mode_refresh_hz: u64,
+    pub kms_scanout_mode_preferred: bool,
     pub kms_resource_failure: Option<String>,
     pub renderer_node_selected: bool,
     pub renderer_node_path: Option<String>,
@@ -462,6 +471,13 @@ impl SmithayRuntimeProbe {
             && self.kms_connected_connector_count > 0
             && self.kms_mode_count > 0
             && self.kms_primary_plane_count > 0
+            && self.kms_scanout_plan_ready
+            && self.kms_scanout_connector_id > 0
+            && self.kms_scanout_crtc_id > 0
+            && self.kms_scanout_primary_plane_id > 0
+            && self.kms_scanout_mode_width > 0
+            && self.kms_scanout_mode_height > 0
+            && self.kms_scanout_mode_refresh_hz > 0
             && self.kms_resource_failure.is_none()
             && self.renderer_node_selected
             && self.input_event_selected
@@ -916,6 +932,15 @@ pub fn smithay_runtime_probe(environment: &BackendPreflightEnvironment) -> Smith
         kms_primary_plane_count: kms_runtime_probe.kms_primary_plane_count,
         kms_cursor_plane_count: kms_runtime_probe.kms_cursor_plane_count,
         kms_overlay_plane_count: kms_runtime_probe.kms_overlay_plane_count,
+        kms_scanout_plan_ready: kms_runtime_probe.kms_scanout_plan_ready,
+        kms_scanout_connector_id: kms_runtime_probe.kms_scanout_connector_id,
+        kms_scanout_connector_name: kms_runtime_probe.kms_scanout_connector_name,
+        kms_scanout_crtc_id: kms_runtime_probe.kms_scanout_crtc_id,
+        kms_scanout_primary_plane_id: kms_runtime_probe.kms_scanout_primary_plane_id,
+        kms_scanout_mode_width: kms_runtime_probe.kms_scanout_mode_width,
+        kms_scanout_mode_height: kms_runtime_probe.kms_scanout_mode_height,
+        kms_scanout_mode_refresh_hz: kms_runtime_probe.kms_scanout_mode_refresh_hz,
+        kms_scanout_mode_preferred: kms_runtime_probe.kms_scanout_mode_preferred,
         kms_resource_failure: kms_runtime_probe.failure,
         renderer_node_selected,
         renderer_node_path,
@@ -987,6 +1012,15 @@ struct SmithayKmsRuntimeProbe {
     kms_primary_plane_count: u64,
     kms_cursor_plane_count: u64,
     kms_overlay_plane_count: u64,
+    kms_scanout_plan_ready: bool,
+    kms_scanout_connector_id: u64,
+    kms_scanout_connector_name: Option<String>,
+    kms_scanout_crtc_id: u64,
+    kms_scanout_primary_plane_id: u64,
+    kms_scanout_mode_width: u64,
+    kms_scanout_mode_height: u64,
+    kms_scanout_mode_refresh_hz: u64,
+    kms_scanout_mode_preferred: bool,
     failure: Option<String>,
 }
 
@@ -1040,6 +1074,13 @@ impl SmithayKmsRuntimeProbe {
             && self.kms_connected_connector_count > 0
             && self.kms_mode_count > 0
             && self.kms_primary_plane_count > 0
+            && self.kms_scanout_plan_ready
+            && self.kms_scanout_connector_id > 0
+            && self.kms_scanout_crtc_id > 0
+            && self.kms_scanout_primary_plane_id > 0
+            && self.kms_scanout_mode_width > 0
+            && self.kms_scanout_mode_height > 0
+            && self.kms_scanout_mode_refresh_hz > 0
             && self.failure.is_none()
     }
 }
@@ -1135,7 +1176,7 @@ fn smithay_kms_runtime_probe(
 
     use smithay::backend::drm::{DrmDevice, DrmDeviceFd};
     use smithay::reexports::calloop::EventLoop;
-    use smithay::reexports::drm::control::{connector, Device as ControlDevice};
+    use smithay::reexports::drm::control::{connector, Device as ControlDevice, ModeTypeFlags};
     use smithay::utils::DeviceFd;
 
     let mut probe = SmithayKmsRuntimeProbe {
@@ -1182,21 +1223,8 @@ fn smithay_kms_runtime_probe(
 
     probe.kms_crtc_count = device.crtcs().len() as u64;
     probe.kms_connector_count = resources.connectors().len() as u64;
-    for connector_handle in resources.connectors() {
-        let connector_info = match device.get_connector(*connector_handle, false) {
-            Ok(info) => info,
-            Err(error) => {
-                probe.failure = Some(format!("kms-connector:{error:?}"));
-                device.pause();
-                return probe;
-            }
-        };
-        if connector_info.state() == connector::State::Connected {
-            probe.kms_connected_connector_count += 1;
-            probe.kms_mode_count += connector_info.modes().len() as u64;
-        }
-    }
 
+    let mut primary_planes_by_crtc = Vec::new();
     for crtc in device.crtcs() {
         let planes = match device.planes(crtc) {
             Ok(planes) => planes,
@@ -1209,6 +1237,89 @@ fn smithay_kms_runtime_probe(
         probe.kms_primary_plane_count += planes.primary.len() as u64;
         probe.kms_cursor_plane_count += planes.cursor.len() as u64;
         probe.kms_overlay_plane_count += planes.overlay.len() as u64;
+        if let Some(primary_plane) = planes.primary.first() {
+            primary_planes_by_crtc.push((*crtc, primary_plane.handle));
+        }
+    }
+
+    for connector_handle in resources.connectors() {
+        let connector_info = match device.get_connector(*connector_handle, false) {
+            Ok(info) => info,
+            Err(error) => {
+                probe.failure = Some(format!("kms-connector:{error:?}"));
+                device.pause();
+                return probe;
+            }
+        };
+        if connector_info.state() == connector::State::Connected {
+            probe.kms_connected_connector_count += 1;
+            probe.kms_mode_count += connector_info.modes().len() as u64;
+
+            if !probe.kms_scanout_plan_ready {
+                let selected_mode = connector_info
+                    .modes()
+                    .iter()
+                    .copied()
+                    .find(|mode| mode.mode_type().contains(ModeTypeFlags::PREFERRED))
+                    .or_else(|| connector_info.modes().first().copied());
+                if let Some(selected_mode) = selected_mode {
+                    let mut candidate_crtcs = Vec::new();
+                    for encoder_handle in connector_info
+                        .current_encoder()
+                        .into_iter()
+                        .chain(connector_info.encoders().iter().copied())
+                    {
+                        let encoder_info = match device.get_encoder(encoder_handle) {
+                            Ok(info) => info,
+                            Err(error) => {
+                                probe.failure = Some(format!("kms-encoder:{error:?}"));
+                                device.pause();
+                                return probe;
+                            }
+                        };
+                        if let Some(current_crtc) = encoder_info.crtc() {
+                            if !candidate_crtcs.contains(&current_crtc) {
+                                candidate_crtcs.push(current_crtc);
+                            }
+                        }
+                        for possible_crtc in resources.filter_crtcs(encoder_info.possible_crtcs()) {
+                            if !candidate_crtcs.contains(&possible_crtc) {
+                                candidate_crtcs.push(possible_crtc);
+                            }
+                        }
+                    }
+                    if candidate_crtcs.is_empty() {
+                        candidate_crtcs.extend(device.crtcs().iter().copied());
+                    }
+
+                    let selected_crtc_plane = candidate_crtcs
+                        .iter()
+                        .find_map(|candidate_crtc| {
+                            primary_planes_by_crtc
+                                .iter()
+                                .find(|(crtc, _plane)| crtc == candidate_crtc)
+                                .copied()
+                        })
+                        .or_else(|| primary_planes_by_crtc.first().copied());
+
+                    if let Some((selected_crtc, selected_primary_plane)) = selected_crtc_plane {
+                        let (mode_width, mode_height) = selected_mode.size();
+                        probe.kms_scanout_plan_ready = true;
+                        probe.kms_scanout_connector_id =
+                            Into::<u32>::into(connector_info.handle()) as u64;
+                        probe.kms_scanout_connector_name = Some(connector_info.to_string());
+                        probe.kms_scanout_crtc_id = Into::<u32>::into(selected_crtc) as u64;
+                        probe.kms_scanout_primary_plane_id =
+                            Into::<u32>::into(selected_primary_plane) as u64;
+                        probe.kms_scanout_mode_width = mode_width as u64;
+                        probe.kms_scanout_mode_height = mode_height as u64;
+                        probe.kms_scanout_mode_refresh_hz = selected_mode.vrefresh() as u64;
+                        probe.kms_scanout_mode_preferred =
+                            selected_mode.mode_type().contains(ModeTypeFlags::PREFERRED);
+                    }
+                }
+            }
+        }
     }
 
     let mut event_loop = match EventLoop::<()>::try_new() {
@@ -1247,6 +1358,10 @@ fn smithay_kms_runtime_probe(
         probe.failure = Some(String::from("kms-no-modes"));
     } else if probe.kms_primary_plane_count == 0 {
         probe.failure = Some(String::from("kms-no-primary-planes"));
+    } else if !probe.kms_scanout_plan_ready {
+        probe.failure = Some(String::from("kms-no-scanout-plan"));
+    } else if probe.kms_scanout_mode_refresh_hz == 0 {
+        probe.failure = Some(String::from("kms-scanout-mode-refresh-zero"));
     }
 
     device.pause();
@@ -1275,6 +1390,15 @@ fn unavailable_smithay_kms_runtime_probe(reason: impl Into<String>) -> SmithayKm
         kms_primary_plane_count: 0,
         kms_cursor_plane_count: 0,
         kms_overlay_plane_count: 0,
+        kms_scanout_plan_ready: false,
+        kms_scanout_connector_id: 0,
+        kms_scanout_connector_name: None,
+        kms_scanout_crtc_id: 0,
+        kms_scanout_primary_plane_id: 0,
+        kms_scanout_mode_width: 0,
+        kms_scanout_mode_height: 0,
+        kms_scanout_mode_refresh_hz: 0,
+        kms_scanout_mode_preferred: false,
         failure: Some(reason.into()),
     }
 }
@@ -4177,6 +4301,7 @@ mod tests {
                 probe.launch_ready,
                 probe.drm_node_resolved
                     && probe.kms_resource_failure.is_none()
+                    && probe.kms_scanout_plan_ready
                     && probe.renderer_node_selected
                     && probe.renderer_runtime_failure.is_none()
                     && probe.input_runtime_failure.is_none()
@@ -4199,6 +4324,15 @@ mod tests {
             assert_eq!(probe.kms_primary_plane_count, 0);
             assert_eq!(probe.kms_cursor_plane_count, 0);
             assert_eq!(probe.kms_overlay_plane_count, 0);
+            assert!(!probe.kms_scanout_plan_ready);
+            assert_eq!(probe.kms_scanout_connector_id, 0);
+            assert!(probe.kms_scanout_connector_name.is_none());
+            assert_eq!(probe.kms_scanout_crtc_id, 0);
+            assert_eq!(probe.kms_scanout_primary_plane_id, 0);
+            assert_eq!(probe.kms_scanout_mode_width, 0);
+            assert_eq!(probe.kms_scanout_mode_height, 0);
+            assert_eq!(probe.kms_scanout_mode_refresh_hz, 0);
+            assert!(!probe.kms_scanout_mode_preferred);
             assert!(probe.kms_resource_failure.is_some());
             assert!(!probe.renderer_node_selected);
             assert!(!probe.gbm_allocator_component);
