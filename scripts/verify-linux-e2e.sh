@@ -34,6 +34,7 @@ session_launch_dir="$out_dir/session-launch"
 session_replay_dir="$out_dir/session-replay"
 session_clean_exit_dir="$out_dir/session-clean-exit"
 drm_session_smoke_dir="$out_dir/drm-session-smoke"
+dedicated_drm_session_dir="$out_dir/dedicated-drm-session"
 mvp0_contract_dir="$out_dir/mvp0-contract"
 mvp1_contract_dir="$out_dir/mvp1-contract"
 mkdir -p "$out_dir"
@@ -75,6 +76,7 @@ cargo clippy --workspace --all-targets -- -D warnings
 ./scripts/verify-session-replay.sh "$session_replay_dir"
 ./scripts/verify-session-clean-exit.sh "$session_clean_exit_dir"
 ./scripts/verify-drm-session-smoke.sh "$drm_session_smoke_dir"
+./scripts/verify-dedicated-drm-session.sh "$dedicated_drm_session_dir"
 
 nested_wayland=false
 nested_wayland_manifest=""
@@ -125,6 +127,7 @@ cat > "$out_dir/manifest.json" <<EOF
     "session_replay_manifest": "$session_replay_dir/manifest.json",
     "session_clean_exit_manifest": "$session_clean_exit_dir/manifest.json",
     "drm_session_smoke_manifest": "$drm_session_smoke_dir/manifest.json",
+    "dedicated_drm_session_manifest": "$dedicated_drm_session_dir/manifest.json",
     "mvp0_contract_manifest": "$mvp0_contract_dir/manifest.json",
     "mvp1_contract_manifest": "$mvp1_contract_dir/manifest.json",
     "nested_wayland_manifest": "$nested_wayland_manifest"
@@ -162,6 +165,7 @@ cat > "$out_dir/manifest.json" <<EOF
     "session_replay": true,
     "session_clean_exit": true,
     "drm_session_smoke": true,
+    "dedicated_drm_session": true,
     "mvp0_contract": true,
     "mvp1_contract": true,
     "nested_wayland": $nested_wayland

@@ -39,6 +39,7 @@ require_executable scripts/verify-launch-readiness.sh
 require_executable scripts/verify-session-launch.sh
 require_executable scripts/verify-drm-session-smoke.sh
 require_executable scripts/verify-drm-master-boundary.sh
+require_executable scripts/verify-dedicated-drm-session.sh
 require_executable scripts/verify-session-replay.sh
 require_executable scripts/verify-compositor-socket.sh
 require_executable scripts/verify-launcher-desktop-discovery.sh
@@ -85,6 +86,11 @@ require_contains scripts/verify-drm-master-boundary.sh '"compositor_service_drm"
 require_contains scripts/verify-drm-master-boundary.sh '"compositor_service_smithay_runtime": true'
 require_contains scripts/verify-drm-master-boundary.sh '"dedicated_session_required": $dedicated_session_required'
 require_contains scripts/verify-drm-master-boundary.sh '"current_session_can_present": $current_session_can_present'
+require_contains scripts/verify-dedicated-drm-session.sh '"name": "backlit-dedicated-drm-session"'
+require_contains scripts/verify-dedicated-drm-session.sh '--require-drm-master-present'
+require_contains scripts/verify-dedicated-drm-session.sh '"dedicated_session_acceptance": $dedicated_session_acceptance'
+require_contains scripts/verify-dedicated-drm-session.sh '"first_present_commit_succeeded": $first_present_commit_succeeded'
+require_contains scripts/verify-dedicated-drm-session.sh '"first_present_vblank_event_received": $first_present_vblank_event_received'
 require_contains scripts/verify-session-replay.sh '"launcher_overlay_frame": true'
 require_contains scripts/verify-session-replay.sh '"app_switcher_overlay_frame": true'
 require_contains scripts/verify-compositor-socket.sh '"session_socket_bound": true'
@@ -131,12 +137,14 @@ require_contains scripts/verify-smithay-compositor-runtime.sh '"smithay_service_
 require_contains scripts/verify-smithay-compositor-runtime.sh '"smithay_demo_client_socket_lifecycle": true'
 require_contains crates/compositor/src/main.rs '"compositor.drm_first_present_probe"'
 require_contains scripts/verify-linux-e2e.sh './scripts/verify-drm-session-smoke.sh'
+require_contains scripts/verify-linux-e2e.sh './scripts/verify-dedicated-drm-session.sh'
 require_contains scripts/verify-linux-e2e.sh './scripts/verify-mvp1-contract.sh'
 
 artifact_manifests_checked=false
 drm_launch_ready_artifact=false
 drm_session_smoke_ready_artifact=false
 drm_master_boundary_artifact=false
+dedicated_drm_session_artifact=false
 debian_package_install_replay_artifact=false
 debian_system_install_replay_artifact=false
 nested_wayland_artifact=false
@@ -151,6 +159,7 @@ if [ -n "$artifact_root" ] && [ -d "$artifact_root" ]; then
   require_file "$artifact_root/session-launch/manifest.json"
   require_file "$artifact_root/drm-session-smoke/manifest.json"
   require_file "$artifact_root/drm-master-boundary/manifest.json"
+  require_file "$artifact_root/dedicated-drm-session/manifest.json"
   require_file "$artifact_root/session-replay/manifest.json"
   require_file "$artifact_root/launch-performance/manifest.json"
   require_file "$artifact_root/resource-budget/manifest.json"
@@ -241,6 +250,24 @@ if [ -n "$artifact_root" ] && [ -d "$artifact_root" ]; then
   else
     require_contains "$artifact_root/drm-master-boundary/manifest.json" '"expected_blocked": true'
   fi
+
+  require_contains "$artifact_root/dedicated-drm-session/manifest.json" '"name": "backlit-dedicated-drm-session"'
+  require_contains "$artifact_root/dedicated-drm-session/manifest.json" '"drm_master_boundary": true'
+  require_contains "$artifact_root/dedicated-drm-session/manifest.json" '"dedicated_session_model": "seat-owner-tty-or-display-manager-session"'
+  if grep '"expected_blocked": false' "$artifact_root/dedicated-drm-session/manifest.json" >/dev/null; then
+    require_contains "$artifact_root/dedicated-drm-session/manifest.json" '"dedicated_session_acceptance": true'
+    require_contains "$artifact_root/dedicated-drm-session/manifest.json" '"first_present_commit_succeeded": true'
+    require_contains "$artifact_root/dedicated-drm-session/manifest.json" '"first_present_vblank_event_received": true'
+    require_contains "$artifact_root/dedicated-drm-session/manifest.json" '"session_drm_first_present_probe": true'
+    require_contains "$artifact_root/dedicated-drm-session/manifest.json" '"session_gui_verified": true'
+    require_contains "$artifact_root/dedicated-drm-session/manifest.json" '"session_services": true'
+    require_contains "$artifact_root/dedicated-drm-session/manifest.json" '"session_clean_exit": true'
+  else
+    require_contains "$artifact_root/dedicated-drm-session/manifest.json" '"expected_blocked": true'
+    require_contains "$artifact_root/dedicated-drm-session/manifest.json" '"dedicated_session_acceptance": false'
+    require_matches "$artifact_root/dedicated-drm-session/manifest.json" '"reason": "(drm-master-unavailable|drm-launch-not-ready|non-linux-host)"'
+  fi
+  dedicated_drm_session_artifact=true
 
   require_contains "$artifact_root/session-replay/manifest.json" '"frame_count": 9'
   require_contains "$artifact_root/session-replay/manifest.json" '"launcher_overlay_frame": true'
@@ -541,6 +568,7 @@ cat > "$manifest" <<EOF
     "launch_readiness_verifier": "scripts/verify-launch-readiness.sh",
     "session_launch_verifier": "scripts/verify-session-launch.sh",
     "drm_session_smoke_verifier": "scripts/verify-drm-session-smoke.sh",
+    "dedicated_drm_session_verifier": "scripts/verify-dedicated-drm-session.sh",
     "linux_e2e_verifier": "scripts/verify-linux-e2e.sh"
   },
   "checks": {
@@ -566,6 +594,7 @@ cat > "$manifest" <<EOF
     "drm_launch_ready_artifact": $drm_launch_ready_artifact,
     "drm_session_smoke_ready_artifact": $drm_session_smoke_ready_artifact,
     "drm_master_boundary_artifact": $drm_master_boundary_artifact,
+    "dedicated_drm_session_artifact": $dedicated_drm_session_artifact,
     "debian_package_install_replay_artifact": $debian_package_install_replay_artifact,
     "debian_system_install_replay_artifact": $debian_system_install_replay_artifact,
     "nested_wayland_artifact": $nested_wayland_artifact

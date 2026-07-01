@@ -61,6 +61,7 @@ require_executable scripts/verify-debian-system-install.sh
 require_executable scripts/verify-staged-session-install.sh
 require_executable scripts/verify-smithay-runtime-probe.sh
 require_executable scripts/verify-drm-master-boundary.sh
+require_executable scripts/verify-dedicated-drm-session.sh
 require_executable scripts/verify-smithay-compositor-runtime.sh
 require_executable scripts/verify-nested-wayland-smoke.sh
 require_executable scripts/verify-session-replay.sh
@@ -146,6 +147,9 @@ require_contains scripts/verify-drm-master-boundary.sh '"session_entry_drm": tru
 require_contains scripts/verify-drm-master-boundary.sh '"compositor_service_drm": true'
 require_contains scripts/verify-drm-master-boundary.sh '"compositor_service_smithay_runtime": true'
 require_contains scripts/verify-drm-master-boundary.sh '"dedicated_session_model": "seat-owner-tty-or-display-manager-session"'
+require_contains scripts/verify-dedicated-drm-session.sh '"name": "backlit-dedicated-drm-session"'
+require_contains scripts/verify-dedicated-drm-session.sh '--require-drm-master-present'
+require_contains scripts/verify-dedicated-drm-session.sh '"dedicated_session_acceptance": $dedicated_session_acceptance'
 require_contains scripts/verify-smithay-compositor-runtime.sh '--features smithay-backend'
 require_contains scripts/verify-smithay-compositor-runtime.sh '--runtime=smithay'
 require_contains scripts/verify-smithay-compositor-runtime.sh '--drm-first-present-probe'
@@ -195,6 +199,7 @@ require_contains scripts/verify-linux-e2e.sh './scripts/verify-debian-system-ins
 require_contains scripts/verify-linux-e2e.sh './scripts/verify-staged-session-install.sh'
 require_contains scripts/verify-linux-e2e.sh './scripts/verify-systemd-activation.sh'
 require_contains scripts/verify-linux-e2e.sh './scripts/verify-drm-session-smoke.sh'
+require_contains scripts/verify-linux-e2e.sh './scripts/verify-dedicated-drm-session.sh'
 require_contains scripts/verify-linux-e2e.sh './scripts/verify-session-replay.sh'
 require_contains scripts/verify-linux-e2e.sh './scripts/verify-session-clean-exit.sh'
 require_contains scripts/verify-linux-e2e.sh './scripts/verify-mvp1-contract.sh'
@@ -206,6 +211,7 @@ require_contains scripts/verify-parallels-linux-e2e.sh '"actual_system_dpkg_inst
 require_contains scripts/verify-parallels-linux-e2e.sh 'debian-package-install-manifest.json'
 require_contains scripts/verify-parallels-linux-e2e.sh 'debian-system-install-manifest.json'
 require_contains scripts/verify-parallels-linux-e2e.sh 'drm-session-smoke-manifest.json'
+require_contains scripts/verify-parallels-linux-e2e.sh 'dedicated-drm-session-manifest.json'
 require_contains scripts/verify-session-launch.sh '--verify-systemd-units'
 require_contains scripts/verify-session-launch.sh 'XDG_RUNTIME_DIR XDG_SESSION_ID XDG_SEAT XDG_SESSION_TYPE WAYLAND_DISPLAY XDG_CURRENT_DESKTOP DESKTOP_SESSION'
 require_contains scripts/verify-session-launch.sh '"session_systemd_units": true'
@@ -292,6 +298,7 @@ if [ -n "$artifact_root" ] && [ -d "$artifact_root" ]; then
   require_file "$artifact_root/launch-readiness/manifest.json"
   require_file "$artifact_root/session-clean-exit/manifest.json"
   require_file "$artifact_root/drm-session-smoke/manifest.json"
+  require_file "$artifact_root/dedicated-drm-session/manifest.json"
   require_file "$artifact_root/mvp1-contract/manifest.json"
 
   require_contains "$artifact_root/gui-smoke/manifest.json" '"protocol_required_count": 7'
@@ -792,6 +799,19 @@ if [ -n "$artifact_root" ] && [ -d "$artifact_root" ]; then
     require_contains "$artifact_root/drm-session-smoke/manifest.json" '"drm_session_smoke_blocked_expected": true'
   fi
 
+  require_contains "$artifact_root/dedicated-drm-session/manifest.json" '"name": "backlit-dedicated-drm-session"'
+  require_contains "$artifact_root/dedicated-drm-session/manifest.json" '"drm_master_boundary": true'
+  if grep '"expected_blocked": false' "$artifact_root/dedicated-drm-session/manifest.json" >/dev/null; then
+    require_contains "$artifact_root/dedicated-drm-session/manifest.json" '"dedicated_session_acceptance": true'
+    require_contains "$artifact_root/dedicated-drm-session/manifest.json" '"first_present_commit_succeeded": true'
+    require_contains "$artifact_root/dedicated-drm-session/manifest.json" '"first_present_vblank_event_received": true'
+    require_contains "$artifact_root/dedicated-drm-session/manifest.json" '"session_drm_first_present_probe": true'
+    require_contains "$artifact_root/dedicated-drm-session/manifest.json" '"session_clean_exit": true'
+  else
+    require_contains "$artifact_root/dedicated-drm-session/manifest.json" '"expected_blocked": true'
+    require_contains "$artifact_root/dedicated-drm-session/manifest.json" '"dedicated_session_acceptance": false'
+  fi
+
   if [ -f "$artifact_root/nested-wayland/manifest.json" ]; then
     nested_wayland_artifact=true
     require_contains "$artifact_root/nested-wayland/manifest.json" '"parent_socket_ready": true'
@@ -865,6 +885,7 @@ cat > "$out_dir/manifest.json" <<EOF
     "debian_system_install": true,
     "staged_session_install": true,
     "drm_session_smoke": true,
+    "dedicated_drm_session": true,
     "mvp1_contract": true,
     "ci_gate": true
   }
