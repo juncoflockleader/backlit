@@ -32,6 +32,7 @@ package_installed_dedicated_drm=false
 current_commit_evidence=false
 gui_launch_verified=false
 preview_evidence=false
+semantic_gui_evidence=false
 mvp1_acceptance=false
 launch_performance_evidence=false
 resource_budget_evidence=false
@@ -70,6 +71,7 @@ write_manifest() {
     "current_commit_evidence": $current_commit_evidence,
     "gui_launch_verified": $gui_launch_verified,
     "preview_evidence": $preview_evidence,
+    "semantic_gui_evidence": $semantic_gui_evidence,
     "mvp1_acceptance": $mvp1_acceptance,
     "launch_performance_evidence": $launch_performance_evidence,
     "resource_budget_evidence": $resource_budget_evidence
@@ -161,6 +163,16 @@ require_contains "$parallels_manifest" '"debian_system_install_replay": true' pa
 require_contains "$parallels_manifest" '"nested_wayland": true' parallels-linux-e2e
 require_contains "$parallels_manifest" '"drm_session_smoke": true' parallels-linux-e2e
 require_contains "$parallels_manifest" '"mvp1_contract": true' parallels-linux-e2e
+require_contains "$parallels_manifest" '"gui_smoke_session_desktop_managed_window": true' semantic-gui-evidence
+require_contains "$parallels_manifest" '"gui_smoke_demo_client_app_id": true' semantic-gui-evidence
+require_contains "$parallels_manifest" '"drm_session_desktop_managed_window": true' semantic-gui-evidence
+require_contains "$parallels_manifest" '"drm_session_demo_client_app_id": true' semantic-gui-evidence
+require_contains "$parallels_manifest" '"debian_package_install_desktop_managed_window": true' semantic-gui-evidence
+require_contains "$parallels_manifest" '"debian_package_install_demo_client_app_id": true' semantic-gui-evidence
+require_contains "$parallels_manifest" '"debian_system_install_desktop_managed_window": true' semantic-gui-evidence
+require_contains "$parallels_manifest" '"debian_system_install_demo_client_app_id": true' semantic-gui-evidence
+require_contains "$parallels_manifest" '"nested_wayland_desktop_managed_window": true' semantic-gui-evidence
+require_contains "$parallels_manifest" '"nested_wayland_demo_client_app_id": true' semantic-gui-evidence
 require_contains "$parallels_manifest" '"launch_performance": true' parallels-linux-e2e
 require_contains "$parallels_manifest" '"resource_budget": true' parallels-linux-e2e
 require_contains "$parallels_manifest" '"png_written": true' preview-evidence
@@ -196,6 +208,8 @@ require_contains "$dedicated_session_manifest" '"session_binary": "/usr/bin/back
 require_contains "$dedicated_session_manifest" '"system_session_binary": true' package-installed-dedicated-drm
 require_contains "$dedicated_session_manifest" '"session_desktop_launch": true' package-installed-dedicated-drm
 require_contains "$dedicated_session_manifest" '"session_compositor_demo_client": true' package-installed-dedicated-drm
+require_contains "$dedicated_session_manifest" '"session_gui_verified": true' semantic-gui-evidence
+require_contains "$dedicated_session_manifest" '"session_services": true' semantic-gui-evidence
 require_contains "$dedicated_session_manifest" '"session_clean_exit": true' package-installed-dedicated-drm
 require_png_file "$dedicated_preview" missing-parallels-dedicated-preview
 package_installed_dedicated_drm=true
@@ -203,6 +217,7 @@ package_installed_dedicated_drm=true
 current_commit_evidence=true
 gui_launch_verified=true
 preview_evidence=true
+semantic_gui_evidence=true
 mvp1_acceptance=true
 write_manifest true complete
 
