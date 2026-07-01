@@ -30,6 +30,12 @@ dedicated_e2e_status=-1
 mvp_complete_status=-1
 passed=false
 reason="not-run"
+normal_health_reason="not-run"
+dedicated_health_reason="not-run"
+normal_health_root_mount=""
+dedicated_health_root_mount=""
+normal_health_root_mount_options=""
+dedicated_health_root_mount_options=""
 
 json_string() {
   printf '"%s"' "$(printf '%s' "$1" | sed 's/\\/\\\\/g; s/"/\\"/g')"
@@ -64,6 +70,30 @@ run_step() {
   return "$status"
 }
 
+json_string_field() {
+  file="$1"
+  key="$2"
+  if [ ! -f "$file" ]; then
+    printf 'missing'
+    return 0
+  fi
+  value="$(sed -n "s/^[[:space:]]*\"$key\": \"\\(.*\\)\"[,]*$/\\1/p" "$file" | sed -n '1p')"
+  if [ -n "$value" ]; then
+    printf '%s' "$value"
+  else
+    printf 'unknown'
+  fi
+}
+
+refresh_health_summary() {
+  normal_health_reason="$(json_string_field "$normal_health_dir/manifest.json" reason)"
+  dedicated_health_reason="$(json_string_field "$dedicated_health_dir/manifest.json" reason)"
+  normal_health_root_mount="$(json_string_field "$normal_health_dir/manifest.json" root_mount)"
+  dedicated_health_root_mount="$(json_string_field "$dedicated_health_dir/manifest.json" root_mount)"
+  normal_health_root_mount_options="$(json_string_field "$normal_health_dir/manifest.json" root_mount_options)"
+  dedicated_health_root_mount_options="$(json_string_field "$dedicated_health_dir/manifest.json" root_mount_options)"
+}
+
 write_manifest() {
   cat > "$manifest" <<EOF
 {
@@ -77,6 +107,14 @@ write_manifest() {
     "upstream_commit": $(json_string "$upstream_commit"),
     "worktree_clean": $(json_bool "$worktree_clean"),
     "pushed_commit": $(json_bool "$pushed_commit")
+  },
+  "health": {
+    "normal_reason": $(json_string "$normal_health_reason"),
+    "dedicated_reason": $(json_string "$dedicated_health_reason"),
+    "normal_root_mount": $(json_string "$normal_health_root_mount"),
+    "dedicated_root_mount": $(json_string "$dedicated_health_root_mount"),
+    "normal_root_mount_options": $(json_string "$normal_health_root_mount_options"),
+    "dedicated_root_mount_options": $(json_string "$dedicated_health_root_mount_options")
   },
   "artifacts": {
     "normal_health_manifest": $(json_string "$normal_health_dir/manifest.json"),
@@ -186,6 +224,7 @@ if run_step dedicated-health ./scripts/verify-parallels-ubuntu-health.sh "$dedic
 else
   dedicated_health_status="$?"
 fi
+refresh_health_summary
 
 if [ "$normal_health_status" -ne 0 ] || [ "$dedicated_health_status" -ne 0 ]; then
   reason="parallels-health-failed"
