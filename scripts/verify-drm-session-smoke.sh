@@ -201,6 +201,13 @@ if [ "$drm_expected_ready" = true ]; then
   grep '"event":"session.backend_preflight"' "$session_log" >/dev/null
   grep '"backend":"drm"' "$session_log" >/dev/null
   grep '"ready":true' "$session_log" >/dev/null
+  grep '"event":"session.backend_launch_plan"' "$session_log" >/dev/null
+  grep '"implementation":"pre-smithay-policy-harness"' "$session_log" >/dev/null
+  grep '"display_driver":"drm-kms"' "$session_log" >/dev/null
+  grep '"uses_drm":true' "$session_log" >/dev/null
+  grep '"uses_libinput":true' "$session_log" >/dev/null
+  grep '"drm_card_selected":true' "$session_log" >/dev/null
+  grep '"input_event_selected":true' "$session_log" >/dev/null
   grep '"xdg_runtime_dir_owned_by_user":true' "$session_log" >/dev/null
   grep '"logind_session_verified":true' "$session_log" >/dev/null
   grep '"session_active":true' "$session_log" >/dev/null
@@ -272,6 +279,8 @@ else
   grep '"event":"session.backend_preflight"' "$session_log" >/dev/null
   grep '"backend":"drm"' "$session_log" >/dev/null
   grep '"ready":false' "$session_log" >/dev/null
+  grep '"event":"session.backend_launch_plan"' "$session_log" >/dev/null
+  grep '"implementation":"pre-smithay-policy-harness"' "$session_log" >/dev/null
   grep '"event":"session.launch_ready"' "$session_log" >/dev/null
   grep '"passed":false' "$session_log" >/dev/null
   drm_session_smoke_blocked_expected=true
@@ -292,6 +301,9 @@ cat > "$out_dir/manifest.json" <<EOF
   "checks": {
     "drm_expected_ready": $drm_expected_ready,
     "drm_session_smoke_ready": $drm_session_smoke_ready,
+    "drm_backend_launch_plan": true,
+    "drm_device_selected": $drm_session_smoke_ready,
+    "drm_input_selected": $drm_session_smoke_ready,
     "drm_session_smoke_blocked_expected": $drm_session_smoke_blocked_expected,
     "drm_session_clean_exit": $drm_session_clean_exit,
 	    "settings_service": $drm_session_smoke_ready,

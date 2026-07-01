@@ -3,7 +3,8 @@ use std::process;
 
 use backlit_common::metrics::{event_json, FieldValue};
 use backlit_compositor_backend::{
-    preflight_backend_with_environment, BackendKind, BackendPreflightEnvironment,
+    backend_launch_plan, preflight_backend_with_environment, BackendKind, BackendLaunchPlan,
+    BackendPreflightEnvironment,
 };
 
 fn main() {
@@ -23,6 +24,7 @@ fn run() -> Result<(), String> {
 
     let environment = BackendPreflightEnvironment::from_host();
     let report = preflight_backend_with_environment(config.backend, &environment);
+    let launch_plan = backend_launch_plan(config.backend, &report, &environment);
     let wayland_display = environment.wayland_display.as_deref().unwrap_or("");
     let xdg_runtime_dir = environment.xdg_runtime_dir.as_deref().unwrap_or("");
     let session_id = environment.session_id.as_deref().unwrap_or("");
@@ -129,6 +131,7 @@ fn run() -> Result<(), String> {
             ],
         )
     );
+    emit_launch_plan(&launch_plan);
 
     if config.verify && !report.ready {
         return Err(format!(
@@ -139,6 +142,59 @@ fn run() -> Result<(), String> {
     }
 
     Ok(())
+}
+
+fn emit_launch_plan(plan: &BackendLaunchPlan) {
+    let primary_drm_card = plan.primary_drm_card.as_deref().unwrap_or("");
+    let primary_drm_render_node = plan.primary_drm_render_node.as_deref().unwrap_or("");
+    let primary_input_event = plan.primary_input_event.as_deref().unwrap_or("");
+    let session_id = plan.session_id.as_deref().unwrap_or("");
+    let seat = plan.seat.as_deref().unwrap_or("");
+    let session_type = plan.session_type.as_deref().unwrap_or("");
+
+    println!(
+        "{}",
+        event_json(
+            "backend.launch_plan",
+            &[
+                ("backend", FieldValue::Str(plan.backend.as_str())),
+                ("ready", FieldValue::Bool(plan.ready)),
+                ("implementation", FieldValue::Str(plan.implementation)),
+                ("display_driver", FieldValue::Str(plan.display_driver)),
+                ("input_driver", FieldValue::Str(plan.input_driver)),
+                ("device_access", FieldValue::Str(plan.device_access)),
+                (
+                    "uses_parent_wayland",
+                    FieldValue::Bool(plan.uses_parent_wayland),
+                ),
+                ("uses_drm", FieldValue::Bool(plan.uses_drm)),
+                ("uses_logind", FieldValue::Bool(plan.uses_logind)),
+                ("uses_libseat", FieldValue::Bool(plan.uses_libseat)),
+                ("uses_libinput", FieldValue::Bool(plan.uses_libinput)),
+                (
+                    "drm_card_selected",
+                    FieldValue::Bool(plan.drm_card_selected),
+                ),
+                (
+                    "drm_render_selected",
+                    FieldValue::Bool(plan.drm_render_selected),
+                ),
+                (
+                    "input_event_selected",
+                    FieldValue::Bool(plan.input_event_selected),
+                ),
+                ("primary_drm_card", FieldValue::Str(primary_drm_card)),
+                (
+                    "primary_drm_render_node",
+                    FieldValue::Str(primary_drm_render_node),
+                ),
+                ("primary_input_event", FieldValue::Str(primary_input_event)),
+                ("session_id", FieldValue::Str(session_id)),
+                ("seat", FieldValue::Str(seat)),
+                ("session_type", FieldValue::Str(session_type)),
+            ],
+        )
+    );
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

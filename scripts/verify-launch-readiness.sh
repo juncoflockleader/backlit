@@ -58,9 +58,17 @@ cargo run -p backlit-compositor-backend -- --backend=drm > "$drm_log"
 grep '"event":"backend.preflight"' "$headless_log" >/dev/null
 grep '"backend":"headless"' "$headless_log" >/dev/null
 grep '"ready":true' "$headless_log" >/dev/null
+grep '"event":"backend.launch_plan"' "$headless_log" >/dev/null
+grep '"implementation":"headless-harness"' "$headless_log" >/dev/null
+grep '"display_driver":"headless"' "$headless_log" >/dev/null
+grep '"input_driver":"synthetic"' "$headless_log" >/dev/null
 grep '"event":"backend.preflight"' "$drm_log" >/dev/null
 grep '"backend":"drm"' "$drm_log" >/dev/null
 grep '"xdg_runtime_dir_owned_by_user":' "$drm_log" >/dev/null
+grep '"event":"backend.launch_plan"' "$drm_log" >/dev/null
+grep '"implementation":"pre-smithay-policy-harness"' "$drm_log" >/dev/null
+grep '"display_driver":"' "$drm_log" >/dev/null
+grep '"input_driver":"' "$drm_log" >/dev/null
 
 drm_ready=false
 if grep '"ready":true' "$drm_log" >/dev/null; then
@@ -190,6 +198,11 @@ if [ "$drm_expected_ready" = true ]; then
     cat "$drm_log" >&2
     fail "DRM preflight should be ready on this host"
   fi
+  grep '"display_driver":"drm-kms"' "$drm_log" >/dev/null
+  grep '"uses_drm":true' "$drm_log" >/dev/null
+  grep '"uses_libinput":true' "$drm_log" >/dev/null
+  grep '"drm_card_selected":true' "$drm_log" >/dev/null
+  grep '"input_event_selected":true' "$drm_log" >/dev/null
 else
   if [ "$drm_ready" = false ]; then
     drm_blocked_expected=true
@@ -207,7 +220,11 @@ cat > "$out_dir/manifest.json" <<EOF
   },
   "checks": {
     "headless_ready": true,
+    "headless_launch_plan": true,
     "drm_checked": true,
+    "drm_launch_plan": true,
+    "drm_device_selected": $drm_ready,
+    "drm_input_selected": $drm_ready,
     "drm_ready": $drm_ready,
     "drm_expected_ready": $drm_expected_ready,
     "drm_blocked_expected": $drm_blocked_expected,

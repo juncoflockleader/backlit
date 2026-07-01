@@ -52,11 +52,17 @@ require_contains docs/architecture/mvp-1.md 'does not claim the real DRM composi
 require_contains scripts/verify-launch-readiness.sh '"drm_expected_ready"'
 require_contains scripts/verify-launch-readiness.sh '"drm_card_access_ready"'
 require_contains scripts/verify-launch-readiness.sh '"input_broker_ready"'
+require_contains scripts/verify-launch-readiness.sh '"backend.launch_plan"'
+require_contains scripts/verify-launch-readiness.sh '"drm_launch_plan": true'
 require_contains scripts/verify-session-launch.sh 'backlit-session --backend=drm --activate-systemd'
 require_contains scripts/verify-session-launch.sh '"session_systemd_launch_plan"'
+require_contains scripts/verify-session-launch.sh '"session.backend_launch_plan"'
+require_contains scripts/verify-session-launch.sh '"drm_backend_launch_plan": true'
 require_contains scripts/verify-drm-session-smoke.sh '--backend=drm'
 require_contains scripts/verify-drm-session-smoke.sh '"drm_session_smoke_ready"'
 require_contains scripts/verify-drm-session-smoke.sh '"drm_session_clean_exit"'
+require_contains scripts/verify-drm-session-smoke.sh '"session.backend_launch_plan"'
+require_contains scripts/verify-drm-session-smoke.sh '"drm_backend_launch_plan": true'
 require_contains scripts/verify-drm-session-smoke.sh '--verify-desktop-launch'
 require_contains scripts/verify-drm-session-smoke.sh '"session_desktop_launch": $drm_session_smoke_ready'
 require_contains scripts/verify-drm-session-smoke.sh '"session_desktop_managed_window": $drm_session_smoke_ready'
@@ -109,6 +115,8 @@ if [ -n "$artifact_root" ] && [ -d "$artifact_root" ]; then
 
   require_contains "$artifact_root/launch-readiness/manifest.json" '"name": "backlit-launch-readiness"'
   require_contains "$artifact_root/launch-readiness/manifest.json" '"drm_checked": true'
+  require_contains "$artifact_root/launch-readiness/manifest.json" '"headless_launch_plan": true'
+  require_contains "$artifact_root/launch-readiness/manifest.json" '"drm_launch_plan": true'
   require_contains "$artifact_root/launch-readiness/manifest.json" '"xdg_runtime_dir_owned_by_user":'
   require_contains "$artifact_root/launch-readiness/manifest.json" '"session_local":'
   require_contains "$artifact_root/launch-readiness/manifest.json" '"drm_card_access_ready":'
@@ -116,6 +124,8 @@ if [ -n "$artifact_root" ] && [ -d "$artifact_root" ]; then
 
   if grep '"drm_expected_ready": true' "$artifact_root/launch-readiness/manifest.json" >/dev/null; then
     require_contains "$artifact_root/launch-readiness/manifest.json" '"drm_ready": true'
+    require_contains "$artifact_root/launch-readiness/manifest.json" '"drm_device_selected": true'
+    require_contains "$artifact_root/launch-readiness/manifest.json" '"drm_input_selected": true'
     drm_launch_ready_artifact=true
   else
     require_contains "$artifact_root/launch-readiness/manifest.json" '"drm_blocked_expected": true'
@@ -123,20 +133,27 @@ if [ -n "$artifact_root" ] && [ -d "$artifact_root" ]; then
 
   require_contains "$artifact_root/session-launch/manifest.json" '"desktop_exec": "backlit-session --backend=drm --activate-systemd"'
   require_contains "$artifact_root/session-launch/manifest.json" '"headless_session_launch_ready": true'
+  require_contains "$artifact_root/session-launch/manifest.json" '"headless_backend_launch_plan": true'
   require_contains "$artifact_root/session-launch/manifest.json" '"session_systemd_units": true'
   require_contains "$artifact_root/session-launch/manifest.json" '"session_systemd_target": true'
   require_contains "$artifact_root/session-launch/manifest.json" '"session_systemd_launch_plan": true'
   require_contains "$artifact_root/session-launch/manifest.json" '"drm_session_checked": true'
+  require_contains "$artifact_root/session-launch/manifest.json" '"drm_backend_launch_plan": true'
 
   if grep '"drm_session_expected_ready": true' "$artifact_root/session-launch/manifest.json" >/dev/null; then
     require_contains "$artifact_root/session-launch/manifest.json" '"drm_session_ready": true'
+    require_contains "$artifact_root/session-launch/manifest.json" '"drm_device_selected": true'
+    require_contains "$artifact_root/session-launch/manifest.json" '"drm_input_selected": true'
   else
     require_contains "$artifact_root/session-launch/manifest.json" '"drm_session_blocked_expected": true'
   fi
 
   require_contains "$artifact_root/drm-session-smoke/manifest.json" '"name": "backlit-drm-session-smoke"'
+  require_contains "$artifact_root/drm-session-smoke/manifest.json" '"drm_backend_launch_plan": true'
   if grep '"drm_session_smoke_ready": true' "$artifact_root/drm-session-smoke/manifest.json" >/dev/null; then
     require_contains "$artifact_root/drm-session-smoke/manifest.json" '"drm_session_clean_exit": true'
+    require_contains "$artifact_root/drm-session-smoke/manifest.json" '"drm_device_selected": true'
+    require_contains "$artifact_root/drm-session-smoke/manifest.json" '"drm_input_selected": true'
     require_contains "$artifact_root/drm-session-smoke/manifest.json" '"settings_service": true'
     require_contains "$artifact_root/drm-session-smoke/manifest.json" '"notification_service": true'
     require_contains "$artifact_root/drm-session-smoke/manifest.json" '"workspace_switch": true'
@@ -249,6 +266,7 @@ cat > "$manifest" <<EOF
     "launch_readiness_contract": true,
     "desktop_session_entry": true,
     "systemd_launch_plan": true,
+    "backend_launch_plan_contract": true,
     "drm_session_smoke_contract": true,
     "session_replay_contract": true,
     "desktop_entry_launch_contract": true,

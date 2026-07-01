@@ -461,8 +461,14 @@ require_contains "$host_launch_readiness_manifest" '"xdg_runtime_dir_owned_by_us
 require_contains "$host_launch_readiness_manifest" '"session_local": true'
 require_contains "$host_launch_readiness_manifest" '"drm_card_access_ready": true'
 require_contains "$host_launch_readiness_manifest" '"input_broker_ready": true'
+require_contains "$host_launch_readiness_manifest" '"drm_launch_plan": true'
+require_contains "$host_launch_readiness_manifest" '"drm_device_selected": true'
+require_contains "$host_launch_readiness_manifest" '"drm_input_selected": true'
 require_contains "$host_drm_session_smoke_manifest" '"drm_session_smoke_ready": true'
 require_contains "$host_drm_session_smoke_manifest" '"drm_session_clean_exit": true'
+require_contains "$host_drm_session_smoke_manifest" '"drm_backend_launch_plan": true'
+require_contains "$host_drm_session_smoke_manifest" '"drm_device_selected": true'
+require_contains "$host_drm_session_smoke_manifest" '"drm_input_selected": true'
 require_contains "$host_drm_session_smoke_manifest" '"session_compositor_demo_client": true'
 require_contains "$host_drm_session_smoke_manifest" '"session_compositor_demo_app_id_preserved": true'
 require_contains "$host_drm_session_smoke_manifest" '"session_desktop_launch": true'
@@ -547,6 +553,7 @@ cat > "$host_out_dir/manifest.json" <<EOF
     "compositor_runtime_policy_preview": true,
     "compositor_socket": true,
     "launch_readiness": true,
+    "drm_launch_plan": true,
     "session_replay": true,
     "parallels_drm_launch_ready": true,
 	    "drm_session_smoke": true,

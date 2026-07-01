@@ -2,6 +2,7 @@ use std::fmt;
 use std::fs;
 #[cfg(target_os = "linux")]
 use std::os::unix::fs::MetadataExt;
+use std::path::PathBuf;
 #[cfg(target_os = "linux")]
 use std::process::Command;
 use std::str::FromStr;
@@ -60,6 +61,9 @@ pub struct BackendPreflightEnvironment {
     pub logind_available: bool,
     pub libseat_available: bool,
     pub libinput_available: bool,
+    pub primary_drm_card: Option<String>,
+    pub primary_drm_render_node: Option<String>,
+    pub primary_input_event: Option<String>,
 }
 
 impl BackendPreflightEnvironment {
@@ -88,6 +92,9 @@ impl BackendPreflightEnvironment {
             logind_available: false,
             libseat_available: false,
             libinput_available: false,
+            primary_drm_card: None,
+            primary_drm_render_node: None,
+            primary_input_event: None,
         }
     }
 
@@ -123,6 +130,21 @@ impl BackendPreflightEnvironment {
             count_openable_entries_with_prefix("/dev/dri", "renderD", AccessMode::Write);
         environment.input_event_readable =
             count_openable_entries_with_prefix("/dev/input", "event", AccessMode::Read);
+        environment.primary_drm_card = first_openable_entry_with_prefix(
+            "/dev/dri",
+            "card",
+            &[AccessMode::Read, AccessMode::Write],
+        );
+        environment.primary_drm_render_node = first_openable_entry_with_prefix(
+            "/dev/dri",
+            "renderD",
+            &[AccessMode::Read, AccessMode::Write],
+        )
+        .or_else(|| first_openable_entry_with_prefix("/dev/dri", "renderD", &[AccessMode::Read]))
+        .or_else(|| first_entry_with_prefix("/dev/dri", "renderD"));
+        environment.primary_input_event =
+            first_openable_entry_with_prefix("/dev/input", "event", &[AccessMode::Read])
+                .or_else(|| first_entry_with_prefix("/dev/input", "event"));
         environment
     }
 
@@ -163,6 +185,21 @@ impl BackendPreflightEnvironment {
 
     pub fn with_input_event_access(mut self, readable: u64) -> Self {
         self.input_event_readable = readable;
+        self
+    }
+
+    pub fn with_primary_drm_card(mut self, value: impl Into<String>) -> Self {
+        self.primary_drm_card = Some(value.into());
+        self
+    }
+
+    pub fn with_primary_drm_render_node(mut self, value: impl Into<String>) -> Self {
+        self.primary_drm_render_node = Some(value.into());
+        self
+    }
+
+    pub fn with_primary_input_event(mut self, value: impl Into<String>) -> Self {
+        self.primary_input_event = Some(value.into());
         self
     }
 
@@ -257,6 +294,143 @@ impl BackendPreflightEnvironment {
             }
             if !status.session_type.is_empty() {
                 self.session_type = Some(status.session_type);
+            }
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct BackendLaunchPlan {
+    pub backend: BackendKind,
+    pub ready: bool,
+    pub implementation: &'static str,
+    pub display_driver: &'static str,
+    pub input_driver: &'static str,
+    pub device_access: &'static str,
+    pub uses_parent_wayland: bool,
+    pub uses_drm: bool,
+    pub uses_logind: bool,
+    pub uses_libseat: bool,
+    pub uses_libinput: bool,
+    pub drm_card_selected: bool,
+    pub drm_render_selected: bool,
+    pub input_event_selected: bool,
+    pub primary_drm_card: Option<String>,
+    pub primary_drm_render_node: Option<String>,
+    pub primary_input_event: Option<String>,
+    pub session_id: Option<String>,
+    pub seat: Option<String>,
+    pub session_type: Option<String>,
+}
+
+pub fn backend_launch_plan(
+    backend: BackendKind,
+    report: &BackendPreflightReport,
+    environment: &BackendPreflightEnvironment,
+) -> BackendLaunchPlan {
+    match backend {
+        BackendKind::Headless => BackendLaunchPlan {
+            backend,
+            ready: report.ready,
+            implementation: "headless-harness",
+            display_driver: "headless",
+            input_driver: "synthetic",
+            device_access: "none",
+            uses_parent_wayland: false,
+            uses_drm: false,
+            uses_logind: false,
+            uses_libseat: false,
+            uses_libinput: false,
+            drm_card_selected: false,
+            drm_render_selected: false,
+            input_event_selected: false,
+            primary_drm_card: None,
+            primary_drm_render_node: None,
+            primary_input_event: None,
+            session_id: None,
+            seat: None,
+            session_type: None,
+        },
+        BackendKind::Wayland => BackendLaunchPlan {
+            backend,
+            ready: report.ready,
+            implementation: "nested-wayland-harness",
+            display_driver: if environment.wayland_display.is_some() {
+                "parent-wayland"
+            } else {
+                "missing-parent-wayland"
+            },
+            input_driver: if report.ready {
+                "parent-wayland-seat"
+            } else {
+                "unavailable"
+            },
+            device_access: if report.ready {
+                "parent-wayland-socket"
+            } else {
+                "unavailable"
+            },
+            uses_parent_wayland: environment.wayland_display.is_some(),
+            uses_drm: false,
+            uses_logind: false,
+            uses_libseat: false,
+            uses_libinput: false,
+            drm_card_selected: false,
+            drm_render_selected: false,
+            input_event_selected: false,
+            primary_drm_card: None,
+            primary_drm_render_node: None,
+            primary_input_event: None,
+            session_id: None,
+            seat: None,
+            session_type: None,
+        },
+        BackendKind::Drm => {
+            let input_driver = if environment.input_event_nodes == 0 {
+                "missing-input"
+            } else if environment.input_event_readable > 0 {
+                "direct-libinput"
+            } else if environment.input_broker_ready() {
+                "logind-libseat-libinput"
+            } else {
+                "unavailable"
+            };
+            let device_access = if !environment.drm_card_access_ready() {
+                "missing-drm-card"
+            } else if input_driver == "direct-libinput" {
+                "drm-card-direct-input"
+            } else if input_driver == "logind-libseat-libinput" {
+                "drm-card-logind-libseat"
+            } else {
+                "unavailable"
+            };
+
+            BackendLaunchPlan {
+                backend,
+                ready: report.ready,
+                implementation: "pre-smithay-policy-harness",
+                display_driver: if environment.drm_card_access_ready() {
+                    "drm-kms"
+                } else {
+                    "unavailable"
+                },
+                input_driver,
+                device_access,
+                uses_parent_wayland: false,
+                uses_drm: environment.drm_card_access_ready(),
+                uses_logind: environment.logind_session_verified || environment.logind_available,
+                uses_libseat: input_driver == "logind-libseat-libinput",
+                uses_libinput: input_driver == "direct-libinput"
+                    || input_driver == "logind-libseat-libinput",
+                drm_card_selected: environment.primary_drm_card.is_some(),
+                drm_render_selected: environment.primary_drm_render_node.is_some(),
+                input_event_selected: environment.primary_input_event.is_some(),
+                primary_drm_card: environment.primary_drm_card.clone(),
+                primary_drm_render_node: environment.primary_drm_render_node.clone(),
+                primary_input_event: environment.primary_input_event.clone(),
+                session_id: environment.session_id.clone(),
+                seat: environment.seat.clone(),
+                session_type: environment.session_type.clone(),
             }
         }
     }
@@ -506,6 +680,52 @@ fn count_openable_entries_with_prefix(dir: &str, prefix: &str, mode: AccessMode)
         })
         .filter(|entry| open_device_node(entry.path().as_path(), mode))
         .count() as u64
+}
+
+fn first_entry_with_prefix(dir: &str, prefix: &str) -> Option<String> {
+    sorted_entries_with_prefix(dir, prefix)
+        .into_iter()
+        .next()
+        .map(path_to_string)
+}
+
+fn first_openable_entry_with_prefix(
+    dir: &str,
+    prefix: &str,
+    access_modes: &[AccessMode],
+) -> Option<String> {
+    sorted_entries_with_prefix(dir, prefix)
+        .into_iter()
+        .find(|path| {
+            access_modes
+                .iter()
+                .all(|mode| open_device_node(path.as_path(), *mode))
+        })
+        .map(path_to_string)
+}
+
+fn sorted_entries_with_prefix(dir: &str, prefix: &str) -> Vec<PathBuf> {
+    let Ok(entries) = fs::read_dir(dir) else {
+        return Vec::new();
+    };
+
+    let mut paths: Vec<_> = entries
+        .filter_map(Result::ok)
+        .filter(|entry| {
+            entry
+                .file_name()
+                .to_str()
+                .map(|name| name.starts_with(prefix))
+                .unwrap_or(false)
+        })
+        .map(|entry| entry.path())
+        .collect();
+    paths.sort_by(|left, right| left.file_name().cmp(&right.file_name()));
+    paths
+}
+
+fn path_to_string(path: PathBuf) -> String {
+    path.display().to_string()
 }
 
 fn open_device_node(path: &std::path::Path, mode: AccessMode) -> bool {
@@ -1118,8 +1338,8 @@ impl fmt::Display for HeadlessError {
 #[cfg(test)]
 mod tests {
     use super::{
-        parse_args, BackendKind, BackendPreflightEnvironment, BufferKind, ClientId,
-        HeadlessCompositor, RunConfig, SurfaceOptions,
+        backend_launch_plan, parse_args, BackendKind, BackendPreflightEnvironment, BufferKind,
+        ClientId, HeadlessCompositor, RunConfig, SurfaceOptions,
     };
 
     #[test]
@@ -1330,6 +1550,23 @@ mod tests {
     }
 
     #[test]
+    fn launch_plan_records_nested_wayland_parent_socket() {
+        let environment = BackendPreflightEnvironment::for_target("linux")
+            .with_wayland_display("wayland-1")
+            .with_xdg_runtime_dir("/run/user/1000");
+        let report = super::preflight_backend_with_environment(BackendKind::Wayland, &environment);
+        let plan = backend_launch_plan(BackendKind::Wayland, &report, &environment);
+
+        assert!(plan.ready);
+        assert_eq!(plan.implementation, "nested-wayland-harness");
+        assert_eq!(plan.display_driver, "parent-wayland");
+        assert_eq!(plan.input_driver, "parent-wayland-seat");
+        assert_eq!(plan.device_access, "parent-wayland-socket");
+        assert!(plan.uses_parent_wayland);
+        assert!(!plan.uses_drm);
+    }
+
+    #[test]
     fn drm_preflight_requires_linux() {
         let report =
             super::preflight_backend(BackendKind::Drm, None, Some("/run/user/1000"), "macos");
@@ -1516,13 +1753,29 @@ mod tests {
             .with_drm_card_access(1, 1)
             .with_input_event_nodes(2)
             .with_input_event_access(1)
-            .with_active_local_session("1", "seat0", "wayland");
+            .with_active_local_session("1", "seat0", "wayland")
+            .with_primary_drm_card("/dev/dri/card0")
+            .with_primary_drm_render_node("/dev/dri/renderD128")
+            .with_primary_input_event("/dev/input/event0");
 
         let report = super::preflight_backend_with_environment(BackendKind::Drm, &environment);
+        let plan = backend_launch_plan(BackendKind::Drm, &report, &environment);
 
         assert!(report.ready, "{report:?}");
         assert_eq!(report.code, "ready-active-local-session-input-broker");
         assert_eq!(environment.input_broker_mode(), "direct");
+        assert!(plan.ready);
+        assert_eq!(plan.implementation, "pre-smithay-policy-harness");
+        assert_eq!(plan.display_driver, "drm-kms");
+        assert_eq!(plan.input_driver, "direct-libinput");
+        assert_eq!(plan.device_access, "drm-card-direct-input");
+        assert!(plan.uses_drm);
+        assert!(plan.uses_libinput);
+        assert!(!plan.uses_libseat);
+        assert!(plan.drm_card_selected);
+        assert!(plan.drm_render_selected);
+        assert!(plan.input_event_selected);
+        assert_eq!(plan.primary_drm_card.as_deref(), Some("/dev/dri/card0"));
     }
 
     #[test]
@@ -1533,12 +1786,25 @@ mod tests {
             .with_drm_card_access(1, 1)
             .with_input_event_nodes(2)
             .with_active_local_session("1", "seat0", "wayland")
-            .with_seat_broker_tools(true, true, true);
+            .with_seat_broker_tools(true, true, true)
+            .with_primary_drm_card("/dev/dri/card0")
+            .with_primary_drm_render_node("/dev/dri/renderD128")
+            .with_primary_input_event("/dev/input/event0");
 
         let report = super::preflight_backend_with_environment(BackendKind::Drm, &environment);
+        let plan = backend_launch_plan(BackendKind::Drm, &report, &environment);
 
         assert!(report.ready, "{report:?}");
         assert_eq!(report.code, "ready-active-local-session-input-broker");
         assert_eq!(environment.input_broker_mode(), "logind-libseat");
+        assert!(plan.ready);
+        assert_eq!(plan.display_driver, "drm-kms");
+        assert_eq!(plan.input_driver, "logind-libseat-libinput");
+        assert_eq!(plan.device_access, "drm-card-logind-libseat");
+        assert!(plan.uses_logind);
+        assert!(plan.uses_libseat);
+        assert!(plan.uses_libinput);
+        assert_eq!(plan.seat.as_deref(), Some("seat0"));
+        assert_eq!(plan.session_type.as_deref(), Some("wayland"));
     }
 }

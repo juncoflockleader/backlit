@@ -46,6 +46,10 @@ cargo run -p backlit-session -- \
 grep '"event":"session.backend_preflight"' "$headless_log" >/dev/null
 grep '"backend":"headless"' "$headless_log" >/dev/null
 grep '"ready":true' "$headless_log" >/dev/null
+grep '"event":"session.backend_launch_plan"' "$headless_log" >/dev/null
+grep '"implementation":"headless-harness"' "$headless_log" >/dev/null
+grep '"display_driver":"headless"' "$headless_log" >/dev/null
+grep '"input_driver":"synthetic"' "$headless_log" >/dev/null
 grep '"event":"session.launch_ready"' "$headless_log" >/dev/null
 grep '"passed":true' "$headless_log" >/dev/null
 grep '"preflight_only":true' "$headless_log" >/dev/null
@@ -88,6 +92,10 @@ set -e
 
 grep '"event":"session.backend_preflight"' "$drm_log" >/dev/null
 grep '"backend":"drm"' "$drm_log" >/dev/null
+grep '"event":"session.backend_launch_plan"' "$drm_log" >/dev/null
+grep '"implementation":"pre-smithay-policy-harness"' "$drm_log" >/dev/null
+grep '"display_driver":"' "$drm_log" >/dev/null
+grep '"input_driver":"' "$drm_log" >/dev/null
 grep '"event":"session.launch_ready"' "$drm_log" >/dev/null
 grep '"preflight_only":true' "$drm_log" >/dev/null
 
@@ -95,6 +103,11 @@ drm_session_ready=false
 if [ "$drm_status" -eq 0 ]; then
   grep '"passed":true' "$drm_log" >/dev/null
   grep '"ready":true' "$drm_log" >/dev/null
+  grep '"display_driver":"drm-kms"' "$drm_log" >/dev/null
+  grep '"uses_drm":true' "$drm_log" >/dev/null
+  grep '"uses_libinput":true' "$drm_log" >/dev/null
+  grep '"drm_card_selected":true' "$drm_log" >/dev/null
+  grep '"input_event_selected":true' "$drm_log" >/dev/null
   grep '"event":"session.exit"' "$drm_log" >/dev/null
   drm_session_ready=true
 else
@@ -159,10 +172,14 @@ cat > "$out_dir/manifest.json" <<EOF
     "desktop_exec": "$session_exec",
     "desktop_exec_program": "$session_exec_program",
     "headless_session_launch_ready": true,
+    "headless_backend_launch_plan": true,
     "session_systemd_units": true,
     "session_systemd_target": true,
     "session_systemd_launch_plan": true,
     "drm_session_checked": true,
+    "drm_backend_launch_plan": true,
+    "drm_device_selected": $drm_session_ready,
+    "drm_input_selected": $drm_session_ready,
     "drm_session_ready": $drm_session_ready,
     "drm_session_expected_ready": $drm_session_expected_ready,
     "drm_session_blocked_expected": $drm_session_blocked_expected,
