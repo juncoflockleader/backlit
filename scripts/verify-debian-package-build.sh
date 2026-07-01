@@ -248,6 +248,7 @@ for verifier in \
   verify-session-launch.sh \
   verify-session-replay.sh \
   verify-drm-session-smoke.sh \
+  verify-drm-master-boundary.sh \
   verify-mvp1-contract.sh \
   verify-linux-e2e.sh
 do
@@ -294,6 +295,7 @@ require_deb_contains fastgui-dev-tools usr/lib/backlit/dev-tools/verify-debian-p
 require_deb_contains fastgui-dev-tools usr/lib/backlit/dev-tools/verify-debian-package-install.sh
 require_deb_contains fastgui-dev-tools usr/lib/backlit/dev-tools/verify-debian-system-install.sh
 require_deb_contains fastgui-dev-tools usr/lib/backlit/dev-tools/verify-session-replay.sh
+require_deb_contains fastgui-dev-tools usr/lib/backlit/dev-tools/verify-drm-master-boundary.sh
 require_deb_contains fastgui-dev-tools usr/lib/backlit/dev-tools/verify-mvp1-contract.sh
 
 test "$(grep -c '^ Package: fastgui-core$' "$out_dir/fastgui-core.info")" = "1" || fail "fastgui-core info missing package field"

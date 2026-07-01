@@ -129,6 +129,7 @@ uploaded_launch_readiness_verifier="/tmp/backlit-verify-launch-readiness.sh"
 uploaded_session_launch_verifier="/tmp/backlit-verify-session-launch.sh"
 uploaded_session_replay_verifier="/tmp/backlit-verify-session-replay.sh"
 uploaded_drm_session_smoke_verifier="/tmp/backlit-verify-drm-session-smoke.sh"
+uploaded_drm_master_boundary_verifier="/tmp/backlit-verify-drm-master-boundary.sh"
 uploaded_service_lifecycle_verifier="/tmp/backlit-verify-service-lifecycle.sh"
 uploaded_mvp0_contract_verifier="/tmp/backlit-verify-mvp0-contract.sh"
 uploaded_mvp1_contract_verifier="/tmp/backlit-verify-mvp1-contract.sh"
@@ -231,6 +232,7 @@ install -m 0755 -o "\$guest_user" -g "\$guest_user" "\$uploaded_launch_readiness
 install -m 0755 -o "\$guest_user" -g "\$guest_user" "\$uploaded_session_launch_verifier" "\$repo_dir/scripts/verify-session-launch.sh"
 install -m 0755 -o "\$guest_user" -g "\$guest_user" "\$uploaded_session_replay_verifier" "\$repo_dir/scripts/verify-session-replay.sh"
 install -m 0755 -o "\$guest_user" -g "\$guest_user" "\$uploaded_drm_session_smoke_verifier" "\$repo_dir/scripts/verify-drm-session-smoke.sh"
+install -m 0755 -o "\$guest_user" -g "\$guest_user" "\$uploaded_drm_master_boundary_verifier" "\$repo_dir/scripts/verify-drm-master-boundary.sh"
 install -m 0755 -o "\$guest_user" -g "\$guest_user" "\$uploaded_service_lifecycle_verifier" "\$repo_dir/scripts/verify-service-lifecycle.sh"
 install -m 0755 -o "\$guest_user" -g "\$guest_user" "\$uploaded_mvp0_contract_verifier" "\$repo_dir/scripts/verify-mvp0-contract.sh"
 install -m 0755 -o "\$guest_user" -g "\$guest_user" "\$uploaded_mvp1_contract_verifier" "\$repo_dir/scripts/verify-mvp1-contract.sh"
@@ -279,6 +281,7 @@ upload_script "$repo_root/scripts/verify-launch-readiness.sh" "/tmp/backlit-veri
 upload_script "$repo_root/scripts/verify-session-launch.sh" "/tmp/backlit-verify-session-launch.sh"
 upload_script "$repo_root/scripts/verify-session-replay.sh" "/tmp/backlit-verify-session-replay.sh"
 upload_script "$repo_root/scripts/verify-drm-session-smoke.sh" "/tmp/backlit-verify-drm-session-smoke.sh"
+upload_script "$repo_root/scripts/verify-drm-master-boundary.sh" "/tmp/backlit-verify-drm-master-boundary.sh"
 upload_script "$repo_root/scripts/verify-service-lifecycle.sh" "/tmp/backlit-verify-service-lifecycle.sh"
 upload_script "$repo_root/scripts/verify-mvp0-contract.sh" "/tmp/backlit-verify-mvp0-contract.sh"
 upload_script "$repo_root/scripts/verify-mvp1-contract.sh" "/tmp/backlit-verify-mvp1-contract.sh"
@@ -307,6 +310,7 @@ host_smithay_runtime_probe_manifest="$host_out_dir/smithay-runtime-probe-manifes
 host_launch_readiness_manifest="$host_out_dir/launch-readiness-manifest.json"
 host_session_replay_manifest="$host_out_dir/session-replay-manifest.json"
 host_drm_session_smoke_manifest="$host_out_dir/drm-session-smoke-manifest.json"
+host_drm_master_boundary_manifest="$host_out_dir/drm-master-boundary-manifest.json"
 host_debian_package_build_manifest="$host_out_dir/debian-package-build-manifest.json"
 host_debian_package_install_manifest="$host_out_dir/debian-package-install-manifest.json"
 host_debian_package_install_replay_manifest="$host_out_dir/debian-package-install-session-replay-manifest.json"
@@ -332,6 +336,7 @@ rm -f \
   "$host_launch_readiness_manifest" \
   "$host_session_replay_manifest" \
   "$host_drm_session_smoke_manifest" \
+  "$host_drm_master_boundary_manifest" \
   "$host_debian_package_build_manifest" \
   "$host_debian_package_install_manifest" \
   "$host_debian_package_install_replay_manifest" \
@@ -356,6 +361,7 @@ download_file "$guest_e2e_dir/smithay-runtime-probe/manifest.json" "$host_smitha
 download_file "$guest_e2e_dir/launch-readiness/manifest.json" "$host_launch_readiness_manifest"
 download_file "$guest_e2e_dir/session-replay/manifest.json" "$host_session_replay_manifest"
 download_file "$guest_e2e_dir/drm-session-smoke/manifest.json" "$host_drm_session_smoke_manifest"
+download_file "$guest_e2e_dir/drm-master-boundary/manifest.json" "$host_drm_master_boundary_manifest"
 download_file "$guest_e2e_dir/debian-package-build/manifest.json" "$host_debian_package_build_manifest"
 download_file "$guest_e2e_dir/debian-package-install/manifest.json" "$host_debian_package_install_manifest"
 download_file "$guest_e2e_dir/debian-package-install/session-replay/manifest.json" "$host_debian_package_install_replay_manifest"
@@ -449,6 +455,7 @@ require_contains "$host_guest_manifest" '"debian_package_build": true'
 require_contains "$host_guest_manifest" '"debian_package_install": true'
 require_contains "$host_guest_manifest" '"launch_readiness": true'
 require_contains "$host_guest_manifest" '"smithay_compositor_runtime": true'
+require_contains "$host_guest_manifest" '"drm_master_boundary": true'
 require_contains "$host_guest_manifest" '"drm_session_smoke": true'
 require_contains "$host_guest_manifest" '"nested_wayland": true'
 require_contains "$host_guest_manifest" '"mvp1_contract": true'
@@ -589,6 +596,18 @@ require_contains "$host_launch_readiness_manifest" '"input_broker_ready": true'
 require_contains "$host_launch_readiness_manifest" '"drm_launch_plan": true'
 require_contains "$host_launch_readiness_manifest" '"drm_device_selected": true'
 require_contains "$host_launch_readiness_manifest" '"drm_input_selected": true'
+require_contains "$host_drm_master_boundary_manifest" '"name": "backlit-drm-master-boundary"'
+require_contains "$host_drm_master_boundary_manifest" '"session_entry_drm": true'
+require_contains "$host_drm_master_boundary_manifest" '"compositor_service_drm": true'
+require_contains "$host_drm_master_boundary_manifest" '"drm_master_boundary_checked": true'
+require_contains "$host_drm_master_boundary_manifest" '"drm_launch_ready": true'
+require_contains "$host_drm_master_boundary_manifest" '"first_present_framebuffer_filled": true'
+require_contains "$host_drm_master_boundary_manifest" '"first_present_plane_state_ready": true'
+require_contains "$host_drm_master_boundary_manifest" '"first_present_blocked_by_drm_master": true'
+require_contains "$host_drm_master_boundary_manifest" '"drm_master_boundary_observed": true'
+require_contains "$host_drm_master_boundary_manifest" '"dedicated_session_required": true'
+require_contains "$host_drm_master_boundary_manifest" '"current_session_can_present": false'
+require_contains "$host_drm_master_boundary_manifest" '"mutating_handoff_attempted": false'
 require_contains "$host_drm_session_smoke_manifest" '"drm_session_smoke_ready": true'
 require_contains "$host_drm_session_smoke_manifest" '"drm_session_clean_exit": true'
 require_contains "$host_drm_session_smoke_manifest" '"drm_backend_launch_plan": true'
@@ -630,8 +649,10 @@ require_contains "$host_debian_system_install_replay_manifest" '"launcher_overla
 require_contains "$host_debian_system_install_replay_manifest" '"app_switcher_overlay_frame": true'
 require_contains "$host_nested_wayland_manifest" '"session_wayland_clean_exit": true'
 require_contains "$host_mvp0_contract_manifest" '"artifact_manifests_checked": true'
+require_contains "$host_mvp0_contract_manifest" '"drm_master_boundary": true'
 require_contains "$host_mvp1_contract_manifest" '"artifact_manifests_checked": true'
 require_contains "$host_mvp1_contract_manifest" '"drm_launch_ready_artifact": true'
+require_contains "$host_mvp1_contract_manifest" '"drm_master_boundary_artifact": true'
 require_contains "$host_mvp1_contract_manifest" '"drm_session_smoke_ready_artifact": true'
 require_contains "$host_mvp1_contract_manifest" '"smithay_compositor_runtime_artifact": true'
 require_contains "$host_mvp1_contract_manifest" '"debian_package_install_replay_artifact": true'
@@ -656,6 +677,7 @@ cat > "$host_out_dir/manifest.json" <<EOF
     "launch_readiness_manifest": "$host_launch_readiness_manifest",
     "session_replay_manifest": "$host_session_replay_manifest",
     "drm_session_smoke_manifest": "$host_drm_session_smoke_manifest",
+    "drm_master_boundary_manifest": "$host_drm_master_boundary_manifest",
     "debian_package_build_manifest": "$host_debian_package_build_manifest",
     "debian_package_install_manifest": "$host_debian_package_install_manifest",
     "debian_package_install_replay_manifest": "$host_debian_package_install_replay_manifest",
@@ -684,6 +706,7 @@ cat > "$host_out_dir/manifest.json" <<EOF
     "smithay_runtime_probe": true,
     "launch_readiness": true,
     "drm_launch_plan": true,
+    "drm_master_boundary": true,
     "session_replay": true,
     "parallels_drm_launch_ready": true,
 	    "drm_session_smoke": true,

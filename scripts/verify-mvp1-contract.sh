@@ -38,6 +38,7 @@ require_file docs/architecture/mvp-1.md
 require_executable scripts/verify-launch-readiness.sh
 require_executable scripts/verify-session-launch.sh
 require_executable scripts/verify-drm-session-smoke.sh
+require_executable scripts/verify-drm-master-boundary.sh
 require_executable scripts/verify-session-replay.sh
 require_executable scripts/verify-compositor-socket.sh
 require_executable scripts/verify-launcher-desktop-discovery.sh
@@ -76,6 +77,11 @@ require_contains scripts/verify-drm-session-smoke.sh '"session_desktop_launch": 
 require_contains scripts/verify-drm-session-smoke.sh '"session_desktop_managed_window": $drm_session_smoke_ready'
 require_contains scripts/verify-drm-session-smoke.sh '"session_compositor_demo_client": $drm_session_smoke_ready'
 require_contains scripts/verify-drm-session-smoke.sh '"session_compositor_demo_app_id_preserved": $drm_session_smoke_ready'
+require_contains scripts/verify-drm-master-boundary.sh '"name": "backlit-drm-master-boundary"'
+require_contains scripts/verify-drm-master-boundary.sh '"session_entry_drm": true'
+require_contains scripts/verify-drm-master-boundary.sh '"compositor_service_drm": true'
+require_contains scripts/verify-drm-master-boundary.sh '"dedicated_session_required": $dedicated_session_required'
+require_contains scripts/verify-drm-master-boundary.sh '"current_session_can_present": $current_session_can_present'
 require_contains scripts/verify-session-replay.sh '"launcher_overlay_frame": true'
 require_contains scripts/verify-session-replay.sh '"app_switcher_overlay_frame": true'
 require_contains scripts/verify-compositor-socket.sh '"session_socket_bound": true'
@@ -106,6 +112,7 @@ require_contains scripts/verify-smithay-runtime-probe.sh '"smithay_wayland_socke
 require_contains scripts/verify-smithay-runtime-probe.sh '"smithay_wayland_client_inserted": $smithay_wayland_client_inserted'
 require_contains scripts/verify-linux-e2e.sh './scripts/verify-smithay-runtime-probe.sh'
 require_contains scripts/verify-linux-e2e.sh './scripts/verify-smithay-compositor-runtime.sh'
+require_contains scripts/verify-linux-e2e.sh './scripts/verify-drm-master-boundary.sh'
 require_contains scripts/verify-smithay-compositor-runtime.sh '--features smithay-backend'
 require_contains scripts/verify-smithay-compositor-runtime.sh '--runtime=smithay'
 require_contains scripts/verify-smithay-compositor-runtime.sh '"smithay_compositor_runtime": true'
@@ -123,6 +130,7 @@ require_contains scripts/verify-linux-e2e.sh './scripts/verify-mvp1-contract.sh'
 artifact_manifests_checked=false
 drm_launch_ready_artifact=false
 drm_session_smoke_ready_artifact=false
+drm_master_boundary_artifact=false
 debian_package_install_replay_artifact=false
 debian_system_install_replay_artifact=false
 nested_wayland_artifact=false
@@ -136,6 +144,7 @@ if [ -n "$artifact_root" ] && [ -d "$artifact_root" ]; then
   require_file "$artifact_root/launch-readiness/manifest.json"
   require_file "$artifact_root/session-launch/manifest.json"
   require_file "$artifact_root/drm-session-smoke/manifest.json"
+  require_file "$artifact_root/drm-master-boundary/manifest.json"
   require_file "$artifact_root/session-replay/manifest.json"
   require_file "$artifact_root/launch-performance/manifest.json"
   require_file "$artifact_root/resource-budget/manifest.json"
@@ -200,6 +209,28 @@ if [ -n "$artifact_root" ] && [ -d "$artifact_root" ]; then
     drm_session_smoke_ready_artifact=true
   else
     require_contains "$artifact_root/drm-session-smoke/manifest.json" '"drm_session_smoke_blocked_expected": true'
+  fi
+
+  require_contains "$artifact_root/drm-master-boundary/manifest.json" '"name": "backlit-drm-master-boundary"'
+  require_contains "$artifact_root/drm-master-boundary/manifest.json" '"session_entry_drm": true'
+  require_contains "$artifact_root/drm-master-boundary/manifest.json" '"compositor_service_drm": true'
+  require_contains "$artifact_root/drm-master-boundary/manifest.json" '"mutating_handoff_attempted": false'
+  require_contains "$artifact_root/drm-master-boundary/manifest.json" '"dedicated_session_model": "seat-owner-tty-or-display-manager-session"'
+  if grep '"drm_launch_ready": true' "$artifact_root/drm-master-boundary/manifest.json" >/dev/null; then
+    require_contains "$artifact_root/drm-master-boundary/manifest.json" '"drm_master_boundary_checked": true'
+    require_contains "$artifact_root/drm-master-boundary/manifest.json" '"first_present_framebuffer_filled": true'
+    require_contains "$artifact_root/drm-master-boundary/manifest.json" '"first_present_plane_state_ready": true'
+    if grep '"current_session_can_present": true' "$artifact_root/drm-master-boundary/manifest.json" >/dev/null; then
+      require_contains "$artifact_root/drm-master-boundary/manifest.json" '"first_present_commit_succeeded": true'
+      require_contains "$artifact_root/drm-master-boundary/manifest.json" '"first_present_vblank_event_received": true'
+    else
+      require_contains "$artifact_root/drm-master-boundary/manifest.json" '"first_present_blocked_by_drm_master": true'
+      require_contains "$artifact_root/drm-master-boundary/manifest.json" '"drm_master_boundary_observed": true'
+      require_contains "$artifact_root/drm-master-boundary/manifest.json" '"dedicated_session_required": true'
+    fi
+    drm_master_boundary_artifact=true
+  else
+    require_contains "$artifact_root/drm-master-boundary/manifest.json" '"expected_blocked": true'
   fi
 
   require_contains "$artifact_root/session-replay/manifest.json" '"frame_count": 9'
@@ -523,6 +554,7 @@ cat > "$manifest" <<EOF
     "compositor_socket_artifact": $compositor_socket_artifact,
     "drm_launch_ready_artifact": $drm_launch_ready_artifact,
     "drm_session_smoke_ready_artifact": $drm_session_smoke_ready_artifact,
+    "drm_master_boundary_artifact": $drm_master_boundary_artifact,
     "debian_package_install_replay_artifact": $debian_package_install_replay_artifact,
     "debian_system_install_replay_artifact": $debian_system_install_replay_artifact,
     "nested_wayland_artifact": $nested_wayland_artifact

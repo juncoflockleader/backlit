@@ -95,6 +95,7 @@ require_line packaging/debian/fastgui-dev-tools.install "usr/lib/backlit/dev-too
 require_line packaging/debian/fastgui-dev-tools.install "usr/lib/backlit/dev-tools/verify-session-launch.sh"
 require_line packaging/debian/fastgui-dev-tools.install "usr/lib/backlit/dev-tools/verify-session-replay.sh"
 require_line packaging/debian/fastgui-dev-tools.install "usr/lib/backlit/dev-tools/verify-drm-session-smoke.sh"
+require_line packaging/debian/fastgui-dev-tools.install "usr/lib/backlit/dev-tools/verify-drm-master-boundary.sh"
 require_line packaging/debian/fastgui-dev-tools.install "usr/lib/backlit/dev-tools/verify-mvp1-contract.sh"
 require_line packaging/debian/fastgui-dev-tools.install "usr/lib/backlit/dev-tools/verify-linux-e2e.sh"
 

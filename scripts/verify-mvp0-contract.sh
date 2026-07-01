@@ -60,6 +60,7 @@ require_executable scripts/verify-debian-package-install.sh
 require_executable scripts/verify-debian-system-install.sh
 require_executable scripts/verify-staged-session-install.sh
 require_executable scripts/verify-smithay-runtime-probe.sh
+require_executable scripts/verify-drm-master-boundary.sh
 require_executable scripts/verify-smithay-compositor-runtime.sh
 require_executable scripts/verify-nested-wayland-smoke.sh
 require_executable scripts/verify-session-replay.sh
@@ -132,6 +133,7 @@ require_contains scripts/verify-compositor-runtime.sh '"runtime_backend": "headl
 require_contains scripts/verify-compositor-runtime.sh '"runtime_trait": true'
 require_contains scripts/verify-linux-e2e.sh './scripts/verify-compositor-socket.sh'
 require_contains scripts/verify-linux-e2e.sh './scripts/verify-smithay-runtime-probe.sh'
+require_contains scripts/verify-linux-e2e.sh './scripts/verify-drm-master-boundary.sh'
 require_contains scripts/verify-linux-e2e.sh './scripts/verify-smithay-compositor-runtime.sh'
 require_contains scripts/verify-smithay-runtime-probe.sh '--features smithay-backend'
 require_contains scripts/verify-smithay-runtime-probe.sh '"smithay_dependency_compiled": true'
@@ -139,6 +141,10 @@ require_contains scripts/verify-smithay-runtime-probe.sh '"smithay_runtime_probe
 require_contains scripts/verify-smithay-runtime-probe.sh '"smithay_runtime_bootstrap": $smithay_runtime_bootstrap'
 require_contains scripts/verify-smithay-runtime-probe.sh '"smithay_wayland_socket_bootstrap": $smithay_wayland_socket_bootstrap'
 require_contains scripts/verify-smithay-runtime-probe.sh '"smithay_wayland_client_inserted": $smithay_wayland_client_inserted'
+require_contains scripts/verify-drm-master-boundary.sh '"name": "backlit-drm-master-boundary"'
+require_contains scripts/verify-drm-master-boundary.sh '"session_entry_drm": true'
+require_contains scripts/verify-drm-master-boundary.sh '"compositor_service_drm": true'
+require_contains scripts/verify-drm-master-boundary.sh '"dedicated_session_model": "seat-owner-tty-or-display-manager-session"'
 require_contains scripts/verify-smithay-compositor-runtime.sh '--features smithay-backend'
 require_contains scripts/verify-smithay-compositor-runtime.sh '--runtime=smithay'
 require_contains scripts/verify-smithay-compositor-runtime.sh '"smithay_compositor_runtime": true'
@@ -274,6 +280,7 @@ if [ -n "$artifact_root" ] && [ -d "$artifact_root" ]; then
   require_file "$artifact_root/debian-system-install/manifest.json"
   require_file "$artifact_root/staged-session-install/manifest.json"
   require_file "$artifact_root/smithay-runtime-probe/manifest.json"
+  require_file "$artifact_root/drm-master-boundary/manifest.json"
   require_file "$artifact_root/launch-readiness/manifest.json"
   require_file "$artifact_root/session-clean-exit/manifest.json"
   require_file "$artifact_root/drm-session-smoke/manifest.json"
@@ -556,6 +563,27 @@ if [ -n "$artifact_root" ] && [ -d "$artifact_root" ]; then
   else
     require_contains "$artifact_root/smithay-runtime-probe/manifest.json" '"expected_blocked": true'
   fi
+  require_contains "$artifact_root/drm-master-boundary/manifest.json" '"name": "backlit-drm-master-boundary"'
+  require_contains "$artifact_root/drm-master-boundary/manifest.json" '"session_entry_drm": true'
+  require_contains "$artifact_root/drm-master-boundary/manifest.json" '"compositor_service_drm": true'
+  require_contains "$artifact_root/drm-master-boundary/manifest.json" '"mutating_handoff_attempted": false'
+  if grep '"drm_launch_ready": true' "$artifact_root/drm-master-boundary/manifest.json" >/dev/null; then
+    require_contains "$artifact_root/drm-master-boundary/manifest.json" '"drm_master_boundary_checked": true'
+    require_contains "$artifact_root/drm-master-boundary/manifest.json" '"first_present_framebuffer_filled": true'
+    require_contains "$artifact_root/drm-master-boundary/manifest.json" '"first_present_plane_state_ready": true'
+    require_matches "$artifact_root/drm-master-boundary/manifest.json" '"first_present_(commit_succeeded|blocked_by_drm_master)": true'
+    if grep '"current_session_can_present": true' "$artifact_root/drm-master-boundary/manifest.json" >/dev/null; then
+      require_contains "$artifact_root/drm-master-boundary/manifest.json" '"first_present_commit_succeeded": true'
+      require_contains "$artifact_root/drm-master-boundary/manifest.json" '"first_present_vblank_event_received": true'
+    else
+      require_contains "$artifact_root/drm-master-boundary/manifest.json" '"first_present_blocked_by_drm_master": true'
+      require_contains "$artifact_root/drm-master-boundary/manifest.json" '"drm_master_boundary_observed": true'
+      require_contains "$artifact_root/drm-master-boundary/manifest.json" '"dedicated_session_required": true'
+      require_contains "$artifact_root/drm-master-boundary/manifest.json" '"current_session_can_present": false'
+    fi
+  else
+    require_contains "$artifact_root/drm-master-boundary/manifest.json" '"expected_blocked": true'
+  fi
   if grep '"session_socket_bound": true' "$artifact_root/compositor-socket/manifest.json" >/dev/null; then
     require_contains "$artifact_root/compositor-socket/manifest.json" '"socket_accepts_client_connection": true'
     require_contains "$artifact_root/compositor-socket/manifest.json" '"demo_client_socket_launch": true'
@@ -789,6 +817,7 @@ cat > "$out_dir/manifest.json" <<EOF
     "compositor_runtime": true,
     "compositor_runtime_trait": true,
     "smithay_runtime_probe": true,
+    "drm_master_boundary": true,
     "smithay_compositor_runtime": true,
     "compositor_socket": true,
     "compositor_service_ready": true,

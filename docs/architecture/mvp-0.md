@@ -6,6 +6,7 @@ MVP 0 is the development harness:
 - Headless compositor entrypoint and backend state model.
 - Backend preflight checks for headless, nested Wayland, and DRM launch paths.
 - Backend launch-plan metrics plus a Smithay runtime probe that identify the current harness implementation, display driver, input driver, selected DRM card/input source, logind/libseat/libinput use, compile-linked Smithay DRM/GBM/EGL/GLES/libinput/libseat/calloop components, Smithay `DrmDevice` KMS resource enumeration for CRTCs, connected connectors, modes, and planes, a selected connector/mode/CRTC/primary-plane scanout target tuple, Smithay `DrmSurface` creation and pending-state inspection for that target, scanout-sized dumb framebuffer allocation, mapping/fill, DRM framebuffer attachment, first-present primary-plane preparation, and either first commit/vblank evidence or the expected DRM-master permission boundary from the nested desktop session, real GBM device/allocator plus EGL display/context/GLES renderer creation from the selected render node, a 16x16 offscreen GLES render with CPU readback and red RGBA sample verification, and a bootstrapped Smithay Wayland display, listening socket, inserted client, and calloop dispatch before the real Smithay loop consumes them.
+- DRM-master permission boundary verifier that confirms the packaged session entry and compositor service use the DRM path, records first-present framebuffer and plane readiness, and distinguishes a true dedicated-session present from the expected nested-desktop DRM-master denial without mutating the host session.
 - Nested Wayland backend flag and Weston-backed compositor/session smoke verifier with clean shutdown.
 - Pure window-policy logic.
 - MVP shell chrome smoke for wallpaper, panel status indicators, panel power menu, NetworkManager/PipeWire status and control plans, workspace indicator, launcher targets, app switcher entries, and lock-screen readiness.
@@ -52,12 +53,12 @@ MVP 0 is the development harness:
 - Launch performance budget verifier for session GUI readiness, shell readiness, and terminal hotkey spawn.
 - Linux resource budget verifier for compositor service readiness, bounded idle CPU, and compositor+shell RSS probes.
 - JSON metrics.
-- Linux E2E verifier for fmt, tests, clippy, GUI smoke, launch performance, resource budgets, settings daemon policy, packaging contract, session clean exit, MVP 1 readiness contract, and nested Wayland smoke inside an Ubuntu guest.
+- Linux E2E verifier for fmt, tests, clippy, GUI smoke, launch performance, resource budgets, settings daemon policy, DRM-master boundary evidence, packaging contract, session clean exit, MVP 1 readiness contract, and nested Wayland smoke inside an Ubuntu guest.
 - GitHub Actions Linux E2E workflow with artifact upload and local contract verification.
 - MVP 0 contract verifier that checks the executable harness still covers the design deliverables and, inside E2E, validates the generated artifact manifests.
 - MVP 1 contract verifier that gathers bare-session launch readiness, DRM session smoke, package install, replay, performance, and resource-budget evidence without claiming the real compositor loop is finished.
 - Parallels runner for repeatable macOS-to-Ubuntu guest verification with the active guest user's logind session and runtime directory.
-- Parallels E2E artifact export for guest manifests, Linux-only DRM/package checks, nested Wayland evidence, MVP contract evidence, and the guest-rendered GUI preview image.
+- Parallels E2E artifact export for guest manifests, Linux-only DRM/package checks, DRM-master boundary evidence, nested Wayland evidence, MVP contract evidence, and the guest-rendered GUI preview image.
 - Packaging contract verifier for session desktop entry, Backlit user target, systemd units, and Debian package split.
 - Package manifest verifier for the `fastgui-core` bare-session meta package and Debian `.install` file ownership split.
 - Debian package-build verifier that assembles and inspects real `fastgui-*` `.deb` artifacts on Linux.
