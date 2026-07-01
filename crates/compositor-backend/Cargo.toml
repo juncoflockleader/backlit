@@ -11,10 +11,16 @@ publish = false
 path = "src/lib.rs"
 
 [features]
-smithay-backend = ["dep:smithay", "dep:wayland-client", "wayland-protocols/client"]
+smithay-backend = [
+  "dep:input",
+  "dep:smithay",
+  "dep:wayland-client",
+  "wayland-protocols/client",
+]
 
 [dependencies]
 backlit-common = { path = "../common" }
+input = { version = "0.9.1", optional = true, features = ["udev"] }
 smithay = { version = "0.7.0", optional = true, default-features = false, features = [
   "backend_drm",
   "backend_gbm",

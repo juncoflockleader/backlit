@@ -57,6 +57,7 @@ name = "backlit-compositor-backend"
 version = "0.1.0"
 dependencies = [
  "backlit-common",
+ "input",
  "smithay",
  "wayland-client",
  "wayland-protocols",
@@ -492,6 +493,7 @@ dependencies = [
  "bitflags",
  "input-sys",
  "libc",
+ "log",
  "udev",
 ]
 

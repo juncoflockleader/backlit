@@ -37,6 +37,14 @@ if [ "$(uname -s)" != "Linux" ]; then
     "smithay_gles_renderer_component": false,
     "smithay_drm_node_resolved": false,
     "smithay_renderer_node_selected": false,
+    "smithay_libseat_session_created": false,
+    "smithay_libseat_event_source_inserted": false,
+    "smithay_libseat_event_loop_dispatched": false,
+    "smithay_libinput_context_created": false,
+    "smithay_libinput_seat_assigned": false,
+    "smithay_libinput_backend_created": false,
+    "smithay_libinput_event_source_inserted": false,
+    "smithay_libinput_event_loop_dispatched": false,
     "smithay_libinput_component": false,
     "smithay_libseat_session_component": false,
     "smithay_calloop_component": false,
@@ -83,6 +91,14 @@ smithay_wayland_socket_bootstrap=false
 smithay_wayland_client_inserted=false
 smithay_drm_node_resolved=false
 smithay_renderer_node_selected=false
+smithay_libseat_session_created=false
+smithay_libseat_event_source_inserted=false
+smithay_libseat_event_loop_dispatched=false
+smithay_libinput_context_created=false
+smithay_libinput_seat_assigned=false
+smithay_libinput_backend_created=false
+smithay_libinput_event_source_inserted=false
+smithay_libinput_event_loop_dispatched=false
 if grep -F '"event":"backend.preflight","backend":"drm","ready":true' "$log" >/dev/null; then
   launch_ready=true
   expected_blocked=false
@@ -99,6 +115,16 @@ if grep -F '"event":"backend.preflight","backend":"drm","ready":true' "$log" >/d
   require_contains "$log" '"uses_logind":true'
   require_contains "$log" '"uses_libseat":true'
   require_contains "$log" '"uses_libinput":true'
+  require_contains "$log" '"libseat_session_created":true'
+  require_contains "$log" '"libseat_session_seat":"seat'
+  require_contains "$log" '"libseat_event_source_inserted":true'
+  require_contains "$log" '"libseat_event_loop_dispatched":true'
+  require_contains "$log" '"libinput_context_created":true'
+  require_contains "$log" '"libinput_seat_assigned":true'
+  require_contains "$log" '"libinput_backend_created":true'
+  require_contains "$log" '"libinput_event_source_inserted":true'
+  require_contains "$log" '"libinput_event_loop_dispatched":true'
+  require_contains "$log" '"input_runtime_failure":""'
   require_contains "$log" '"display_created":true'
   require_contains "$log" '"display_handle_created":true'
   require_contains "$log" '"listening_socket_bound":true'
@@ -117,6 +143,14 @@ if grep -F '"event":"backend.preflight","backend":"drm","ready":true' "$log" >/d
   smithay_wayland_client_inserted=true
   smithay_drm_node_resolved=true
   smithay_renderer_node_selected=true
+  smithay_libseat_session_created=true
+  smithay_libseat_event_source_inserted=true
+  smithay_libseat_event_loop_dispatched=true
+  smithay_libinput_context_created=true
+  smithay_libinput_seat_assigned=true
+  smithay_libinput_backend_created=true
+  smithay_libinput_event_source_inserted=true
+  smithay_libinput_event_loop_dispatched=true
 else
   require_contains "$log" '"event":"backend.preflight","backend":"drm","ready":false'
   require_contains "$log" '"launch_ready":false'
@@ -140,6 +174,14 @@ cat > "$out_dir/manifest.json" <<EOF
     "smithay_gles_renderer_component": true,
     "smithay_drm_node_resolved": $smithay_drm_node_resolved,
     "smithay_renderer_node_selected": $smithay_renderer_node_selected,
+    "smithay_libseat_session_created": $smithay_libseat_session_created,
+    "smithay_libseat_event_source_inserted": $smithay_libseat_event_source_inserted,
+    "smithay_libseat_event_loop_dispatched": $smithay_libseat_event_loop_dispatched,
+    "smithay_libinput_context_created": $smithay_libinput_context_created,
+    "smithay_libinput_seat_assigned": $smithay_libinput_seat_assigned,
+    "smithay_libinput_backend_created": $smithay_libinput_backend_created,
+    "smithay_libinput_event_source_inserted": $smithay_libinput_event_source_inserted,
+    "smithay_libinput_event_loop_dispatched": $smithay_libinput_event_loop_dispatched,
     "smithay_libinput_component": true,
     "smithay_libseat_session_component": true,
     "smithay_calloop_component": true,

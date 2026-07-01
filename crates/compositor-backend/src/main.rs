@@ -233,6 +233,8 @@ fn emit_smithay_runtime_probe(probe: &SmithayRuntimeProbe) {
     let drm_node_primary_path = probe.drm_node_primary_path.as_deref().unwrap_or("");
     let drm_node_render_path = probe.drm_node_render_path.as_deref().unwrap_or("");
     let renderer_node_path = probe.renderer_node_path.as_deref().unwrap_or("");
+    let libseat_session_seat = probe.libseat_session_seat.as_deref().unwrap_or("");
+    let input_runtime_failure = probe.input_runtime_failure.as_deref().unwrap_or("");
     let primary_input_event = probe.primary_input_event.as_deref().unwrap_or("");
     let components = probe.components.join(",");
 
@@ -296,6 +298,58 @@ fn emit_smithay_runtime_probe(probe: &SmithayRuntimeProbe) {
                 (
                     "gles_renderer_component",
                     FieldValue::Bool(probe.gles_renderer_component),
+                ),
+                (
+                    "libseat_session_created",
+                    FieldValue::Bool(probe.libseat_session_created),
+                ),
+                (
+                    "libseat_session_active",
+                    FieldValue::Bool(probe.libseat_session_active),
+                ),
+                (
+                    "libseat_session_seat",
+                    FieldValue::Str(libseat_session_seat),
+                ),
+                (
+                    "libseat_event_source_inserted",
+                    FieldValue::Bool(probe.libseat_event_source_inserted),
+                ),
+                (
+                    "libseat_event_loop_dispatched",
+                    FieldValue::Bool(probe.libseat_event_loop_dispatched),
+                ),
+                (
+                    "libseat_session_event_count",
+                    FieldValue::U64(probe.libseat_session_event_count),
+                ),
+                (
+                    "libinput_context_created",
+                    FieldValue::Bool(probe.libinput_context_created),
+                ),
+                (
+                    "libinput_seat_assigned",
+                    FieldValue::Bool(probe.libinput_seat_assigned),
+                ),
+                (
+                    "libinput_backend_created",
+                    FieldValue::Bool(probe.libinput_backend_created),
+                ),
+                (
+                    "libinput_event_source_inserted",
+                    FieldValue::Bool(probe.libinput_event_source_inserted),
+                ),
+                (
+                    "libinput_event_loop_dispatched",
+                    FieldValue::Bool(probe.libinput_event_loop_dispatched),
+                ),
+                (
+                    "libinput_event_count",
+                    FieldValue::U64(probe.libinput_event_count),
+                ),
+                (
+                    "input_runtime_failure",
+                    FieldValue::Str(input_runtime_failure),
                 ),
                 ("primary_drm_card", FieldValue::Str(primary_drm_card)),
                 (

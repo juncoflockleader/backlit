@@ -350,6 +350,19 @@ pub struct SmithayRuntimeProbe {
     pub gbm_allocator_component: bool,
     pub egl_display_component: bool,
     pub gles_renderer_component: bool,
+    pub libseat_session_created: bool,
+    pub libseat_session_active: bool,
+    pub libseat_session_seat: Option<String>,
+    pub libseat_event_source_inserted: bool,
+    pub libseat_event_loop_dispatched: bool,
+    pub libseat_session_event_count: u64,
+    pub libinput_context_created: bool,
+    pub libinput_seat_assigned: bool,
+    pub libinput_backend_created: bool,
+    pub libinput_event_source_inserted: bool,
+    pub libinput_event_loop_dispatched: bool,
+    pub libinput_event_count: u64,
+    pub input_runtime_failure: Option<String>,
     pub primary_drm_card: Option<String>,
     pub primary_drm_render_node: Option<String>,
     pub primary_input_event: Option<String>,
@@ -417,6 +430,15 @@ impl SmithayRuntimeProbe {
             && self.gbm_allocator_component
             && self.egl_display_component
             && self.gles_renderer_component
+            && self.libseat_session_created
+            && self.libseat_event_source_inserted
+            && self.libseat_event_loop_dispatched
+            && self.libinput_context_created
+            && self.libinput_seat_assigned
+            && self.libinput_backend_created
+            && self.libinput_event_source_inserted
+            && self.libinput_event_loop_dispatched
+            && self.input_runtime_failure.is_none()
     }
 }
 
@@ -768,6 +790,11 @@ pub fn smithay_runtime_probe(environment: &BackendPreflightEnvironment) -> Smith
         None
     };
     let renderer_node_selected = renderer_node_path.is_some();
+    let input_runtime_probe = smithay_input_runtime_probe(
+        environment.target_os.as_str(),
+        environment.input_broker_ready(),
+        environment.seat.as_deref(),
+    );
     let launch_ready = compiled
         && environment.target_os == "linux"
         && environment.drm_card_access_ready()
@@ -775,7 +802,8 @@ pub fn smithay_runtime_probe(environment: &BackendPreflightEnvironment) -> Smith
         && environment.primary_drm_card.is_some()
         && environment.primary_input_event.is_some()
         && drm_node_probe.resolved
-        && renderer_node_selected;
+        && renderer_node_selected
+        && input_runtime_probe.passed();
 
     SmithayRuntimeProbe {
         feature_enabled,
@@ -819,6 +847,19 @@ pub fn smithay_runtime_probe(environment: &BackendPreflightEnvironment) -> Smith
         gbm_allocator_component: compiled,
         egl_display_component: compiled,
         gles_renderer_component: compiled,
+        libseat_session_created: input_runtime_probe.libseat_session_created,
+        libseat_session_active: input_runtime_probe.libseat_session_active,
+        libseat_session_seat: input_runtime_probe.libseat_session_seat,
+        libseat_event_source_inserted: input_runtime_probe.libseat_event_source_inserted,
+        libseat_event_loop_dispatched: input_runtime_probe.libseat_event_loop_dispatched,
+        libseat_session_event_count: input_runtime_probe.libseat_session_event_count,
+        libinput_context_created: input_runtime_probe.libinput_context_created,
+        libinput_seat_assigned: input_runtime_probe.libinput_seat_assigned,
+        libinput_backend_created: input_runtime_probe.libinput_backend_created,
+        libinput_event_source_inserted: input_runtime_probe.libinput_event_source_inserted,
+        libinput_event_loop_dispatched: input_runtime_probe.libinput_event_loop_dispatched,
+        libinput_event_count: input_runtime_probe.libinput_event_count,
+        input_runtime_failure: input_runtime_probe.failure,
         primary_drm_card: environment.primary_drm_card.clone(),
         primary_drm_render_node: environment.primary_drm_render_node.clone(),
         primary_input_event: environment.primary_input_event.clone(),
@@ -833,6 +874,37 @@ struct SmithayDrmNodeProbe {
     primary_path: Option<String>,
     render_path: Option<String>,
     renderer_path: Option<String>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct SmithayInputRuntimeProbe {
+    libseat_session_created: bool,
+    libseat_session_active: bool,
+    libseat_session_seat: Option<String>,
+    libseat_event_source_inserted: bool,
+    libseat_event_loop_dispatched: bool,
+    libseat_session_event_count: u64,
+    libinput_context_created: bool,
+    libinput_seat_assigned: bool,
+    libinput_backend_created: bool,
+    libinput_event_source_inserted: bool,
+    libinput_event_loop_dispatched: bool,
+    libinput_event_count: u64,
+    failure: Option<String>,
+}
+
+impl SmithayInputRuntimeProbe {
+    fn passed(&self) -> bool {
+        self.libseat_session_created
+            && self.libseat_event_source_inserted
+            && self.libseat_event_loop_dispatched
+            && self.libinput_context_created
+            && self.libinput_seat_assigned
+            && self.libinput_backend_created
+            && self.libinput_event_source_inserted
+            && self.libinput_event_loop_dispatched
+            && self.failure.is_none()
+    }
 }
 
 #[cfg(all(feature = "smithay-backend", target_os = "linux"))]
@@ -888,6 +960,181 @@ fn smithay_drm_node_type_name(node_type: smithay::backend::drm::NodeType) -> &'s
         smithay::backend::drm::NodeType::Primary => "primary",
         smithay::backend::drm::NodeType::Control => "control",
         smithay::backend::drm::NodeType::Render => "render",
+    }
+}
+
+#[cfg(all(feature = "smithay-backend", target_os = "linux"))]
+fn smithay_input_runtime_probe(
+    target_os: &str,
+    input_broker_ready: bool,
+    seat: Option<&str>,
+) -> SmithayInputRuntimeProbe {
+    use std::sync::{
+        atomic::{AtomicU64, Ordering},
+        Arc,
+    };
+    use std::time::Duration;
+
+    use smithay::backend::libinput::{LibinputInputBackend, LibinputSessionInterface};
+    use smithay::backend::session::{libseat::LibSeatSession, Session};
+    use smithay::reexports::calloop::EventLoop;
+
+    if target_os != "linux" {
+        return unavailable_smithay_input_runtime_probe("non-linux-target");
+    }
+
+    if !input_broker_ready {
+        return unavailable_smithay_input_runtime_probe("input-broker-not-ready");
+    }
+
+    let Some(expected_seat) = seat.filter(|value| !value.trim().is_empty()) else {
+        return unavailable_smithay_input_runtime_probe("missing-seat");
+    };
+
+    let (session, session_notifier) = match LibSeatSession::new() {
+        Ok(session) => session,
+        Err(error) => {
+            return unavailable_smithay_input_runtime_probe(format!("libseat-session:{error:?}"));
+        }
+    };
+    let session_active = session.is_active();
+    let session_seat = session.seat();
+    if session_seat != expected_seat {
+        return SmithayInputRuntimeProbe {
+            libseat_session_created: true,
+            libseat_session_active: session_active,
+            libseat_session_seat: Some(session_seat),
+            failure: Some(format!("seat-mismatch:expected-{expected_seat}")),
+            ..unavailable_smithay_input_runtime_probe("seat-mismatch")
+        };
+    }
+
+    let mut libinput_context =
+        input::Libinput::new_with_udev(LibinputSessionInterface::from(session));
+    if libinput_context.udev_assign_seat(expected_seat).is_err() {
+        return SmithayInputRuntimeProbe {
+            libseat_session_created: true,
+            libseat_session_active: session_active,
+            libseat_session_seat: Some(session_seat),
+            libinput_context_created: true,
+            failure: Some(String::from("libinput-assign-seat")),
+            ..unavailable_smithay_input_runtime_probe("libinput-assign-seat")
+        };
+    }
+
+    let libinput_backend = LibinputInputBackend::new(libinput_context);
+    let mut event_loop = match EventLoop::<()>::try_new() {
+        Ok(event_loop) => event_loop,
+        Err(error) => {
+            return SmithayInputRuntimeProbe {
+                libseat_session_created: true,
+                libseat_session_active: session_active,
+                libseat_session_seat: Some(session_seat),
+                libinput_context_created: true,
+                libinput_seat_assigned: true,
+                libinput_backend_created: true,
+                failure: Some(format!("event-loop-new:{error}")),
+                ..unavailable_smithay_input_runtime_probe("event-loop-new")
+            };
+        }
+    };
+
+    let libseat_session_events = Arc::new(AtomicU64::new(0));
+    let libinput_events = Arc::new(AtomicU64::new(0));
+    let session_events_for_callback = Arc::clone(&libseat_session_events);
+    let input_events_for_callback = Arc::clone(&libinput_events);
+
+    let libseat_event_source_inserted = event_loop
+        .handle()
+        .insert_source(session_notifier, move |_event, _metadata, _data| {
+            session_events_for_callback.fetch_add(1, Ordering::SeqCst);
+        })
+        .is_ok();
+
+    if !libseat_event_source_inserted {
+        return SmithayInputRuntimeProbe {
+            libseat_session_created: true,
+            libseat_session_active: session_active,
+            libseat_session_seat: Some(session_seat),
+            libinput_context_created: true,
+            libinput_seat_assigned: true,
+            libinput_backend_created: true,
+            failure: Some(String::from("libseat-event-source-insert")),
+            ..unavailable_smithay_input_runtime_probe("libseat-event-source-insert")
+        };
+    }
+
+    let libinput_event_source_inserted = event_loop
+        .handle()
+        .insert_source(libinput_backend, move |_event, _metadata, _data| {
+            input_events_for_callback.fetch_add(1, Ordering::SeqCst);
+        })
+        .is_ok();
+
+    if !libinput_event_source_inserted {
+        return SmithayInputRuntimeProbe {
+            libseat_session_created: true,
+            libseat_session_active: session_active,
+            libseat_session_seat: Some(session_seat),
+            libseat_event_source_inserted: true,
+            libinput_context_created: true,
+            libinput_seat_assigned: true,
+            libinput_backend_created: true,
+            failure: Some(String::from("libinput-event-source-insert")),
+            ..unavailable_smithay_input_runtime_probe("libinput-event-source-insert")
+        };
+    }
+
+    let mut data = ();
+    let dispatched = event_loop
+        .dispatch(Some(Duration::from_millis(0)), &mut data)
+        .is_ok();
+
+    SmithayInputRuntimeProbe {
+        libseat_session_created: true,
+        libseat_session_active: session_active,
+        libseat_session_seat: Some(session_seat),
+        libseat_event_source_inserted: true,
+        libseat_event_loop_dispatched: dispatched,
+        libseat_session_event_count: libseat_session_events.load(Ordering::SeqCst),
+        libinput_context_created: true,
+        libinput_seat_assigned: true,
+        libinput_backend_created: true,
+        libinput_event_source_inserted: true,
+        libinput_event_loop_dispatched: dispatched,
+        libinput_event_count: libinput_events.load(Ordering::SeqCst),
+        failure: if dispatched {
+            None
+        } else {
+            Some(String::from("event-loop-dispatch"))
+        },
+    }
+}
+
+#[cfg(not(all(feature = "smithay-backend", target_os = "linux")))]
+fn smithay_input_runtime_probe(
+    _target_os: &str,
+    _input_broker_ready: bool,
+    _seat: Option<&str>,
+) -> SmithayInputRuntimeProbe {
+    unavailable_smithay_input_runtime_probe("unavailable")
+}
+
+fn unavailable_smithay_input_runtime_probe(reason: impl Into<String>) -> SmithayInputRuntimeProbe {
+    SmithayInputRuntimeProbe {
+        libseat_session_created: false,
+        libseat_session_active: false,
+        libseat_session_seat: None,
+        libseat_event_source_inserted: false,
+        libseat_event_loop_dispatched: false,
+        libseat_session_event_count: 0,
+        libinput_context_created: false,
+        libinput_seat_assigned: false,
+        libinput_backend_created: false,
+        libinput_event_source_inserted: false,
+        libinput_event_loop_dispatched: false,
+        libinput_event_count: 0,
+        failure: Some(reason.into()),
     }
 }
 
@@ -3018,7 +3265,12 @@ mod tests {
             assert!(probe.gbm_allocator_component);
             assert!(probe.egl_display_component);
             assert!(probe.gles_renderer_component);
-            assert_eq!(probe.launch_ready, probe.drm_node_resolved);
+            assert_eq!(
+                probe.launch_ready,
+                probe.drm_node_resolved
+                    && probe.renderer_node_selected
+                    && probe.input_runtime_failure.is_none()
+            );
             assert_eq!(probe.passed(), probe.launch_ready);
         } else {
             assert!(!probe.compiled, "{probe:?}");
@@ -3029,6 +3281,15 @@ mod tests {
             assert!(!probe.gbm_allocator_component);
             assert!(!probe.egl_display_component);
             assert!(!probe.gles_renderer_component);
+            assert!(!probe.libseat_session_created);
+            assert!(!probe.libseat_event_source_inserted);
+            assert!(!probe.libseat_event_loop_dispatched);
+            assert!(!probe.libinput_context_created);
+            assert!(!probe.libinput_seat_assigned);
+            assert!(!probe.libinput_backend_created);
+            assert!(!probe.libinput_event_source_inserted);
+            assert!(!probe.libinput_event_loop_dispatched);
+            assert!(probe.input_runtime_failure.is_some());
         }
     }
 
