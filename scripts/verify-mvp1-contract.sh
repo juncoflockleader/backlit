@@ -52,6 +52,7 @@ require_executable scripts/verify-smithay-compositor-runtime.sh
 require_executable scripts/verify-nested-wayland-smoke.sh
 require_executable scripts/verify-linux-e2e.sh
 require_executable scripts/verify-parallels-dedicated-drm-e2e.sh
+require_executable scripts/verify-mvp-complete.sh
 
 require_contains docs/architecture/mvp-1.md 'MVP 1 is the bare graphical session'
 require_contains docs/architecture/mvp-1.md 'DRM/KMS backend'
@@ -61,6 +62,7 @@ require_contains docs/architecture/mvp-1.md 'terminal hotkey'
 require_contains docs/architecture/mvp-1.md 'app switcher'
 require_contains docs/architecture/mvp-1.md 'clean exit'
 require_contains docs/architecture/mvp-1.md 'managed desktop-launch window'
+require_contains docs/architecture/mvp-1.md 'verify-mvp-complete.sh'
 require_contains docs/architecture/mvp-1.md 'does not claim the real DRM compositor loop is complete'
 require_contains scripts/verify-launch-readiness.sh '"drm_expected_ready"'
 require_contains scripts/verify-launch-readiness.sh '"drm_card_access_ready"'
@@ -127,6 +129,12 @@ require_contains scripts/verify-parallels-dedicated-drm-e2e.sh '"system_package_
 require_contains scripts/verify-parallels-dedicated-drm-e2e.sh '"system_session_binary": true'
 require_contains scripts/verify-parallels-dedicated-drm-e2e.sh '"debs_built": true'
 require_contains scripts/verify-parallels-dedicated-drm-e2e.sh '"dedicated_session_acceptance": true'
+require_contains scripts/verify-mvp-complete.sh '"name": "backlit-mvp-complete"'
+require_contains scripts/verify-mvp-complete.sh '"actual_system_dpkg_install": true'
+require_contains scripts/verify-mvp-complete.sh '"resource_budget": true'
+require_contains scripts/verify-mvp-complete.sh '"system_package_dedicated_drm": true'
+require_contains scripts/verify-mvp-complete.sh '"session_binary": "/usr/bin/backlit-session"'
+require_contains scripts/verify-mvp-complete.sh '"package_installed_dedicated_drm": $package_installed_dedicated_drm'
 require_contains scripts/verify-session-replay.sh '"launcher_overlay_frame": true'
 require_contains scripts/verify-session-replay.sh '"app_switcher_overlay_frame": true'
 require_contains scripts/verify-compositor-socket.sh '"session_socket_bound": true'

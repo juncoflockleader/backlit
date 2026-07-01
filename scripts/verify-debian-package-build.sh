@@ -252,6 +252,7 @@ for verifier in \
   verify-drm-master-boundary.sh \
   verify-dedicated-drm-session.sh \
   verify-parallels-dedicated-drm-e2e.sh \
+  verify-mvp-complete.sh \
   verify-mvp1-contract.sh \
   verify-linux-e2e.sh
 do
@@ -301,6 +302,7 @@ require_deb_contains fastgui-dev-tools usr/lib/backlit/dev-tools/verify-session-
 require_deb_contains fastgui-dev-tools usr/lib/backlit/dev-tools/verify-drm-master-boundary.sh
 require_deb_contains fastgui-dev-tools usr/lib/backlit/dev-tools/verify-dedicated-drm-session.sh
 require_deb_contains fastgui-dev-tools usr/lib/backlit/dev-tools/verify-parallels-dedicated-drm-e2e.sh
+require_deb_contains fastgui-dev-tools usr/lib/backlit/dev-tools/verify-mvp-complete.sh
 require_deb_contains fastgui-dev-tools usr/lib/backlit/dev-tools/verify-mvp1-contract.sh
 
 test "$(grep -c '^ Package: fastgui-core$' "$out_dir/fastgui-core.info")" = "1" || fail "fastgui-core info missing package field"
