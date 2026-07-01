@@ -354,6 +354,11 @@ pub struct SmithayRuntimeBootstrap {
     pub runtime_backend: &'static str,
     pub display_created: bool,
     pub display_handle_created: bool,
+    pub listening_socket_bound: bool,
+    pub socket_name: String,
+    pub socket_connect_succeeded: bool,
+    pub socket_accept_succeeded: bool,
+    pub client_inserted: bool,
     pub display_clients_dispatched: bool,
     pub display_dispatch_count: u64,
     pub display_clients_flushed: bool,
@@ -369,6 +374,11 @@ impl SmithayRuntimeBootstrap {
             && self.runtime_backend == "smithay-drm-bootstrap"
             && self.display_created
             && self.display_handle_created
+            && self.listening_socket_bound
+            && !self.socket_name.is_empty()
+            && self.socket_connect_succeeded
+            && self.socket_accept_succeeded
+            && self.client_inserted
             && self.display_clients_dispatched
             && self.display_clients_flushed
             && self.event_loop_created
@@ -402,10 +412,11 @@ pub fn smithay_runtime_bootstrap() -> SmithayRuntimeBootstrap {
 
 #[cfg(all(feature = "smithay-backend", target_os = "linux"))]
 fn smithay_runtime_bootstrap_impl() -> SmithayRuntimeBootstrap {
-    use std::time::Duration;
+    use std::{env, os::unix::net::UnixStream, path::PathBuf, sync::Arc, time::Duration};
 
     use smithay::reexports::calloop::EventLoop;
-    use smithay::reexports::wayland_server::Display;
+    use smithay::reexports::wayland_server::backend::ClientData;
+    use smithay::reexports::wayland_server::{Display, ListeningSocket};
 
     #[derive(Default)]
     struct BootstrapState;
@@ -419,6 +430,11 @@ fn smithay_runtime_bootstrap_impl() -> SmithayRuntimeBootstrap {
                 runtime_backend: "smithay-drm-bootstrap",
                 display_created: false,
                 display_handle_created: false,
+                listening_socket_bound: false,
+                socket_name: String::new(),
+                socket_connect_succeeded: false,
+                socket_accept_succeeded: false,
+                client_inserted: false,
                 display_clients_dispatched: false,
                 display_dispatch_count: 0,
                 display_clients_flushed: false,
@@ -428,7 +444,151 @@ fn smithay_runtime_bootstrap_impl() -> SmithayRuntimeBootstrap {
             };
         }
     };
-    let _display_handle = display.handle();
+    let mut display_handle = display.handle();
+    let listening_socket = match ListeningSocket::bind_auto("backlit-smithay-bootstrap", 0..64) {
+        Ok(listening_socket) => listening_socket,
+        Err(error) => {
+            return SmithayRuntimeBootstrap {
+                feature_enabled: true,
+                compiled: true,
+                runtime_backend: "smithay-drm-bootstrap",
+                display_created: true,
+                display_handle_created: true,
+                listening_socket_bound: false,
+                socket_name: String::new(),
+                socket_connect_succeeded: false,
+                socket_accept_succeeded: false,
+                client_inserted: false,
+                display_clients_dispatched: false,
+                display_dispatch_count: 0,
+                display_clients_flushed: false,
+                event_loop_created: false,
+                event_loop_dispatched: false,
+                failure: format!("socket-bind:{error}"),
+            };
+        }
+    };
+    let socket_name = match listening_socket
+        .socket_name()
+        .and_then(|name| name.to_str())
+        .map(String::from)
+    {
+        Some(socket_name) => socket_name,
+        None => {
+            return SmithayRuntimeBootstrap {
+                feature_enabled: true,
+                compiled: true,
+                runtime_backend: "smithay-drm-bootstrap",
+                display_created: true,
+                display_handle_created: true,
+                listening_socket_bound: true,
+                socket_name: String::new(),
+                socket_connect_succeeded: false,
+                socket_accept_succeeded: false,
+                client_inserted: false,
+                display_clients_dispatched: false,
+                display_dispatch_count: 0,
+                display_clients_flushed: false,
+                event_loop_created: false,
+                event_loop_dispatched: false,
+                failure: String::from("socket-name:unavailable"),
+            };
+        }
+    };
+    let runtime_dir = match env::var_os("XDG_RUNTIME_DIR") {
+        Some(runtime_dir) => runtime_dir,
+        None => {
+            return SmithayRuntimeBootstrap {
+                feature_enabled: true,
+                compiled: true,
+                runtime_backend: "smithay-drm-bootstrap",
+                display_created: true,
+                display_handle_created: true,
+                listening_socket_bound: true,
+                socket_name,
+                socket_connect_succeeded: false,
+                socket_accept_succeeded: false,
+                client_inserted: false,
+                display_clients_dispatched: false,
+                display_dispatch_count: 0,
+                display_clients_flushed: false,
+                event_loop_created: false,
+                event_loop_dispatched: false,
+                failure: String::from("socket-connect:missing-runtime-dir"),
+            };
+        }
+    };
+    let socket_path = PathBuf::from(runtime_dir).join(&socket_name);
+    let _client_stream = match UnixStream::connect(&socket_path) {
+        Ok(client_stream) => client_stream,
+        Err(error) => {
+            return SmithayRuntimeBootstrap {
+                feature_enabled: true,
+                compiled: true,
+                runtime_backend: "smithay-drm-bootstrap",
+                display_created: true,
+                display_handle_created: true,
+                listening_socket_bound: true,
+                socket_name,
+                socket_connect_succeeded: false,
+                socket_accept_succeeded: false,
+                client_inserted: false,
+                display_clients_dispatched: false,
+                display_dispatch_count: 0,
+                display_clients_flushed: false,
+                event_loop_created: false,
+                event_loop_dispatched: false,
+                failure: format!("socket-connect:{error}"),
+            };
+        }
+    };
+    let accepted_stream = match accept_bootstrap_client(&listening_socket) {
+        Ok(accepted_stream) => accepted_stream,
+        Err(error) => {
+            return SmithayRuntimeBootstrap {
+                feature_enabled: true,
+                compiled: true,
+                runtime_backend: "smithay-drm-bootstrap",
+                display_created: true,
+                display_handle_created: true,
+                listening_socket_bound: true,
+                socket_name,
+                socket_connect_succeeded: true,
+                socket_accept_succeeded: false,
+                client_inserted: false,
+                display_clients_dispatched: false,
+                display_dispatch_count: 0,
+                display_clients_flushed: false,
+                event_loop_created: false,
+                event_loop_dispatched: false,
+                failure: error,
+            };
+        }
+    };
+    let client_data: Arc<dyn ClientData> = Arc::new(());
+    let _client = match display_handle.insert_client(accepted_stream, client_data) {
+        Ok(client) => client,
+        Err(error) => {
+            return SmithayRuntimeBootstrap {
+                feature_enabled: true,
+                compiled: true,
+                runtime_backend: "smithay-drm-bootstrap",
+                display_created: true,
+                display_handle_created: true,
+                listening_socket_bound: true,
+                socket_name,
+                socket_connect_succeeded: true,
+                socket_accept_succeeded: true,
+                client_inserted: false,
+                display_clients_dispatched: false,
+                display_dispatch_count: 0,
+                display_clients_flushed: false,
+                event_loop_created: false,
+                event_loop_dispatched: false,
+                failure: format!("client-insert:{error}"),
+            };
+        }
+    };
     let mut state = BootstrapState;
     let display_dispatch_count = match display.dispatch_clients(&mut state) {
         Ok(count) => count as u64,
@@ -439,6 +599,11 @@ fn smithay_runtime_bootstrap_impl() -> SmithayRuntimeBootstrap {
                 runtime_backend: "smithay-drm-bootstrap",
                 display_created: true,
                 display_handle_created: true,
+                listening_socket_bound: true,
+                socket_name,
+                socket_connect_succeeded: true,
+                socket_accept_succeeded: true,
+                client_inserted: true,
                 display_clients_dispatched: false,
                 display_dispatch_count: 0,
                 display_clients_flushed: false,
@@ -457,6 +622,11 @@ fn smithay_runtime_bootstrap_impl() -> SmithayRuntimeBootstrap {
                 runtime_backend: "smithay-drm-bootstrap",
                 display_created: true,
                 display_handle_created: true,
+                listening_socket_bound: true,
+                socket_name,
+                socket_connect_succeeded: true,
+                socket_accept_succeeded: true,
+                client_inserted: true,
                 display_clients_dispatched: true,
                 display_dispatch_count,
                 display_clients_flushed: false,
@@ -475,6 +645,11 @@ fn smithay_runtime_bootstrap_impl() -> SmithayRuntimeBootstrap {
                 runtime_backend: "smithay-drm-bootstrap",
                 display_created: true,
                 display_handle_created: true,
+                listening_socket_bound: true,
+                socket_name,
+                socket_connect_succeeded: true,
+                socket_accept_succeeded: true,
+                client_inserted: true,
                 display_clients_dispatched: true,
                 display_dispatch_count,
                 display_clients_flushed,
@@ -494,6 +669,11 @@ fn smithay_runtime_bootstrap_impl() -> SmithayRuntimeBootstrap {
                     runtime_backend: "smithay-drm-bootstrap",
                     display_created: true,
                     display_handle_created: true,
+                    listening_socket_bound: true,
+                    socket_name,
+                    socket_connect_succeeded: true,
+                    socket_accept_succeeded: true,
+                    client_inserted: true,
                     display_clients_dispatched: true,
                     display_dispatch_count,
                     display_clients_flushed,
@@ -510,6 +690,11 @@ fn smithay_runtime_bootstrap_impl() -> SmithayRuntimeBootstrap {
         runtime_backend: "smithay-drm-bootstrap",
         display_created: true,
         display_handle_created: true,
+        listening_socket_bound: true,
+        socket_name,
+        socket_connect_succeeded: true,
+        socket_accept_succeeded: true,
+        client_inserted: true,
         display_clients_dispatched: true,
         display_dispatch_count,
         display_clients_flushed,
@@ -517,6 +702,21 @@ fn smithay_runtime_bootstrap_impl() -> SmithayRuntimeBootstrap {
         event_loop_dispatched,
         failure: String::new(),
     }
+}
+
+#[cfg(all(feature = "smithay-backend", target_os = "linux"))]
+fn accept_bootstrap_client(
+    listening_socket: &smithay::reexports::wayland_server::ListeningSocket,
+) -> Result<std::os::unix::net::UnixStream, String> {
+    for _ in 0..16 {
+        match listening_socket.accept() {
+            Ok(Some(stream)) => return Ok(stream),
+            Ok(None) => std::thread::sleep(std::time::Duration::from_millis(1)),
+            Err(error) => return Err(format!("socket-accept:{error}")),
+        }
+    }
+
+    Err(String::from("socket-accept:would-block"))
 }
 
 #[cfg(not(all(feature = "smithay-backend", target_os = "linux")))]
@@ -527,6 +727,11 @@ fn smithay_runtime_bootstrap_impl() -> SmithayRuntimeBootstrap {
         runtime_backend: "smithay-uncompiled",
         display_created: false,
         display_handle_created: false,
+        listening_socket_bound: false,
+        socket_name: String::new(),
+        socket_connect_succeeded: false,
+        socket_accept_succeeded: false,
+        client_inserted: false,
         display_clients_dispatched: false,
         display_dispatch_count: 0,
         display_clients_flushed: false,
@@ -1920,6 +2125,13 @@ mod tests {
             assert_eq!(bootstrap.runtime_backend, "smithay-drm-bootstrap");
             assert!(bootstrap.display_created);
             assert!(bootstrap.display_handle_created);
+            assert!(bootstrap.listening_socket_bound);
+            assert!(bootstrap
+                .socket_name
+                .starts_with("backlit-smithay-bootstrap-"));
+            assert!(bootstrap.socket_connect_succeeded);
+            assert!(bootstrap.socket_accept_succeeded);
+            assert!(bootstrap.client_inserted);
             assert!(bootstrap.display_clients_dispatched);
             assert!(bootstrap.display_clients_flushed);
             assert!(bootstrap.event_loop_created);
@@ -1929,6 +2141,11 @@ mod tests {
             assert!(!bootstrap.compiled, "{bootstrap:?}");
             assert!(!bootstrap.passed(), "{bootstrap:?}");
             assert_eq!(bootstrap.failure, "unavailable");
+            assert!(!bootstrap.listening_socket_bound);
+            assert!(bootstrap.socket_name.is_empty());
+            assert!(!bootstrap.socket_connect_succeeded);
+            assert!(!bootstrap.socket_accept_succeeded);
+            assert!(!bootstrap.client_inserted);
         }
     }
 

@@ -463,6 +463,8 @@ require_contains "$host_smithay_runtime_probe_manifest" '"drm_launch_ready": tru
 require_contains "$host_smithay_runtime_probe_manifest" '"smithay_runtime_probe": true'
 require_contains "$host_smithay_runtime_probe_manifest" '"smithay_runtime_bootstrap": true'
 require_contains "$host_smithay_runtime_probe_manifest" '"smithay_wayland_display_bootstrap": true'
+require_contains "$host_smithay_runtime_probe_manifest" '"smithay_wayland_socket_bootstrap": true'
+require_contains "$host_smithay_runtime_probe_manifest" '"smithay_wayland_client_inserted": true'
 require_contains "$host_smithay_runtime_probe_manifest" '"smithay_calloop_dispatch_bootstrap": true'
 require_contains "$host_session_replay_manifest" '"session_replay_event": true'
 require_contains "$host_session_replay_manifest" '"frame_count": 9'

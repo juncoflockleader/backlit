@@ -36,6 +36,8 @@ if [ "$(uname -s)" != "Linux" ]; then
     "smithay_libseat_session_component": false,
     "smithay_calloop_component": false,
     "smithay_wayland_display_bootstrap": false,
+    "smithay_wayland_socket_bootstrap": false,
+    "smithay_wayland_client_inserted": false,
     "smithay_calloop_dispatch_bootstrap": false,
     "drm_launch_ready": false,
     "smithay_runtime_probe": false,
@@ -69,6 +71,8 @@ launch_ready=false
 expected_blocked=true
 smithay_runtime_probe=false
 smithay_runtime_bootstrap=false
+smithay_wayland_socket_bootstrap=false
+smithay_wayland_client_inserted=false
 if grep -F '"event":"backend.preflight","backend":"drm","ready":true' "$log" >/dev/null; then
   launch_ready=true
   expected_blocked=false
@@ -81,6 +85,11 @@ if grep -F '"event":"backend.preflight","backend":"drm","ready":true' "$log" >/d
   require_contains "$log" '"uses_libinput":true'
   require_contains "$log" '"display_created":true'
   require_contains "$log" '"display_handle_created":true'
+  require_contains "$log" '"listening_socket_bound":true'
+  require_contains "$log" '"socket_name":"backlit-smithay-bootstrap-'
+  require_contains "$log" '"socket_connect_succeeded":true'
+  require_contains "$log" '"socket_accept_succeeded":true'
+  require_contains "$log" '"client_inserted":true'
   require_contains "$log" '"display_clients_dispatched":true'
   require_contains "$log" '"display_clients_flushed":true'
   require_contains "$log" '"event_loop_created":true'
@@ -88,6 +97,8 @@ if grep -F '"event":"backend.preflight","backend":"drm","ready":true' "$log" >/d
   require_contains "$log" '"failure":""'
   smithay_runtime_probe=true
   smithay_runtime_bootstrap=true
+  smithay_wayland_socket_bootstrap=true
+  smithay_wayland_client_inserted=true
 else
   require_contains "$log" '"event":"backend.preflight","backend":"drm","ready":false'
   require_contains "$log" '"launch_ready":false'
@@ -110,6 +121,8 @@ cat > "$out_dir/manifest.json" <<EOF
     "smithay_libseat_session_component": true,
     "smithay_calloop_component": true,
     "smithay_wayland_display_bootstrap": $smithay_runtime_bootstrap,
+    "smithay_wayland_socket_bootstrap": $smithay_wayland_socket_bootstrap,
+    "smithay_wayland_client_inserted": $smithay_wayland_client_inserted,
     "smithay_calloop_dispatch_bootstrap": $smithay_runtime_bootstrap,
     "drm_launch_ready": $launch_ready,
     "smithay_runtime_probe": $smithay_runtime_probe,

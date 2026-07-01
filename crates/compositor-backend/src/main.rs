@@ -182,6 +182,26 @@ fn emit_smithay_runtime_bootstrap(bootstrap: &SmithayRuntimeBootstrap) {
                     FieldValue::Bool(bootstrap.display_handle_created),
                 ),
                 (
+                    "listening_socket_bound",
+                    FieldValue::Bool(bootstrap.listening_socket_bound),
+                ),
+                (
+                    "socket_name",
+                    FieldValue::Str(bootstrap.socket_name.as_str())
+                ),
+                (
+                    "socket_connect_succeeded",
+                    FieldValue::Bool(bootstrap.socket_connect_succeeded),
+                ),
+                (
+                    "socket_accept_succeeded",
+                    FieldValue::Bool(bootstrap.socket_accept_succeeded),
+                ),
+                (
+                    "client_inserted",
+                    FieldValue::Bool(bootstrap.client_inserted),
+                ),
+                (
                     "display_clients_dispatched",
                     FieldValue::Bool(bootstrap.display_clients_dispatched),
                 ),

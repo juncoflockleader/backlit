@@ -95,6 +95,8 @@ require_contains scripts/verify-smithay-runtime-probe.sh '--features smithay-bac
 require_contains scripts/verify-smithay-runtime-probe.sh '"smithay_dependency_compiled": true'
 require_contains scripts/verify-smithay-runtime-probe.sh '"smithay_runtime_probe": $smithay_runtime_probe'
 require_contains scripts/verify-smithay-runtime-probe.sh '"smithay_runtime_bootstrap": $smithay_runtime_bootstrap'
+require_contains scripts/verify-smithay-runtime-probe.sh '"smithay_wayland_socket_bootstrap": $smithay_wayland_socket_bootstrap'
+require_contains scripts/verify-smithay-runtime-probe.sh '"smithay_wayland_client_inserted": $smithay_wayland_client_inserted'
 require_contains scripts/verify-linux-e2e.sh './scripts/verify-smithay-runtime-probe.sh'
 require_contains scripts/verify-linux-e2e.sh './scripts/verify-drm-session-smoke.sh'
 require_contains scripts/verify-linux-e2e.sh './scripts/verify-mvp1-contract.sh'
@@ -224,6 +226,8 @@ if [ -n "$artifact_root" ] && [ -d "$artifact_root" ]; then
   require_contains "$artifact_root/smithay-runtime-probe/manifest.json" '"smithay_runtime_probe":'
   require_contains "$artifact_root/smithay-runtime-probe/manifest.json" '"smithay_runtime_bootstrap":'
   require_contains "$artifact_root/smithay-runtime-probe/manifest.json" '"smithay_wayland_display_bootstrap":'
+  require_contains "$artifact_root/smithay-runtime-probe/manifest.json" '"smithay_wayland_socket_bootstrap":'
+  require_contains "$artifact_root/smithay-runtime-probe/manifest.json" '"smithay_wayland_client_inserted":'
   require_contains "$artifact_root/smithay-runtime-probe/manifest.json" '"smithay_calloop_dispatch_bootstrap":'
   if grep '"checked": true' "$artifact_root/smithay-runtime-probe/manifest.json" >/dev/null; then
     require_contains "$artifact_root/smithay-runtime-probe/manifest.json" '"smithay_dependency_compiled": true'
@@ -236,6 +240,8 @@ if [ -n "$artifact_root" ] && [ -d "$artifact_root" ]; then
       require_contains "$artifact_root/smithay-runtime-probe/manifest.json" '"smithay_runtime_probe": true'
       require_contains "$artifact_root/smithay-runtime-probe/manifest.json" '"smithay_runtime_bootstrap": true'
       require_contains "$artifact_root/smithay-runtime-probe/manifest.json" '"smithay_wayland_display_bootstrap": true'
+      require_contains "$artifact_root/smithay-runtime-probe/manifest.json" '"smithay_wayland_socket_bootstrap": true'
+      require_contains "$artifact_root/smithay-runtime-probe/manifest.json" '"smithay_wayland_client_inserted": true'
       require_contains "$artifact_root/smithay-runtime-probe/manifest.json" '"smithay_calloop_dispatch_bootstrap": true'
       smithay_runtime_probe_artifact=true
     else
