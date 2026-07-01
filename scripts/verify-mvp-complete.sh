@@ -31,6 +31,7 @@ normal_parallels_e2e=false
 package_installed_dedicated_drm=false
 current_commit_evidence=false
 gui_launch_verified=false
+preview_evidence=false
 mvp1_acceptance=false
 launch_performance_evidence=false
 resource_budget_evidence=false
@@ -68,6 +69,7 @@ write_manifest() {
     "package_installed_dedicated_drm": $package_installed_dedicated_drm,
     "current_commit_evidence": $current_commit_evidence,
     "gui_launch_verified": $gui_launch_verified,
+    "preview_evidence": $preview_evidence,
     "mvp1_acceptance": $mvp1_acceptance,
     "launch_performance_evidence": $launch_performance_evidence,
     "resource_budget_evidence": $resource_budget_evidence
@@ -153,6 +155,8 @@ require_contains "$parallels_manifest" '"drm_session_smoke": true' parallels-lin
 require_contains "$parallels_manifest" '"mvp1_contract": true' parallels-linux-e2e
 require_contains "$parallels_manifest" '"launch_performance": true' parallels-linux-e2e
 require_contains "$parallels_manifest" '"resource_budget": true' parallels-linux-e2e
+require_contains "$parallels_manifest" '"png_written": true' preview-evidence
+require_contains "$parallels_manifest" '"preview_format": "png"' preview-evidence
 require_contains "$launch_performance_manifest" '"startup_budget": true' launch-performance-evidence
 require_contains "$launch_performance_manifest" '"terminal_launch_budget": true' launch-performance-evidence
 require_contains "$launch_performance_manifest" '"shell_ready_budget": true' launch-performance-evidence
@@ -175,6 +179,8 @@ require_contains "$dedicated_manifest" '"drm_first_present_vblank": true' packag
 require_contains "$dedicated_manifest" '"session_gui_verified": true' package-installed-dedicated-drm
 require_contains "$dedicated_manifest" '"session_services": true' package-installed-dedicated-drm
 require_contains "$dedicated_manifest" '"session_clean_exit": true' package-installed-dedicated-drm
+require_contains "$dedicated_manifest" '"png_written": true' preview-evidence
+require_contains "$dedicated_manifest" '"preview_format": "png"' preview-evidence
 require_contains "$package_build_manifest" '"debs_built": true' package-installed-dedicated-drm
 require_contains "$dedicated_session_manifest" '"expected_blocked": false' package-installed-dedicated-drm
 require_contains "$dedicated_session_manifest" '"reason": "dedicated-drm-session-presented"' package-installed-dedicated-drm
@@ -188,6 +194,7 @@ package_installed_dedicated_drm=true
 
 current_commit_evidence=true
 gui_launch_verified=true
+preview_evidence=true
 mvp1_acceptance=true
 write_manifest true complete
 
