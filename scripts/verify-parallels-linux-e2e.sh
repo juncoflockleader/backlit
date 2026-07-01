@@ -492,6 +492,7 @@ require_contains "$host_smithay_compositor_runtime_manifest" '"smithay_seat_glob
 require_contains "$host_smithay_compositor_runtime_manifest" '"smithay_keyboard_pointer_capabilities": true'
 require_contains "$host_smithay_compositor_runtime_manifest" '"smithay_input_sources": true'
 require_contains "$host_smithay_compositor_runtime_manifest" '"smithay_input_event_loop": true'
+require_contains "$host_smithay_compositor_runtime_manifest" '"smithay_input_seat_handles": true'
 require_contains "$host_smithay_compositor_runtime_manifest" '"smithay_input_event_classification": true'
 require_contains "$host_smithay_compositor_runtime_manifest" '"smithay_real_wayland_client": true'
 require_contains "$host_smithay_compositor_runtime_manifest" '"smithay_real_wayland_metadata": true'

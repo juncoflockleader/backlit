@@ -3349,6 +3349,15 @@ pub trait CompositorRuntime {
     fn input_sources_ready(&self) -> bool {
         false
     }
+    fn input_seat_ready(&self) -> bool {
+        false
+    }
+    fn input_keyboard_handle_ready(&self) -> bool {
+        false
+    }
+    fn input_pointer_handle_ready(&self) -> bool {
+        false
+    }
     fn input_event_counters(&self) -> InputEventCounters {
         InputEventCounters::default()
     }
@@ -3650,6 +3659,9 @@ struct SmithayCompositorState {
     shm_state: smithay::wayland::shm::ShmState,
     xdg_shell_state: smithay::wayland::shell::xdg::XdgShellState,
     seat_state: smithay::input::SeatState<SmithayCompositorState>,
+    seat: smithay::input::Seat<SmithayCompositorState>,
+    keyboard_handle: smithay::input::keyboard::KeyboardHandle<SmithayCompositorState>,
+    pointer_handle: smithay::input::pointer::PointerHandle<SmithayCompositorState>,
     protocol_global_count: u64,
     seat_global_count: u64,
     seat_keyboard_capability: bool,
@@ -3732,6 +3744,9 @@ pub struct SmithayWaylandClientSmokeReport {
     pub input_sources_ready: bool,
     pub input_source_count: u64,
     pub input_event_loop_dispatch_count: u64,
+    pub input_seat_ready: bool,
+    pub input_keyboard_handle_ready: bool,
+    pub input_pointer_handle_ready: bool,
     pub input_event_counters: InputEventCounters,
     pub surface_commit_count: u64,
     pub xdg_toplevel_count: u64,
@@ -3777,6 +3792,9 @@ impl SmithayWaylandClientSmokeReport {
             && self.input_sources_ready
             && self.input_source_count >= 2
             && self.input_event_loop_dispatch_count >= 3
+            && self.input_seat_ready
+            && self.input_keyboard_handle_ready
+            && self.input_pointer_handle_ready
             && self.surface_commit_count >= 1
             && self.xdg_toplevel_count >= 1
             && self.title_changed_count >= 1
@@ -4189,8 +4207,8 @@ impl SmithayCompositorState {
         let xdg_shell_state = smithay::wayland::shell::xdg::XdgShellState::new::<Self>(display);
         let mut seat_state = smithay::input::SeatState::new();
         let mut seat = seat_state.new_wl_seat(display, "backlit-seat0");
-        let _pointer = seat.add_pointer();
-        let _keyboard = seat
+        let pointer_handle = seat.add_pointer();
+        let keyboard_handle = seat
             .add_keyboard(Default::default(), 200, 25)
             .map_err(|error| SmithayRuntimeError(format!("seat-keyboard:{error}")))?;
 
@@ -4199,6 +4217,9 @@ impl SmithayCompositorState {
             shm_state,
             xdg_shell_state,
             seat_state,
+            seat,
+            keyboard_handle,
+            pointer_handle,
             protocol_global_count: 5,
             seat_global_count: 1,
             seat_keyboard_capability: true,
@@ -4230,6 +4251,26 @@ impl SmithayCompositorState {
             shm_buffer_height: 0,
             shm_buffer_pixels: 0,
         })
+    }
+
+    fn input_keyboard_handle_ready(&self) -> bool {
+        self.seat
+            .get_keyboard()
+            .as_ref()
+            .map(|handle| handle == &self.keyboard_handle)
+            .unwrap_or(false)
+    }
+
+    fn input_pointer_handle_ready(&self) -> bool {
+        self.seat
+            .get_pointer()
+            .as_ref()
+            .map(|handle| handle == &self.pointer_handle)
+            .unwrap_or(false)
+    }
+
+    fn input_seat_ready(&self) -> bool {
+        self.input_keyboard_handle_ready() && self.input_pointer_handle_ready()
     }
 }
 
@@ -4545,6 +4586,18 @@ impl SmithayCompositorRuntime {
         self.state.input_sources_ready && self.state.input_runtime_failure.is_none()
     }
 
+    pub fn input_seat_ready(&self) -> bool {
+        self.state.input_seat_ready()
+    }
+
+    pub fn input_keyboard_handle_ready(&self) -> bool {
+        self.state.input_keyboard_handle_ready()
+    }
+
+    pub fn input_pointer_handle_ready(&self) -> bool {
+        self.state.input_pointer_handle_ready()
+    }
+
     pub fn input_event_counters(&self) -> InputEventCounters {
         self.state.libinput_event_counters
     }
@@ -4619,6 +4672,9 @@ impl SmithayCompositorRuntime {
             input_sources_ready: self.input_sources_ready(),
             input_source_count: self.input_source_count(),
             input_event_loop_dispatch_count: self.input_event_loop_dispatch_count(),
+            input_seat_ready: self.input_seat_ready(),
+            input_keyboard_handle_ready: self.input_keyboard_handle_ready(),
+            input_pointer_handle_ready: self.input_pointer_handle_ready(),
             input_event_counters: self.input_event_counters(),
             surface_commit_count: self.state.surface_commit_count,
             xdg_toplevel_count: self.state.xdg_toplevel_count,
@@ -4791,6 +4847,18 @@ impl CompositorRuntime for SmithayCompositorRuntime {
 
     fn input_sources_ready(&self) -> bool {
         SmithayCompositorRuntime::input_sources_ready(self)
+    }
+
+    fn input_seat_ready(&self) -> bool {
+        SmithayCompositorRuntime::input_seat_ready(self)
+    }
+
+    fn input_keyboard_handle_ready(&self) -> bool {
+        SmithayCompositorRuntime::input_keyboard_handle_ready(self)
+    }
+
+    fn input_pointer_handle_ready(&self) -> bool {
+        SmithayCompositorRuntime::input_pointer_handle_ready(self)
     }
 
     fn input_event_counters(&self) -> InputEventCounters {

@@ -199,6 +199,15 @@ fn run() -> Result<(), String> {
                     "input_event_loop_dispatch_count",
                     FieldValue::U64(smoke.input_event_loop_dispatch_count),
                 ),
+                ("input_seat_ready", FieldValue::Bool(smoke.input_seat_ready)),
+                (
+                    "input_keyboard_handle_ready",
+                    FieldValue::Bool(smoke.input_keyboard_handle_ready),
+                ),
+                (
+                    "input_pointer_handle_ready",
+                    FieldValue::Bool(smoke.input_pointer_handle_ready),
+                ),
                 (
                     "input_event_count",
                     FieldValue::U64(smoke.input_event_counters.total),
@@ -359,6 +368,18 @@ fn run() -> Result<(), String> {
                 (
                     "input_event_loop_dispatch_count",
                     FieldValue::U64(runtime.input_event_loop_dispatch_count),
+                ),
+                (
+                    "input_seat_ready",
+                    FieldValue::Bool(runtime.input_seat_ready),
+                ),
+                (
+                    "input_keyboard_handle_ready",
+                    FieldValue::Bool(runtime.input_keyboard_handle_ready),
+                ),
+                (
+                    "input_pointer_handle_ready",
+                    FieldValue::Bool(runtime.input_pointer_handle_ready),
                 ),
                 (
                     "input_event_count",
@@ -544,6 +565,18 @@ fn run() -> Result<(), String> {
                 (
                     "input_event_loop_dispatch_count",
                     FieldValue::U64(readiness.input_event_loop_dispatch_count),
+                ),
+                (
+                    "input_seat_ready",
+                    FieldValue::Bool(readiness.input_seat_ready),
+                ),
+                (
+                    "input_keyboard_handle_ready",
+                    FieldValue::Bool(readiness.input_keyboard_handle_ready),
+                ),
+                (
+                    "input_pointer_handle_ready",
+                    FieldValue::Bool(readiness.input_pointer_handle_ready),
                 ),
                 (
                     "input_event_count",
@@ -946,6 +979,9 @@ impl<B: CompositorRuntime> SocketClientRuntime<B> {
             input_sources_ready: self.backend.input_sources_ready(),
             input_source_count: self.backend.input_source_count(),
             input_event_loop_dispatch_count: self.backend.input_event_loop_dispatch_count(),
+            input_seat_ready: self.backend.input_seat_ready(),
+            input_keyboard_handle_ready: self.backend.input_keyboard_handle_ready(),
+            input_pointer_handle_ready: self.backend.input_pointer_handle_ready(),
             input_event_counters: self.backend.input_event_counters(),
             smithay_protocol_globals: self.backend.smithay_protocol_global_count(),
             policy_windows: self.manager.policy().windows().len() as u64,
@@ -1049,6 +1085,9 @@ impl<B: CompositorRuntime> SocketClientRuntime<B> {
             input_sources_ready: self.backend.input_sources_ready(),
             input_source_count: self.backend.input_source_count(),
             input_event_loop_dispatch_count: self.backend.input_event_loop_dispatch_count(),
+            input_seat_ready: self.backend.input_seat_ready(),
+            input_keyboard_handle_ready: self.backend.input_keyboard_handle_ready(),
+            input_pointer_handle_ready: self.backend.input_pointer_handle_ready(),
             input_event_counters: self.backend.input_event_counters(),
             smithay_protocol_globals: self.backend.smithay_protocol_global_count(),
             policy_windows: self.manager.policy().windows().len() as u64,
@@ -1111,6 +1150,9 @@ impl<B: CompositorRuntime> SocketClientRuntime<B> {
             input_sources_ready: self.backend.input_sources_ready(),
             input_source_count: self.backend.input_source_count(),
             input_event_loop_dispatch_count: self.backend.input_event_loop_dispatch_count(),
+            input_seat_ready: self.backend.input_seat_ready(),
+            input_keyboard_handle_ready: self.backend.input_keyboard_handle_ready(),
+            input_pointer_handle_ready: self.backend.input_pointer_handle_ready(),
             input_event_counters: self.backend.input_event_counters(),
             smithay_protocol_globals: self.backend.smithay_protocol_global_count(),
             policy_windows: self.manager.policy().windows().len() as u64,
@@ -1188,6 +1230,9 @@ impl<B: CompositorRuntime> SocketClientRuntime<B> {
             input_sources_ready: self.backend.input_sources_ready(),
             input_source_count: self.backend.input_source_count(),
             input_event_loop_dispatch_count: self.backend.input_event_loop_dispatch_count(),
+            input_seat_ready: self.backend.input_seat_ready(),
+            input_keyboard_handle_ready: self.backend.input_keyboard_handle_ready(),
+            input_pointer_handle_ready: self.backend.input_pointer_handle_ready(),
             input_event_counters: self.backend.input_event_counters(),
             smithay_protocol_globals: self.backend.smithay_protocol_global_count(),
             policy_windows: self.manager.policy().windows().len() as u64,
@@ -1290,6 +1335,9 @@ struct SocketClientReport {
     input_sources_ready: bool,
     input_source_count: u64,
     input_event_loop_dispatch_count: u64,
+    input_seat_ready: bool,
+    input_keyboard_handle_ready: bool,
+    input_pointer_handle_ready: bool,
     input_event_counters: InputEventCounters,
     smithay_protocol_globals: u64,
     policy_windows: u64,
@@ -1334,6 +1382,9 @@ impl SocketClientReport {
             input_sources_ready: false,
             input_source_count: 0,
             input_event_loop_dispatch_count: 0,
+            input_seat_ready: false,
+            input_keyboard_handle_ready: false,
+            input_pointer_handle_ready: false,
             input_event_counters: InputEventCounters::default(),
             smithay_protocol_globals: 0,
             policy_windows: 0,
@@ -1647,6 +1698,9 @@ struct SmithayClientSmoke {
     input_sources_ready: bool,
     input_source_count: u64,
     input_event_loop_dispatch_count: u64,
+    input_seat_ready: bool,
+    input_keyboard_handle_ready: bool,
+    input_pointer_handle_ready: bool,
     input_event_counters: InputEventCounters,
     surface_commit_count: u64,
     xdg_toplevel_count: u64,
@@ -1699,6 +1753,9 @@ impl SmithayClientSmoke {
             && self.input_sources_ready
             && self.input_source_count >= 2
             && self.input_event_loop_dispatch_count >= 3
+            && self.input_seat_ready
+            && self.input_keyboard_handle_ready
+            && self.input_pointer_handle_ready
             && self.surface_commit_count >= 1
             && self.xdg_toplevel_count >= 1
             && self.title_changed_count >= 1
@@ -1776,6 +1833,9 @@ fn run_smithay_client_smoke_for_config(config: &RunConfig) -> Result<SmithayClie
         input_sources_ready: report.input_sources_ready,
         input_source_count: report.input_source_count,
         input_event_loop_dispatch_count: report.input_event_loop_dispatch_count,
+        input_seat_ready: report.input_seat_ready,
+        input_keyboard_handle_ready: report.input_keyboard_handle_ready,
+        input_pointer_handle_ready: report.input_pointer_handle_ready,
         input_event_counters: report.input_event_counters,
         surface_commit_count: report.surface_commit_count,
         xdg_toplevel_count: report.xdg_toplevel_count,
@@ -1870,6 +1930,9 @@ struct ScriptedClientRuntime {
     input_sources_ready: bool,
     input_source_count: u64,
     input_event_loop_dispatch_count: u64,
+    input_seat_ready: bool,
+    input_keyboard_handle_ready: bool,
+    input_pointer_handle_ready: bool,
     input_event_counters: InputEventCounters,
     smithay_protocol_globals: u64,
     client_connected: bool,
@@ -1941,7 +2004,10 @@ impl ScriptedClientRuntime {
                 && self.calloop_dispatch_count >= self.frames
                 && self.input_sources_ready
                 && self.input_source_count >= 2
-                && self.input_event_loop_dispatch_count >= self.frames)
+                && self.input_event_loop_dispatch_count >= self.frames
+                && self.input_seat_ready
+                && self.input_keyboard_handle_ready
+                && self.input_pointer_handle_ready)
     }
 
     fn smithay_protocol_globals_ok(self) -> bool {
@@ -2061,6 +2127,9 @@ fn run_scripted_client_runtime_with_backend<B: CompositorRuntime>(
         input_sources_ready: backend.input_sources_ready(),
         input_source_count: backend.input_source_count(),
         input_event_loop_dispatch_count: backend.input_event_loop_dispatch_count(),
+        input_seat_ready: backend.input_seat_ready(),
+        input_keyboard_handle_ready: backend.input_keyboard_handle_ready(),
+        input_pointer_handle_ready: backend.input_pointer_handle_ready(),
         input_event_counters: backend.input_event_counters(),
         smithay_protocol_globals: backend.smithay_protocol_global_count(),
         client_connected: first_frame.client_count == 1,
@@ -2311,6 +2380,9 @@ struct CompositorReadyReport {
     input_sources_ready: bool,
     input_source_count: u64,
     input_event_loop_dispatch_count: u64,
+    input_seat_ready: bool,
+    input_keyboard_handle_ready: bool,
+    input_pointer_handle_ready: bool,
     input_event_counters: InputEventCounters,
     smithay_protocol_globals: u64,
     accepting_clients: bool,
@@ -2346,7 +2418,10 @@ impl CompositorReadyReport {
                 && self.calloop_dispatch_count >= self.frames
                 && self.input_sources_ready
                 && self.input_source_count >= 2
-                && self.input_event_loop_dispatch_count >= self.frames)
+                && self.input_event_loop_dispatch_count >= self.frames
+                && self.input_seat_ready
+                && self.input_keyboard_handle_ready
+                && self.input_pointer_handle_ready)
     }
 
     fn smithay_protocol_globals_ok(self) -> bool {
@@ -2395,6 +2470,9 @@ fn run_service_ready_with_backend<B: CompositorRuntime>(mut backend: B) -> Compo
         input_sources_ready: backend.input_sources_ready(),
         input_source_count: backend.input_source_count(),
         input_event_loop_dispatch_count: backend.input_event_loop_dispatch_count(),
+        input_seat_ready: backend.input_seat_ready(),
+        input_keyboard_handle_ready: backend.input_keyboard_handle_ready(),
+        input_pointer_handle_ready: backend.input_pointer_handle_ready(),
         input_event_counters: backend.input_event_counters(),
         smithay_protocol_globals: backend.smithay_protocol_global_count(),
         accepting_clients: backend.client_count() > 0,
@@ -2991,6 +3069,18 @@ fn emit_socket_client(config: &RunConfig, runtime_backend: &str, report: &Socket
             (
                 "input_event_loop_dispatch_count",
                 FieldValue::U64(report.input_event_loop_dispatch_count),
+            ),
+            (
+                "input_seat_ready",
+                FieldValue::Bool(report.input_seat_ready),
+            ),
+            (
+                "input_keyboard_handle_ready",
+                FieldValue::Bool(report.input_keyboard_handle_ready),
+            ),
+            (
+                "input_pointer_handle_ready",
+                FieldValue::Bool(report.input_pointer_handle_ready),
             ),
             (
                 "input_event_count",
