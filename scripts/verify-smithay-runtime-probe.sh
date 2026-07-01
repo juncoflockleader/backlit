@@ -41,6 +41,17 @@ if [ "$(uname -s)" != "Linux" ]; then
     "smithay_egl_display_created": false,
     "smithay_egl_context_created": false,
     "smithay_gles_renderer_created": false,
+    "smithay_offscreen_buffer_created": false,
+    "smithay_offscreen_frame_rendered": false,
+    "smithay_offscreen_frame_copied": false,
+    "smithay_offscreen_pixel_verified": false,
+    "smithay_offscreen_render_width": 0,
+    "smithay_offscreen_render_height": 0,
+    "smithay_offscreen_render_pixels": 0,
+    "smithay_offscreen_sample_red": 0,
+    "smithay_offscreen_sample_green": 0,
+    "smithay_offscreen_sample_blue": 0,
+    "smithay_offscreen_sample_alpha": 0,
     "smithay_drm_node_resolved": false,
     "smithay_renderer_node_selected": false,
     "smithay_libseat_session_created": false,
@@ -103,6 +114,17 @@ smithay_gbm_allocator_created=false
 smithay_egl_display_created=false
 smithay_egl_context_created=false
 smithay_gles_renderer_created=false
+smithay_offscreen_buffer_created=false
+smithay_offscreen_frame_rendered=false
+smithay_offscreen_frame_copied=false
+smithay_offscreen_pixel_verified=false
+smithay_offscreen_render_width=0
+smithay_offscreen_render_height=0
+smithay_offscreen_render_pixels=0
+smithay_offscreen_sample_red=0
+smithay_offscreen_sample_green=0
+smithay_offscreen_sample_blue=0
+smithay_offscreen_sample_alpha=0
 smithay_libseat_session_created=false
 smithay_libseat_event_source_inserted=false
 smithay_libseat_event_loop_dispatched=false
@@ -129,6 +151,17 @@ if grep -F '"event":"backend.preflight","backend":"drm","ready":true' "$log" >/d
   require_contains "$log" '"egl_display_created":true'
   require_contains "$log" '"egl_context_created":true'
   require_contains "$log" '"gles_renderer_created":true'
+  require_contains "$log" '"offscreen_buffer_created":true'
+  require_contains "$log" '"offscreen_frame_rendered":true'
+  require_contains "$log" '"offscreen_frame_copied":true'
+  require_contains "$log" '"offscreen_pixel_verified":true'
+  require_contains "$log" '"offscreen_render_width":16'
+  require_contains "$log" '"offscreen_render_height":16'
+  require_contains "$log" '"offscreen_render_pixels":256'
+  require_contains "$log" '"offscreen_sample_red":255'
+  require_contains "$log" '"offscreen_sample_green":0'
+  require_contains "$log" '"offscreen_sample_blue":0'
+  require_contains "$log" '"offscreen_sample_alpha":255'
   require_contains "$log" '"renderer_runtime_failure":""'
   require_contains "$log" '"input_event_selected":true'
   require_contains "$log" '"uses_logind":true'
@@ -168,6 +201,17 @@ if grep -F '"event":"backend.preflight","backend":"drm","ready":true' "$log" >/d
   smithay_egl_display_created=true
   smithay_egl_context_created=true
   smithay_gles_renderer_created=true
+  smithay_offscreen_buffer_created=true
+  smithay_offscreen_frame_rendered=true
+  smithay_offscreen_frame_copied=true
+  smithay_offscreen_pixel_verified=true
+  smithay_offscreen_render_width=16
+  smithay_offscreen_render_height=16
+  smithay_offscreen_render_pixels=256
+  smithay_offscreen_sample_red=255
+  smithay_offscreen_sample_green=0
+  smithay_offscreen_sample_blue=0
+  smithay_offscreen_sample_alpha=255
   smithay_libseat_session_created=true
   smithay_libseat_event_source_inserted=true
   smithay_libseat_event_loop_dispatched=true
@@ -203,6 +247,17 @@ cat > "$out_dir/manifest.json" <<EOF
     "smithay_egl_display_created": $smithay_egl_display_created,
     "smithay_egl_context_created": $smithay_egl_context_created,
     "smithay_gles_renderer_created": $smithay_gles_renderer_created,
+    "smithay_offscreen_buffer_created": $smithay_offscreen_buffer_created,
+    "smithay_offscreen_frame_rendered": $smithay_offscreen_frame_rendered,
+    "smithay_offscreen_frame_copied": $smithay_offscreen_frame_copied,
+    "smithay_offscreen_pixel_verified": $smithay_offscreen_pixel_verified,
+    "smithay_offscreen_render_width": $smithay_offscreen_render_width,
+    "smithay_offscreen_render_height": $smithay_offscreen_render_height,
+    "smithay_offscreen_render_pixels": $smithay_offscreen_render_pixels,
+    "smithay_offscreen_sample_red": $smithay_offscreen_sample_red,
+    "smithay_offscreen_sample_green": $smithay_offscreen_sample_green,
+    "smithay_offscreen_sample_blue": $smithay_offscreen_sample_blue,
+    "smithay_offscreen_sample_alpha": $smithay_offscreen_sample_alpha,
     "smithay_drm_node_resolved": $smithay_drm_node_resolved,
     "smithay_renderer_node_selected": $smithay_renderer_node_selected,
     "smithay_libseat_session_created": $smithay_libseat_session_created,

@@ -356,6 +356,17 @@ pub struct SmithayRuntimeProbe {
     pub egl_display_created: bool,
     pub egl_context_created: bool,
     pub gles_renderer_created: bool,
+    pub offscreen_buffer_created: bool,
+    pub offscreen_frame_rendered: bool,
+    pub offscreen_frame_copied: bool,
+    pub offscreen_pixel_verified: bool,
+    pub offscreen_render_width: u64,
+    pub offscreen_render_height: u64,
+    pub offscreen_render_pixels: u64,
+    pub offscreen_sample_red: u64,
+    pub offscreen_sample_green: u64,
+    pub offscreen_sample_blue: u64,
+    pub offscreen_sample_alpha: u64,
     pub renderer_runtime_failure: Option<String>,
     pub libseat_session_created: bool,
     pub libseat_session_active: bool,
@@ -443,6 +454,14 @@ impl SmithayRuntimeProbe {
             && self.egl_display_created
             && self.egl_context_created
             && self.gles_renderer_created
+            && self.offscreen_buffer_created
+            && self.offscreen_frame_rendered
+            && self.offscreen_frame_copied
+            && self.offscreen_pixel_verified
+            && self.offscreen_render_width > 0
+            && self.offscreen_render_height > 0
+            && self.offscreen_render_pixels
+                == self.offscreen_render_width * self.offscreen_render_height
             && self.renderer_runtime_failure.is_none()
             && self.libseat_session_created
             && self.libseat_event_source_inserted
@@ -872,6 +891,17 @@ pub fn smithay_runtime_probe(environment: &BackendPreflightEnvironment) -> Smith
         egl_display_created: renderer_runtime_probe.egl_display_created,
         egl_context_created: renderer_runtime_probe.egl_context_created,
         gles_renderer_created: renderer_runtime_probe.gles_renderer_created,
+        offscreen_buffer_created: renderer_runtime_probe.offscreen_buffer_created,
+        offscreen_frame_rendered: renderer_runtime_probe.offscreen_frame_rendered,
+        offscreen_frame_copied: renderer_runtime_probe.offscreen_frame_copied,
+        offscreen_pixel_verified: renderer_runtime_probe.offscreen_pixel_verified,
+        offscreen_render_width: renderer_runtime_probe.offscreen_render_width,
+        offscreen_render_height: renderer_runtime_probe.offscreen_render_height,
+        offscreen_render_pixels: renderer_runtime_probe.offscreen_render_pixels,
+        offscreen_sample_red: renderer_runtime_probe.offscreen_sample_red,
+        offscreen_sample_green: renderer_runtime_probe.offscreen_sample_green,
+        offscreen_sample_blue: renderer_runtime_probe.offscreen_sample_blue,
+        offscreen_sample_alpha: renderer_runtime_probe.offscreen_sample_alpha,
         renderer_runtime_failure: renderer_runtime_probe.failure,
         libseat_session_created: input_runtime_probe.libseat_session_created,
         libseat_session_active: input_runtime_probe.libseat_session_active,
@@ -927,6 +957,17 @@ struct SmithayRendererRuntimeProbe {
     egl_display_created: bool,
     egl_context_created: bool,
     gles_renderer_created: bool,
+    offscreen_buffer_created: bool,
+    offscreen_frame_rendered: bool,
+    offscreen_frame_copied: bool,
+    offscreen_pixel_verified: bool,
+    offscreen_render_width: u64,
+    offscreen_render_height: u64,
+    offscreen_render_pixels: u64,
+    offscreen_sample_red: u64,
+    offscreen_sample_green: u64,
+    offscreen_sample_blue: u64,
+    offscreen_sample_alpha: u64,
     failure: Option<String>,
 }
 
@@ -952,6 +993,14 @@ impl SmithayRendererRuntimeProbe {
             && self.egl_display_created
             && self.egl_context_created
             && self.gles_renderer_created
+            && self.offscreen_buffer_created
+            && self.offscreen_frame_rendered
+            && self.offscreen_frame_copied
+            && self.offscreen_pixel_verified
+            && self.offscreen_render_width > 0
+            && self.offscreen_render_height > 0
+            && self.offscreen_render_pixels
+                == self.offscreen_render_width * self.offscreen_render_height
             && self.failure.is_none()
     }
 }
@@ -1011,10 +1060,19 @@ fn smithay_renderer_runtime_probe(
     use std::os::unix::io::OwnedFd;
 
     use smithay::backend::allocator::gbm::{GbmAllocator, GbmBufferFlags, GbmDevice};
+    use smithay::backend::allocator::Fourcc;
     use smithay::backend::drm::DrmDeviceFd;
     use smithay::backend::egl::{EGLContext, EGLDisplay};
-    use smithay::backend::renderer::gles::GlesRenderer;
-    use smithay::utils::DeviceFd;
+    use smithay::backend::renderer::gles::{GlesRenderbuffer, GlesRenderer};
+    use smithay::backend::renderer::{Bind, Color32F, ExportMem, Frame, Offscreen, Renderer};
+    use smithay::utils::{DeviceFd, Rectangle, Transform};
+
+    const OFFSCREEN_WIDTH: i32 = 16;
+    const OFFSCREEN_HEIGHT: i32 = 16;
+    const EXPECTED_RED: u8 = 255;
+    const EXPECTED_GREEN: u8 = 0;
+    const EXPECTED_BLUE: u8 = 0;
+    const EXPECTED_ALPHA: u8 = 255;
 
     if target_os != "linux" {
         return unavailable_smithay_renderer_runtime_probe("non-linux-target");
@@ -1072,25 +1130,218 @@ fn smithay_renderer_runtime_probe(
         }
     };
 
-    match unsafe { GlesRenderer::new(egl_context) } {
-        Ok(_renderer) => SmithayRendererRuntimeProbe {
+    let mut renderer = match unsafe { GlesRenderer::new(egl_context) } {
+        Ok(renderer) => renderer,
+        Err(error) => {
+            return SmithayRendererRuntimeProbe {
+                renderer_node_opened: true,
+                gbm_device_created: true,
+                gbm_allocator_created: true,
+                egl_display_created: true,
+                egl_context_created: true,
+                failure: Some(format!("gles-renderer:{error:?}")),
+                ..unavailable_smithay_renderer_runtime_probe("gles-renderer")
+            };
+        }
+    };
+
+    let mut offscreen = match Offscreen::<GlesRenderbuffer>::create_buffer(
+        &mut renderer,
+        Fourcc::Abgr8888,
+        (OFFSCREEN_WIDTH, OFFSCREEN_HEIGHT).into(),
+    ) {
+        Ok(offscreen) => offscreen,
+        Err(error) => {
+            return SmithayRendererRuntimeProbe {
+                renderer_node_opened: true,
+                gbm_device_created: true,
+                gbm_allocator_created: true,
+                egl_display_created: true,
+                egl_context_created: true,
+                gles_renderer_created: true,
+                failure: Some(format!("offscreen-buffer:{error:?}")),
+                ..unavailable_smithay_renderer_runtime_probe("offscreen-buffer")
+            };
+        }
+    };
+
+    let mut framebuffer = match renderer.bind(&mut offscreen) {
+        Ok(framebuffer) => framebuffer,
+        Err(error) => {
+            return SmithayRendererRuntimeProbe {
+                renderer_node_opened: true,
+                gbm_device_created: true,
+                gbm_allocator_created: true,
+                egl_display_created: true,
+                egl_context_created: true,
+                gles_renderer_created: true,
+                offscreen_buffer_created: true,
+                failure: Some(format!("offscreen-bind:{error:?}")),
+                ..unavailable_smithay_renderer_runtime_probe("offscreen-bind")
+            };
+        }
+    };
+
+    let mut frame = match renderer.render(
+        &mut framebuffer,
+        (OFFSCREEN_WIDTH, OFFSCREEN_HEIGHT).into(),
+        Transform::Normal,
+    ) {
+        Ok(frame) => frame,
+        Err(error) => {
+            return SmithayRendererRuntimeProbe {
+                renderer_node_opened: true,
+                gbm_device_created: true,
+                gbm_allocator_created: true,
+                egl_display_created: true,
+                egl_context_created: true,
+                gles_renderer_created: true,
+                offscreen_buffer_created: true,
+                failure: Some(format!("offscreen-render:{error:?}")),
+                ..unavailable_smithay_renderer_runtime_probe("offscreen-render")
+            };
+        }
+    };
+
+    let full_damage = [Rectangle::from_size(
+        (OFFSCREEN_WIDTH, OFFSCREEN_HEIGHT).into(),
+    )];
+    if let Err(error) = frame.clear(Color32F::new(1.0, 0.0, 0.0, 1.0), &full_damage) {
+        return SmithayRendererRuntimeProbe {
             renderer_node_opened: true,
             gbm_device_created: true,
             gbm_allocator_created: true,
             egl_display_created: true,
             egl_context_created: true,
             gles_renderer_created: true,
-            failure: None,
-        },
-        Err(error) => SmithayRendererRuntimeProbe {
+            offscreen_buffer_created: true,
+            failure: Some(format!("offscreen-clear:{error:?}")),
+            ..unavailable_smithay_renderer_runtime_probe("offscreen-clear")
+        };
+    }
+
+    match frame.finish() {
+        Ok(sync) => {
+            if let Err(error) = sync.wait() {
+                return SmithayRendererRuntimeProbe {
+                    renderer_node_opened: true,
+                    gbm_device_created: true,
+                    gbm_allocator_created: true,
+                    egl_display_created: true,
+                    egl_context_created: true,
+                    gles_renderer_created: true,
+                    offscreen_buffer_created: true,
+                    failure: Some(format!("offscreen-sync:{error:?}")),
+                    ..unavailable_smithay_renderer_runtime_probe("offscreen-sync")
+                };
+            }
+        }
+        Err(error) => {
+            return SmithayRendererRuntimeProbe {
+                renderer_node_opened: true,
+                gbm_device_created: true,
+                gbm_allocator_created: true,
+                egl_display_created: true,
+                egl_context_created: true,
+                gles_renderer_created: true,
+                offscreen_buffer_created: true,
+                failure: Some(format!("offscreen-finish:{error:?}")),
+                ..unavailable_smithay_renderer_runtime_probe("offscreen-finish")
+            };
+        }
+    }
+
+    let mapping = match renderer.copy_framebuffer(
+        &framebuffer,
+        Rectangle::from_size((OFFSCREEN_WIDTH, OFFSCREEN_HEIGHT).into()),
+        Fourcc::Abgr8888,
+    ) {
+        Ok(mapping) => mapping,
+        Err(error) => {
+            return SmithayRendererRuntimeProbe {
+                renderer_node_opened: true,
+                gbm_device_created: true,
+                gbm_allocator_created: true,
+                egl_display_created: true,
+                egl_context_created: true,
+                gles_renderer_created: true,
+                offscreen_buffer_created: true,
+                offscreen_frame_rendered: true,
+                failure: Some(format!("offscreen-copy:{error:?}")),
+                ..unavailable_smithay_renderer_runtime_probe("offscreen-copy")
+            };
+        }
+    };
+
+    let pixels = match renderer.map_texture(&mapping) {
+        Ok(pixels) => pixels,
+        Err(error) => {
+            return SmithayRendererRuntimeProbe {
+                renderer_node_opened: true,
+                gbm_device_created: true,
+                gbm_allocator_created: true,
+                egl_display_created: true,
+                egl_context_created: true,
+                gles_renderer_created: true,
+                offscreen_buffer_created: true,
+                offscreen_frame_rendered: true,
+                offscreen_frame_copied: true,
+                failure: Some(format!("offscreen-map:{error:?}")),
+                ..unavailable_smithay_renderer_runtime_probe("offscreen-map")
+            };
+        }
+    };
+
+    let sample = pixels.get(0..4).unwrap_or(&[]);
+    let expected_sample = [EXPECTED_RED, EXPECTED_GREEN, EXPECTED_BLUE, EXPECTED_ALPHA];
+    let pixel_verified = sample == expected_sample.as_slice();
+    let sample_red = sample.first().copied().unwrap_or(0);
+    let sample_green = sample.get(1).copied().unwrap_or(0);
+    let sample_blue = sample.get(2).copied().unwrap_or(0);
+    let sample_alpha = sample.get(3).copied().unwrap_or(0);
+    let expected_len = (OFFSCREEN_WIDTH * OFFSCREEN_HEIGHT * 4) as usize;
+    if pixels.len() < expected_len || !pixel_verified {
+        return SmithayRendererRuntimeProbe {
             renderer_node_opened: true,
             gbm_device_created: true,
             gbm_allocator_created: true,
             egl_display_created: true,
             egl_context_created: true,
-            failure: Some(format!("gles-renderer:{error:?}")),
-            ..unavailable_smithay_renderer_runtime_probe("gles-renderer")
-        },
+            gles_renderer_created: true,
+            offscreen_buffer_created: true,
+            offscreen_frame_rendered: true,
+            offscreen_frame_copied: true,
+            offscreen_pixel_verified: false,
+            offscreen_render_width: OFFSCREEN_WIDTH as u64,
+            offscreen_render_height: OFFSCREEN_HEIGHT as u64,
+            offscreen_render_pixels: (pixels.len() / 4) as u64,
+            offscreen_sample_red: sample_red as u64,
+            offscreen_sample_green: sample_green as u64,
+            offscreen_sample_blue: sample_blue as u64,
+            offscreen_sample_alpha: sample_alpha as u64,
+            failure: Some(String::from("offscreen-pixel-verify")),
+        };
+    }
+
+    SmithayRendererRuntimeProbe {
+        renderer_node_opened: true,
+        gbm_device_created: true,
+        gbm_allocator_created: true,
+        egl_display_created: true,
+        egl_context_created: true,
+        gles_renderer_created: true,
+        offscreen_buffer_created: true,
+        offscreen_frame_rendered: true,
+        offscreen_frame_copied: true,
+        offscreen_pixel_verified: true,
+        offscreen_render_width: OFFSCREEN_WIDTH as u64,
+        offscreen_render_height: OFFSCREEN_HEIGHT as u64,
+        offscreen_render_pixels: (pixels.len() / 4) as u64,
+        offscreen_sample_red: sample_red as u64,
+        offscreen_sample_green: sample_green as u64,
+        offscreen_sample_blue: sample_blue as u64,
+        offscreen_sample_alpha: sample_alpha as u64,
+        failure: None,
     }
 }
 
@@ -1112,6 +1363,17 @@ fn unavailable_smithay_renderer_runtime_probe(
         egl_display_created: false,
         egl_context_created: false,
         gles_renderer_created: false,
+        offscreen_buffer_created: false,
+        offscreen_frame_rendered: false,
+        offscreen_frame_copied: false,
+        offscreen_pixel_verified: false,
+        offscreen_render_width: 0,
+        offscreen_render_height: 0,
+        offscreen_render_pixels: 0,
+        offscreen_sample_red: 0,
+        offscreen_sample_green: 0,
+        offscreen_sample_blue: 0,
+        offscreen_sample_alpha: 0,
         failure: Some(reason.into()),
     }
 }
@@ -3707,6 +3969,17 @@ mod tests {
             assert!(!probe.egl_display_created);
             assert!(!probe.egl_context_created);
             assert!(!probe.gles_renderer_created);
+            assert!(!probe.offscreen_buffer_created);
+            assert!(!probe.offscreen_frame_rendered);
+            assert!(!probe.offscreen_frame_copied);
+            assert!(!probe.offscreen_pixel_verified);
+            assert_eq!(probe.offscreen_render_width, 0);
+            assert_eq!(probe.offscreen_render_height, 0);
+            assert_eq!(probe.offscreen_render_pixels, 0);
+            assert_eq!(probe.offscreen_sample_red, 0);
+            assert_eq!(probe.offscreen_sample_green, 0);
+            assert_eq!(probe.offscreen_sample_blue, 0);
+            assert_eq!(probe.offscreen_sample_alpha, 0);
             assert!(probe.renderer_runtime_failure.is_some());
             assert!(!probe.libseat_session_created);
             assert!(!probe.libseat_event_source_inserted);

@@ -325,6 +325,50 @@ fn emit_smithay_runtime_probe(probe: &SmithayRuntimeProbe) {
                     FieldValue::Bool(probe.gles_renderer_created),
                 ),
                 (
+                    "offscreen_buffer_created",
+                    FieldValue::Bool(probe.offscreen_buffer_created),
+                ),
+                (
+                    "offscreen_frame_rendered",
+                    FieldValue::Bool(probe.offscreen_frame_rendered),
+                ),
+                (
+                    "offscreen_frame_copied",
+                    FieldValue::Bool(probe.offscreen_frame_copied),
+                ),
+                (
+                    "offscreen_pixel_verified",
+                    FieldValue::Bool(probe.offscreen_pixel_verified),
+                ),
+                (
+                    "offscreen_render_width",
+                    FieldValue::U64(probe.offscreen_render_width),
+                ),
+                (
+                    "offscreen_render_height",
+                    FieldValue::U64(probe.offscreen_render_height),
+                ),
+                (
+                    "offscreen_render_pixels",
+                    FieldValue::U64(probe.offscreen_render_pixels),
+                ),
+                (
+                    "offscreen_sample_red",
+                    FieldValue::U64(probe.offscreen_sample_red),
+                ),
+                (
+                    "offscreen_sample_green",
+                    FieldValue::U64(probe.offscreen_sample_green),
+                ),
+                (
+                    "offscreen_sample_blue",
+                    FieldValue::U64(probe.offscreen_sample_blue),
+                ),
+                (
+                    "offscreen_sample_alpha",
+                    FieldValue::U64(probe.offscreen_sample_alpha),
+                ),
+                (
                     "renderer_runtime_failure",
                     FieldValue::Str(renderer_runtime_failure),
                 ),
