@@ -1984,6 +1984,7 @@ struct SmithayCompositorState {
     compositor_state: smithay::wayland::compositor::CompositorState,
     shm_state: smithay::wayland::shm::ShmState,
     xdg_shell_state: smithay::wayland::shell::xdg::XdgShellState,
+    seat_state: smithay::input::SeatState<SmithayCompositorState>,
     protocol_global_count: u64,
     surface_commit_count: u64,
     xdg_toplevel_count: u64,
@@ -2013,6 +2014,7 @@ impl SmithayCompositorState {
             compositor_state,
             shm_state,
             xdg_shell_state,
+            seat_state: Default::default(),
             protocol_global_count: 4,
             surface_commit_count: 0,
             xdg_toplevel_count: 0,
@@ -2058,6 +2060,17 @@ impl smithay::wayland::buffer::BufferHandler for SmithayCompositorState {
 impl smithay::wayland::shm::ShmHandler for SmithayCompositorState {
     fn shm_state(&self) -> &smithay::wayland::shm::ShmState {
         &self.shm_state
+    }
+}
+
+#[cfg(all(feature = "smithay-backend", target_os = "linux"))]
+impl smithay::input::SeatHandler for SmithayCompositorState {
+    type KeyboardFocus = smithay::reexports::wayland_server::protocol::wl_surface::WlSurface;
+    type PointerFocus = smithay::reexports::wayland_server::protocol::wl_surface::WlSurface;
+    type TouchFocus = smithay::reexports::wayland_server::protocol::wl_surface::WlSurface;
+
+    fn seat_state(&mut self) -> &mut smithay::input::SeatState<Self> {
+        &mut self.seat_state
     }
 }
 
