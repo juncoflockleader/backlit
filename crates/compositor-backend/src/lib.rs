@@ -371,6 +371,15 @@ pub struct SmithayRuntimeProbe {
     pub kms_surface_pending_mode_matches_plan: bool,
     pub kms_surface_commit_pending: bool,
     pub kms_surface_dropped_after_pause: bool,
+    pub kms_framebuffer_created: bool,
+    pub kms_framebuffer_added: bool,
+    pub kms_framebuffer_test_state_succeeded: bool,
+    pub kms_framebuffer_test_allow_modeset: bool,
+    pub kms_framebuffer_primary_plane_matches_surface: bool,
+    pub kms_framebuffer_width: u64,
+    pub kms_framebuffer_height: u64,
+    pub kms_framebuffer_released_before_surface_drop: bool,
+    pub kms_framebuffer_failure: Option<String>,
     pub kms_surface_failure: Option<String>,
     pub kms_resource_failure: Option<String>,
     pub renderer_node_selected: bool,
@@ -494,6 +503,14 @@ impl SmithayRuntimeProbe {
             && self.kms_surface_pending_connector_count > 0
             && self.kms_surface_pending_mode_matches_plan
             && self.kms_surface_dropped_after_pause
+            && self.kms_framebuffer_created
+            && self.kms_framebuffer_added
+            && self.kms_framebuffer_test_state_succeeded
+            && self.kms_framebuffer_primary_plane_matches_surface
+            && self.kms_framebuffer_width == self.kms_scanout_mode_width
+            && self.kms_framebuffer_height == self.kms_scanout_mode_height
+            && self.kms_framebuffer_released_before_surface_drop
+            && self.kms_framebuffer_failure.is_none()
             && self.kms_surface_failure.is_none()
             && self.kms_resource_failure.is_none()
             && self.renderer_node_selected
@@ -969,6 +986,18 @@ pub fn smithay_runtime_probe(environment: &BackendPreflightEnvironment) -> Smith
             .kms_surface_pending_mode_matches_plan,
         kms_surface_commit_pending: kms_runtime_probe.kms_surface_commit_pending,
         kms_surface_dropped_after_pause: kms_runtime_probe.kms_surface_dropped_after_pause,
+        kms_framebuffer_created: kms_runtime_probe.kms_framebuffer_created,
+        kms_framebuffer_added: kms_runtime_probe.kms_framebuffer_added,
+        kms_framebuffer_test_state_succeeded: kms_runtime_probe
+            .kms_framebuffer_test_state_succeeded,
+        kms_framebuffer_test_allow_modeset: kms_runtime_probe.kms_framebuffer_test_allow_modeset,
+        kms_framebuffer_primary_plane_matches_surface: kms_runtime_probe
+            .kms_framebuffer_primary_plane_matches_surface,
+        kms_framebuffer_width: kms_runtime_probe.kms_framebuffer_width,
+        kms_framebuffer_height: kms_runtime_probe.kms_framebuffer_height,
+        kms_framebuffer_released_before_surface_drop: kms_runtime_probe
+            .kms_framebuffer_released_before_surface_drop,
+        kms_framebuffer_failure: kms_runtime_probe.framebuffer_failure,
         kms_surface_failure: kms_runtime_probe.surface_failure,
         kms_resource_failure: kms_runtime_probe.failure,
         renderer_node_selected,
@@ -1059,6 +1088,15 @@ struct SmithayKmsRuntimeProbe {
     kms_surface_pending_mode_matches_plan: bool,
     kms_surface_commit_pending: bool,
     kms_surface_dropped_after_pause: bool,
+    kms_framebuffer_created: bool,
+    kms_framebuffer_added: bool,
+    kms_framebuffer_test_state_succeeded: bool,
+    kms_framebuffer_test_allow_modeset: bool,
+    kms_framebuffer_primary_plane_matches_surface: bool,
+    kms_framebuffer_width: u64,
+    kms_framebuffer_height: u64,
+    kms_framebuffer_released_before_surface_drop: bool,
+    framebuffer_failure: Option<String>,
     surface_failure: Option<String>,
     failure: Option<String>,
 }
@@ -1126,6 +1164,14 @@ impl SmithayKmsRuntimeProbe {
             && self.kms_surface_pending_connector_count > 0
             && self.kms_surface_pending_mode_matches_plan
             && self.kms_surface_dropped_after_pause
+            && self.kms_framebuffer_created
+            && self.kms_framebuffer_added
+            && self.kms_framebuffer_test_state_succeeded
+            && self.kms_framebuffer_primary_plane_matches_surface
+            && self.kms_framebuffer_width == self.kms_scanout_mode_width
+            && self.kms_framebuffer_height == self.kms_scanout_mode_height
+            && self.kms_framebuffer_released_before_surface_drop
+            && self.framebuffer_failure.is_none()
             && self.surface_failure.is_none()
             && self.failure.is_none()
     }
@@ -1220,12 +1266,14 @@ fn smithay_kms_runtime_probe(
     use std::os::unix::io::OwnedFd;
     use std::time::Duration;
 
-    use smithay::backend::drm::{DrmDevice, DrmDeviceFd};
+    use smithay::backend::allocator::{dumb::DumbAllocator, Allocator, Fourcc, Modifier};
+    use smithay::backend::drm::dumb::framebuffer_from_dumb_buffer;
+    use smithay::backend::drm::{DrmDevice, DrmDeviceFd, PlaneConfig, PlaneState};
     use smithay::reexports::calloop::EventLoop;
     use smithay::reexports::drm::control::{
         connector, crtc, plane, Device as ControlDevice, Mode, ModeTypeFlags,
     };
-    use smithay::utils::DeviceFd;
+    use smithay::utils::{DeviceFd, Rectangle, Transform};
 
     let mut probe = SmithayKmsRuntimeProbe {
         failure: None,
@@ -1466,6 +1514,96 @@ fn smithay_kms_runtime_probe(
             probe.surface_failure = Some(String::from("kms-surface-pending-mode-mismatch"));
         }
 
+        if probe.surface_failure.is_none() {
+            let framebuffer_width = surface_mode.size().0 as u32;
+            let framebuffer_height = surface_mode.size().1 as u32;
+            probe.kms_framebuffer_width = framebuffer_width as u64;
+            probe.kms_framebuffer_height = framebuffer_height as u64;
+            probe.kms_framebuffer_primary_plane_matches_surface =
+                surface.plane() == surface_primary_plane;
+            probe.kms_framebuffer_test_allow_modeset =
+                !surface.is_legacy() && surface.commit_pending();
+
+            let mut allocator = DumbAllocator::new(surface.device_fd().clone());
+            match allocator.create_buffer(
+                framebuffer_width,
+                framebuffer_height,
+                Fourcc::Xrgb8888,
+                &[Modifier::Linear],
+            ) {
+                Ok(dumb_buffer) => {
+                    probe.kms_framebuffer_created = true;
+                    match framebuffer_from_dumb_buffer(surface.device_fd(), &dumb_buffer, false) {
+                        Ok(framebuffer) => {
+                            probe.kms_framebuffer_added = true;
+                            let framebuffer_handle = *framebuffer.as_ref();
+                            let plane_state = PlaneState {
+                                handle: surface.plane(),
+                                config: Some(PlaneConfig {
+                                    src: Rectangle::from_size(
+                                        (framebuffer_width as i32, framebuffer_height as i32)
+                                            .into(),
+                                    )
+                                    .to_f64(),
+                                    dst: Rectangle::from_size(
+                                        (framebuffer_width as i32, framebuffer_height as i32)
+                                            .into(),
+                                    ),
+                                    transform: Transform::Normal,
+                                    alpha: 1.0,
+                                    damage_clips: None,
+                                    fb: framebuffer_handle,
+                                    fence: None,
+                                }),
+                            };
+
+                            match surface
+                                .test_state([plane_state], probe.kms_framebuffer_test_allow_modeset)
+                            {
+                                Ok(()) => {
+                                    probe.kms_framebuffer_test_state_succeeded = true;
+                                }
+                                Err(error) => {
+                                    probe.framebuffer_failure =
+                                        Some(format!("kms-framebuffer-test-state:{error:?}"));
+                                }
+                            }
+
+                            drop(framebuffer);
+                            drop(dumb_buffer);
+                            probe.kms_framebuffer_released_before_surface_drop = true;
+                        }
+                        Err(error) => {
+                            probe.framebuffer_failure =
+                                Some(format!("kms-framebuffer-add:{error:?}"));
+                            drop(dumb_buffer);
+                        }
+                    }
+                }
+                Err(error) => {
+                    probe.framebuffer_failure = Some(format!("kms-framebuffer-create:{error}"));
+                }
+            }
+
+            if !probe.kms_framebuffer_primary_plane_matches_surface {
+                probe.framebuffer_failure = Some(String::from("kms-framebuffer-plane-mismatch"));
+            } else if probe.kms_framebuffer_width != probe.kms_scanout_mode_width
+                || probe.kms_framebuffer_height != probe.kms_scanout_mode_height
+            {
+                probe.framebuffer_failure = Some(String::from("kms-framebuffer-size-mismatch"));
+            } else if !probe.kms_framebuffer_created {
+                probe.framebuffer_failure = Some(String::from("kms-framebuffer-not-created"));
+            } else if !probe.kms_framebuffer_added {
+                probe.framebuffer_failure = Some(String::from("kms-framebuffer-not-added"));
+            } else if !probe.kms_framebuffer_test_state_succeeded {
+                probe
+                    .framebuffer_failure
+                    .get_or_insert_with(|| String::from("kms-framebuffer-test-state-failed"));
+            } else if !probe.kms_framebuffer_released_before_surface_drop {
+                probe.framebuffer_failure = Some(String::from("kms-framebuffer-not-released"));
+            }
+        }
+
         device.pause();
         drop(surface);
         probe.kms_surface_dropped_after_pause = true;
@@ -1517,6 +1655,15 @@ fn unavailable_smithay_kms_runtime_probe(reason: impl Into<String>) -> SmithayKm
         kms_surface_pending_mode_matches_plan: false,
         kms_surface_commit_pending: false,
         kms_surface_dropped_after_pause: false,
+        kms_framebuffer_created: false,
+        kms_framebuffer_added: false,
+        kms_framebuffer_test_state_succeeded: false,
+        kms_framebuffer_test_allow_modeset: false,
+        kms_framebuffer_primary_plane_matches_surface: false,
+        kms_framebuffer_width: 0,
+        kms_framebuffer_height: 0,
+        kms_framebuffer_released_before_surface_drop: false,
+        framebuffer_failure: Some(reason.clone()),
         surface_failure: Some(reason.clone()),
         failure: Some(reason),
     }
@@ -4423,6 +4570,8 @@ mod tests {
                     && probe.kms_scanout_plan_ready
                     && probe.kms_surface_created
                     && probe.kms_surface_failure.is_none()
+                    && probe.kms_framebuffer_created
+                    && probe.kms_framebuffer_failure.is_none()
                     && probe.renderer_node_selected
                     && probe.renderer_runtime_failure.is_none()
                     && probe.input_runtime_failure.is_none()
@@ -4463,6 +4612,15 @@ mod tests {
             assert!(!probe.kms_surface_pending_mode_matches_plan);
             assert!(!probe.kms_surface_commit_pending);
             assert!(!probe.kms_surface_dropped_after_pause);
+            assert!(!probe.kms_framebuffer_created);
+            assert!(!probe.kms_framebuffer_added);
+            assert!(!probe.kms_framebuffer_test_state_succeeded);
+            assert!(!probe.kms_framebuffer_test_allow_modeset);
+            assert!(!probe.kms_framebuffer_primary_plane_matches_surface);
+            assert_eq!(probe.kms_framebuffer_width, 0);
+            assert_eq!(probe.kms_framebuffer_height, 0);
+            assert!(!probe.kms_framebuffer_released_before_surface_drop);
+            assert!(probe.kms_framebuffer_failure.is_some());
             assert!(probe.kms_surface_failure.is_some());
             assert!(probe.kms_resource_failure.is_some());
             assert!(!probe.renderer_node_selected);

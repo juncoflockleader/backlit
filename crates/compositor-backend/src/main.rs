@@ -237,6 +237,7 @@ fn emit_smithay_runtime_probe(probe: &SmithayRuntimeProbe) {
     let input_runtime_failure = probe.input_runtime_failure.as_deref().unwrap_or("");
     let kms_resource_failure = probe.kms_resource_failure.as_deref().unwrap_or("");
     let kms_surface_failure = probe.kms_surface_failure.as_deref().unwrap_or("");
+    let kms_framebuffer_failure = probe.kms_framebuffer_failure.as_deref().unwrap_or("");
     let kms_scanout_connector_name = probe.kms_scanout_connector_name.as_deref().unwrap_or("");
     let renderer_runtime_failure = probe.renderer_runtime_failure.as_deref().unwrap_or("");
     let primary_input_event = probe.primary_input_event.as_deref().unwrap_or("");
@@ -389,6 +390,42 @@ fn emit_smithay_runtime_probe(probe: &SmithayRuntimeProbe) {
                 (
                     "kms_surface_dropped_after_pause",
                     FieldValue::Bool(probe.kms_surface_dropped_after_pause),
+                ),
+                (
+                    "kms_framebuffer_created",
+                    FieldValue::Bool(probe.kms_framebuffer_created),
+                ),
+                (
+                    "kms_framebuffer_added",
+                    FieldValue::Bool(probe.kms_framebuffer_added),
+                ),
+                (
+                    "kms_framebuffer_test_state_succeeded",
+                    FieldValue::Bool(probe.kms_framebuffer_test_state_succeeded),
+                ),
+                (
+                    "kms_framebuffer_test_allow_modeset",
+                    FieldValue::Bool(probe.kms_framebuffer_test_allow_modeset),
+                ),
+                (
+                    "kms_framebuffer_primary_plane_matches_surface",
+                    FieldValue::Bool(probe.kms_framebuffer_primary_plane_matches_surface),
+                ),
+                (
+                    "kms_framebuffer_width",
+                    FieldValue::U64(probe.kms_framebuffer_width),
+                ),
+                (
+                    "kms_framebuffer_height",
+                    FieldValue::U64(probe.kms_framebuffer_height),
+                ),
+                (
+                    "kms_framebuffer_released_before_surface_drop",
+                    FieldValue::Bool(probe.kms_framebuffer_released_before_surface_drop),
+                ),
+                (
+                    "kms_framebuffer_failure",
+                    FieldValue::Str(kms_framebuffer_failure),
                 ),
                 ("kms_surface_failure", FieldValue::Str(kms_surface_failure),),
                 (

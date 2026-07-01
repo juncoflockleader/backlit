@@ -76,6 +76,14 @@ if [ "$(uname -s)" != "Linux" ]; then
     "smithay_kms_surface_pending_mode_matches_plan": false,
     "smithay_kms_surface_commit_pending": false,
     "smithay_kms_surface_dropped_after_pause": false,
+    "smithay_kms_framebuffer_created": false,
+    "smithay_kms_framebuffer_added": false,
+    "smithay_kms_framebuffer_test_state_succeeded": false,
+    "smithay_kms_framebuffer_test_allow_modeset": false,
+    "smithay_kms_framebuffer_primary_plane_matches_surface": false,
+    "smithay_kms_framebuffer_width": 0,
+    "smithay_kms_framebuffer_height": 0,
+    "smithay_kms_framebuffer_released_before_surface_drop": false,
     "smithay_renderer_node_opened": false,
     "smithay_gbm_device_created": false,
     "smithay_gbm_allocator_created": false,
@@ -177,6 +185,14 @@ smithay_kms_surface_current_connector_count=0
 smithay_kms_surface_pending_mode_matches_plan=false
 smithay_kms_surface_commit_pending=false
 smithay_kms_surface_dropped_after_pause=false
+smithay_kms_framebuffer_created=false
+smithay_kms_framebuffer_added=false
+smithay_kms_framebuffer_test_state_succeeded=false
+smithay_kms_framebuffer_test_allow_modeset=false
+smithay_kms_framebuffer_primary_plane_matches_surface=false
+smithay_kms_framebuffer_width=0
+smithay_kms_framebuffer_height=0
+smithay_kms_framebuffer_released_before_surface_drop=false
 smithay_renderer_node_selected=false
 smithay_renderer_node_opened=false
 smithay_gbm_device_created=false
@@ -243,6 +259,15 @@ if grep -F '"event":"backend.preflight","backend":"drm","ready":true' "$log" >/d
   require_contains "$log" '"kms_surface_pending_mode_matches_plan":true'
   require_matches "$log" '"kms_surface_commit_pending":(true|false)'
   require_contains "$log" '"kms_surface_dropped_after_pause":true'
+  require_contains "$log" '"kms_framebuffer_created":true'
+  require_contains "$log" '"kms_framebuffer_added":true'
+  require_contains "$log" '"kms_framebuffer_test_state_succeeded":true'
+  require_matches "$log" '"kms_framebuffer_test_allow_modeset":(true|false)'
+  require_contains "$log" '"kms_framebuffer_primary_plane_matches_surface":true'
+  require_matches "$log" '"kms_framebuffer_width":[1-9][0-9]*'
+  require_matches "$log" '"kms_framebuffer_height":[1-9][0-9]*'
+  require_contains "$log" '"kms_framebuffer_released_before_surface_drop":true'
+  require_contains "$log" '"kms_framebuffer_failure":""'
   require_contains "$log" '"kms_surface_failure":""'
   require_contains "$log" '"kms_resource_failure":""'
   require_contains "$log" '"renderer_node_selected":true'
@@ -333,6 +358,16 @@ if grep -F '"event":"backend.preflight","backend":"drm","ready":true' "$log" >/d
     smithay_kms_surface_commit_pending=true
   fi
   smithay_kms_surface_dropped_after_pause=true
+  smithay_kms_framebuffer_created=true
+  smithay_kms_framebuffer_added=true
+  smithay_kms_framebuffer_test_state_succeeded=true
+  if grep -F '"kms_framebuffer_test_allow_modeset":true' "$log" >/dev/null; then
+    smithay_kms_framebuffer_test_allow_modeset=true
+  fi
+  smithay_kms_framebuffer_primary_plane_matches_surface=true
+  smithay_kms_framebuffer_width="$(extract_u64 "$log" kms_framebuffer_width)"
+  smithay_kms_framebuffer_height="$(extract_u64 "$log" kms_framebuffer_height)"
+  smithay_kms_framebuffer_released_before_surface_drop=true
   smithay_renderer_node_selected=true
   smithay_renderer_node_opened=true
   smithay_gbm_device_created=true
@@ -409,6 +444,14 @@ cat > "$out_dir/manifest.json" <<EOF
     "smithay_kms_surface_pending_mode_matches_plan": $smithay_kms_surface_pending_mode_matches_plan,
     "smithay_kms_surface_commit_pending": $smithay_kms_surface_commit_pending,
     "smithay_kms_surface_dropped_after_pause": $smithay_kms_surface_dropped_after_pause,
+    "smithay_kms_framebuffer_created": $smithay_kms_framebuffer_created,
+    "smithay_kms_framebuffer_added": $smithay_kms_framebuffer_added,
+    "smithay_kms_framebuffer_test_state_succeeded": $smithay_kms_framebuffer_test_state_succeeded,
+    "smithay_kms_framebuffer_test_allow_modeset": $smithay_kms_framebuffer_test_allow_modeset,
+    "smithay_kms_framebuffer_primary_plane_matches_surface": $smithay_kms_framebuffer_primary_plane_matches_surface,
+    "smithay_kms_framebuffer_width": $smithay_kms_framebuffer_width,
+    "smithay_kms_framebuffer_height": $smithay_kms_framebuffer_height,
+    "smithay_kms_framebuffer_released_before_surface_drop": $smithay_kms_framebuffer_released_before_surface_drop,
     "smithay_renderer_node_opened": $smithay_renderer_node_opened,
     "smithay_gbm_device_created": $smithay_gbm_device_created,
     "smithay_gbm_allocator_created": $smithay_gbm_allocator_created,
