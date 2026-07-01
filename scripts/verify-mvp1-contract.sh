@@ -153,6 +153,8 @@ require_contains scripts/verify-mvp-complete.sh '"system_package_dedicated_drm":
 require_contains scripts/verify-mvp-complete.sh '"session_binary": "/usr/bin/backlit-session"'
 require_contains scripts/verify-mvp-complete.sh '"package_installed_dedicated_drm": $package_installed_dedicated_drm'
 require_contains scripts/verify-mvp-complete.sh '"preview_evidence": $preview_evidence'
+require_contains scripts/verify-mvp-complete.sh 'require_png_file'
+require_contains scripts/verify-mvp-complete.sh '89504e470d0a1a0a'
 require_contains scripts/verify-mvp-complete.sh '"png_written": true'
 require_contains scripts/verify-mvp-complete.sh '"preview_format": "png"'
 require_contains scripts/verify-session-replay.sh '"launcher_overlay_frame": true'

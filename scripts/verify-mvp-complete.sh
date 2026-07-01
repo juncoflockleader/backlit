@@ -99,6 +99,14 @@ require_nonempty_file() {
   test -s "$file" || fail "$reason" "missing or empty file $file"
 }
 
+require_png_file() {
+  file="$1"
+  reason="$2"
+  require_nonempty_file "$file" "$reason"
+  signature="$(od -An -tx1 -N8 "$file" 2>/dev/null | tr -d ' \n')"
+  test "$signature" = "89504e470d0a1a0a" || fail "$reason" "file is not a PNG image: $file"
+}
+
 require_contains() {
   file="$1"
   value="$2"
@@ -163,7 +171,7 @@ require_contains "$launch_performance_manifest" '"shell_ready_budget": true' lau
 require_contains "$resource_budget_manifest" '"resource_budget_checked": true' resource-budget-evidence
 require_contains "$resource_budget_manifest" '"idle_cpu_budget": true' resource-budget-evidence
 require_contains "$resource_budget_manifest" '"idle_rss_budget": true' resource-budget-evidence
-require_nonempty_file "$parallels_preview" missing-parallels-linux-preview
+require_png_file "$parallels_preview" missing-parallels-linux-preview
 normal_parallels_e2e=true
 launch_performance_evidence=true
 resource_budget_evidence=true
@@ -189,7 +197,7 @@ require_contains "$dedicated_session_manifest" '"system_session_binary": true' p
 require_contains "$dedicated_session_manifest" '"session_desktop_launch": true' package-installed-dedicated-drm
 require_contains "$dedicated_session_manifest" '"session_compositor_demo_client": true' package-installed-dedicated-drm
 require_contains "$dedicated_session_manifest" '"session_clean_exit": true' package-installed-dedicated-drm
-require_nonempty_file "$dedicated_preview" missing-parallels-dedicated-preview
+require_png_file "$dedicated_preview" missing-parallels-dedicated-preview
 package_installed_dedicated_drm=true
 
 current_commit_evidence=true
