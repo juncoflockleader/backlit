@@ -14,8 +14,8 @@ use std::time::Instant;
 use backlit_common::metrics::{event_json, FieldValue};
 use backlit_compositor_backend::{
     backend_launch_plan, parse_args, preflight_backend_with_environment, BackendLaunchPlan,
-    BackendPreflightEnvironment, BackendPreflightReport, ClientId, HeadlessCompositor, RunConfig,
-    SurfaceId as BackendSurfaceId, SurfaceOptions,
+    BackendPreflightEnvironment, BackendPreflightReport, ClientId, CompositorRuntime,
+    HeadlessCompositor, RunConfig, SurfaceId as BackendSurfaceId, SurfaceOptions,
 };
 use backlit_demo_client::{render_policy_gui, verify_policy_gui};
 use backlit_surface::{SurfaceManager, SurfacePhase, SurfaceRole};
@@ -69,6 +69,8 @@ fn run() -> Result<(), String> {
             &config,
             &[
                 ("passed", FieldValue::Bool(runtime.passed())),
+                ("runtime_backend", FieldValue::Str(runtime.runtime_backend)),
+                ("runtime_trait", FieldValue::Bool(runtime.runtime_trait)),
                 (
                     "client_connected",
                     FieldValue::Bool(runtime.client_connected),
@@ -185,6 +187,11 @@ fn run() -> Result<(), String> {
             &config,
             &[
                 ("ready", FieldValue::Bool(readiness.passed())),
+                (
+                    "runtime_backend",
+                    FieldValue::Str(readiness.runtime_backend),
+                ),
+                ("runtime_trait", FieldValue::Bool(readiness.runtime_trait)),
                 (
                     "accepting_clients",
                     FieldValue::Bool(readiness.accepting_clients),
@@ -424,16 +431,22 @@ fn bind_session_socket_in_runtime(
 }
 
 #[derive(Debug)]
-struct SocketClientRuntime {
-    backend: HeadlessCompositor,
+struct SocketClientRuntime<B: CompositorRuntime = HeadlessCompositor> {
+    backend: B,
     manager: SurfaceManager,
     clients: Vec<SocketClientRecord>,
 }
 
-impl SocketClientRuntime {
+impl SocketClientRuntime<HeadlessCompositor> {
     fn new() -> Self {
+        Self::with_backend(HeadlessCompositor::default())
+    }
+}
+
+impl<B: CompositorRuntime> SocketClientRuntime<B> {
+    fn with_backend(backend: B) -> Self {
         Self {
-            backend: HeadlessCompositor::default(),
+            backend,
             manager: SurfaceManager::new(OutputLayout::new(1400, 900, 42)),
             clients: Vec::new(),
         }
@@ -471,9 +484,8 @@ impl SocketClientRuntime {
     }
 
     fn map_surface(&mut self, command: DemoSocketCommand) -> SocketClientReport {
-        let client = self
-            .backend
-            .connect_client(format!("socket-client-{}", command.app_id));
+        let client_name = format!("socket-client-{}", command.app_id);
+        let client = self.backend.connect_client(client_name.as_str());
         let backend_surface = self.backend.submit_surface(
             client,
             command.title.as_str(),
@@ -1048,10 +1060,10 @@ impl DemoSocketCommand {
     }
 }
 
-fn run_service_loop_for(
+fn run_service_loop_for<B: CompositorRuntime>(
     config: &RunConfig,
     socket: Option<&BoundSessionSocket>,
-    runtime: &mut SocketClientRuntime,
+    runtime: &mut SocketClientRuntime<B>,
     duration: Duration,
 ) -> Result<(), String> {
     let deadline = Instant::now() + duration;
@@ -1068,10 +1080,10 @@ fn run_service_loop_for(
     Ok(())
 }
 
-fn poll_socket_clients(
+fn poll_socket_clients<B: CompositorRuntime>(
     config: &RunConfig,
     socket: Option<&BoundSessionSocket>,
-    runtime: &mut SocketClientRuntime,
+    runtime: &mut SocketClientRuntime<B>,
 ) -> Result<(), String> {
     let Some(socket) = socket else {
         return Ok(());
@@ -1088,6 +1100,8 @@ fn poll_socket_clients(
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 struct ScriptedClientRuntime {
+    runtime_backend: &'static str,
+    runtime_trait: bool,
     client_connected: bool,
     surfaces_after_map: u64,
     first_frame_damaged_surfaces: u64,
@@ -1119,7 +1133,9 @@ struct ScriptedClientRuntime {
 
 impl ScriptedClientRuntime {
     fn passed(self) -> bool {
-        self.client_connected
+        self.runtime_trait
+            && !self.runtime_backend.is_empty()
+            && self.client_connected
             && self.surfaces_after_map == 2
             && self.first_frame_damaged_surfaces == 2
             && self.idle_frame_damaged_surfaces == 0
@@ -1150,7 +1166,14 @@ impl ScriptedClientRuntime {
 fn run_scripted_client_runtime(
     policy_preview_path: Option<&str>,
 ) -> Result<ScriptedClientRuntime, String> {
-    let mut backend = HeadlessCompositor::default();
+    run_scripted_client_runtime_with_backend(HeadlessCompositor::default(), policy_preview_path)
+}
+
+fn run_scripted_client_runtime_with_backend<B: CompositorRuntime>(
+    mut backend: B,
+    policy_preview_path: Option<&str>,
+) -> Result<ScriptedClientRuntime, String> {
+    let runtime_backend = backend.runtime_name();
     let layout = OutputLayout::new(1400, 900, 42);
     let mut manager = SurfaceManager::new(layout);
     let client = backend.connect_client("scripted-terminal-client");
@@ -1217,6 +1240,8 @@ fn run_scripted_client_runtime(
         disconnect_frame.client_count == 0 && disconnect_frame.surface_count == 0;
 
     Ok(ScriptedClientRuntime {
+        runtime_backend,
+        runtime_trait: true,
         client_connected: first_frame.client_count == 1,
         surfaces_after_map: first_frame.surface_count,
         first_frame_damaged_surfaces: first_frame.damaged_surfaces,
@@ -1457,6 +1482,8 @@ fn run_smoke_test(config: &RunConfig) {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 struct CompositorReadyReport {
+    runtime_backend: &'static str,
+    runtime_trait: bool,
     accepting_clients: bool,
     bootstrap_client_connected: bool,
     bootstrap_surface_presented: bool,
@@ -1469,7 +1496,9 @@ struct CompositorReadyReport {
 
 impl CompositorReadyReport {
     fn passed(self) -> bool {
-        self.accepting_clients
+        self.runtime_trait
+            && !self.runtime_backend.is_empty()
+            && self.accepting_clients
             && self.bootstrap_client_connected
             && self.bootstrap_surface_presented
             && self.clients == 1
@@ -1481,7 +1510,11 @@ impl CompositorReadyReport {
 }
 
 fn run_service_ready() -> CompositorReadyReport {
-    let mut backend = HeadlessCompositor::default();
+    run_service_ready_with_backend(HeadlessCompositor::default())
+}
+
+fn run_service_ready_with_backend<B: CompositorRuntime>(mut backend: B) -> CompositorReadyReport {
+    let runtime_backend = backend.runtime_name();
     let client = backend.connect_client("backlit-session-service");
     let bootstrap_surface_presented = backend
         .submit_surface(client, "backlit-bootstrap", 1, 1)
@@ -1489,8 +1522,10 @@ fn run_service_ready() -> CompositorReadyReport {
     let frame = backend.present();
 
     CompositorReadyReport {
-        accepting_clients: !backend.clients().is_empty(),
-        bootstrap_client_connected: backend.clients().len() == 1,
+        runtime_backend,
+        runtime_trait: true,
+        accepting_clients: backend.client_count() > 0,
+        bootstrap_client_connected: backend.client_count() == 1,
         bootstrap_surface_presented,
         clients: frame.client_count,
         surfaces: frame.surface_count,
@@ -1550,8 +1585,13 @@ impl CompositorSurfaceSmoke {
 }
 
 fn run_compositor_surface_smoke() -> CompositorSurfaceSmoke {
+    run_compositor_surface_smoke_with_backend(HeadlessCompositor::default())
+}
+
+fn run_compositor_surface_smoke_with_backend<B: CompositorRuntime>(
+    mut backend: B,
+) -> CompositorSurfaceSmoke {
     let mut manager = SurfaceManager::new(OutputLayout::new(800, 520, 42));
-    let mut backend = HeadlessCompositor::default();
     let client = backend.connect_client("xdg-demo-client");
     let surface = manager.create_toplevel("xdg-terminal", (640, 480));
     let xdg_shell_registered = backlit_protocols::lookup_protocol("xdg_wm_base")
@@ -1699,43 +1739,65 @@ struct DirectScanoutSmoke {
 }
 
 fn run_direct_scanout_smoke() -> DirectScanoutSmoke {
-    let mut compositor = HeadlessCompositor::default();
+    run_direct_scanout_smoke_with_backends(
+        HeadlessCompositor::default(),
+        HeadlessCompositor::default(),
+    )
+}
+
+fn run_direct_scanout_smoke_with_backends<B: CompositorRuntime, S: CompositorRuntime>(
+    mut compositor: B,
+    mut shm_compositor: S,
+) -> DirectScanoutSmoke {
+    let failed = DirectScanoutSmoke {
+        eligible: false,
+        dmabuf: false,
+        fullscreen: false,
+        overlay_blocked: false,
+        shm_blocked: false,
+    };
     let client = compositor.connect_client("scanout-video-client");
-    let video = compositor
-        .submit_surface_with_options(
-            client,
-            "fullscreen-video",
-            1920,
-            1080,
-            SurfaceOptions::dmabuf_fullscreen(),
-        )
-        .expect("scanout client should be registered");
-    let eligible = compositor
-        .direct_scanout_candidate(video, 1920, 1080)
-        .expect("scanout surface should exist");
+    let Ok(video) = compositor.submit_surface_with_options(
+        client,
+        "fullscreen-video",
+        1920,
+        1080,
+        SurfaceOptions::dmabuf_fullscreen(),
+    ) else {
+        return failed;
+    };
+    let Ok(eligible) = compositor.direct_scanout_candidate(video, 1920, 1080) else {
+        return failed;
+    };
 
-    compositor
+    let panel_presented = compositor
         .submit_surface(client, "panel-overlay", 1920, 42)
-        .expect("scanout client should be registered");
-    let overlay_blocked = compositor
-        .direct_scanout_candidate(video, 1920, 1080)
-        .map(|report| !report.eligible && report.reason == "occluded-by-other-surface")
-        .unwrap_or(false);
+        .is_ok();
+    let overlay_blocked = panel_presented
+        && compositor
+            .direct_scanout_candidate(video, 1920, 1080)
+            .map(|report| !report.eligible && report.reason == "occluded-by-other-surface")
+            .unwrap_or(false);
 
-    let mut shm_compositor = HeadlessCompositor::default();
     let client = shm_compositor.connect_client("scanout-shm-client");
-    let shm_video = shm_compositor
-        .submit_surface_with_options(
-            client,
-            "fullscreen-shm-video",
-            1920,
-            1080,
-            SurfaceOptions {
-                fullscreen: true,
-                ..SurfaceOptions::default()
-            },
-        )
-        .expect("scanout client should be registered");
+    let Ok(shm_video) = shm_compositor.submit_surface_with_options(
+        client,
+        "fullscreen-shm-video",
+        1920,
+        1080,
+        SurfaceOptions {
+            fullscreen: true,
+            ..SurfaceOptions::default()
+        },
+    ) else {
+        return DirectScanoutSmoke {
+            eligible: eligible.eligible,
+            dmabuf: eligible.buffer_kind.as_str() == "dmabuf",
+            fullscreen: eligible.reason == "eligible",
+            overlay_blocked,
+            shm_blocked: false,
+        };
+    };
     let shm_blocked = shm_compositor
         .direct_scanout_candidate(shm_video, 1920, 1080)
         .map(|report| !report.eligible && report.reason == "not-dmabuf")
@@ -2076,9 +2138,11 @@ Backend launch preflight runs before smoke or service readiness events.
 #[cfg(test)]
 mod tests {
     use super::{
-        run_compositor_surface_smoke, run_scripted_client_runtime, DemoSocketAction,
-        DemoSocketCommand, SocketClientRuntime,
+        run_compositor_surface_smoke, run_compositor_surface_smoke_with_backend,
+        run_direct_scanout_smoke_with_backends, run_scripted_client_runtime,
+        run_service_ready_with_backend, DemoSocketAction, DemoSocketCommand, SocketClientRuntime,
     };
+    use backlit_compositor_backend::HeadlessCompositor;
     use std::fs;
     use std::os::unix::fs::FileTypeExt;
     use std::os::unix::net::UnixStream;
@@ -2096,10 +2160,32 @@ mod tests {
     }
 
     #[test]
+    fn compositor_surface_smoke_accepts_runtime_trait_backend() {
+        let report = run_compositor_surface_smoke_with_backend(HeadlessCompositor::default());
+
+        assert!(report.passed(), "{report:?}");
+        assert_eq!(report.presented_surfaces, 2);
+    }
+
+    #[test]
+    fn direct_scanout_smoke_accepts_runtime_trait_backends() {
+        let report = run_direct_scanout_smoke_with_backends(
+            HeadlessCompositor::default(),
+            HeadlessCompositor::default(),
+        );
+
+        assert!(report.eligible, "{report:?}");
+        assert!(report.overlay_blocked, "{report:?}");
+        assert!(report.shm_blocked, "{report:?}");
+    }
+
+    #[test]
     fn compositor_service_ready_accepts_client_and_presents_bootstrap_surface() {
         let report = super::run_service_ready();
 
         assert!(report.passed(), "{report:?}");
+        assert_eq!(report.runtime_backend, "headless-compositor");
+        assert!(report.runtime_trait);
         assert!(report.accepting_clients);
         assert_eq!(report.clients, 1);
         assert_eq!(report.surfaces, 1);
@@ -2107,10 +2193,21 @@ mod tests {
     }
 
     #[test]
+    fn compositor_service_ready_accepts_runtime_trait_backend() {
+        let report = run_service_ready_with_backend(HeadlessCompositor::default());
+
+        assert!(report.passed(), "{report:?}");
+        assert_eq!(report.runtime_backend, "headless-compositor");
+        assert!(report.runtime_trait);
+    }
+
+    #[test]
     fn scripted_client_runtime_maps_damages_and_disconnects() {
         let report = run_scripted_client_runtime(None).unwrap();
 
         assert!(report.passed(), "{report:?}");
+        assert_eq!(report.runtime_backend, "headless-compositor");
+        assert!(report.runtime_trait);
         assert_eq!(report.surfaces_after_map, 2);
         assert_eq!(report.surfaces_after_disconnect, 0);
         assert_eq!(report.clients_after_disconnect, 0);
@@ -2227,6 +2324,20 @@ mod tests {
         assert!(report.focused_window);
         assert_eq!(report.focused_title, "socket-demo");
         assert_eq!(report.focused_app_id, "org.backlit.SocketDemo");
+    }
+
+    #[test]
+    fn socket_client_runtime_accepts_runtime_trait_backend() {
+        let mut runtime = SocketClientRuntime::with_backend(HeadlessCompositor::default());
+        let reports = runtime.handle_stream(
+            "BACKLIT_DEMO_CLIENT surface title=socket-demo app_id=org.backlit.SocketDemo width=640 height=480\n",
+        );
+        let report = &reports[0];
+
+        assert!(report.backend_surface_presented);
+        assert_eq!(report.backend_clients, 1);
+        assert_eq!(report.backend_surfaces, 1);
+        assert!(report.policy_app_id_preserved);
     }
 
     #[test]

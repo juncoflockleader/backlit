@@ -35,6 +35,8 @@ target/debug/backlit-compositor \
 
 require_contains "$compositor_log" '"event":"compositor.scripted_client"'
 require_contains "$compositor_log" '"passed":true'
+require_contains "$compositor_log" '"runtime_backend":"headless-compositor"'
+require_contains "$compositor_log" '"runtime_trait":true'
 require_contains "$compositor_log" '"client_connected":true'
 require_contains "$compositor_log" '"surfaces_after_map":2'
 require_contains "$compositor_log" '"first_frame_damaged_surfaces":2'
@@ -113,6 +115,9 @@ cat > "$out_dir/manifest.json" <<EOF
   },
   "checks": {
     "scripted_client_runtime": true,
+    "runtime_backend_contract": true,
+    "runtime_backend": "headless-compositor",
+    "runtime_trait": true,
     "app_surface_map": true,
     "surface_policy_preview": true,
     "targeted_surface_damage": true,

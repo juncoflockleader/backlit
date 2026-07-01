@@ -119,6 +119,9 @@ require_contains scripts/verify-nested-wayland-smoke.sh '"launcher_terminal_wayl
 require_contains scripts/verify-nested-wayland-smoke.sh '"launcher_terminal_no_seat_expected":'
 require_contains scripts/verify-linux-e2e.sh './scripts/render-gui-preview.sh'
 require_contains scripts/verify-linux-e2e.sh './scripts/verify-compositor-runtime.sh'
+require_contains scripts/verify-compositor-runtime.sh '"runtime_backend_contract": true'
+require_contains scripts/verify-compositor-runtime.sh '"runtime_backend": "headless-compositor"'
+require_contains scripts/verify-compositor-runtime.sh '"runtime_trait": true'
 require_contains scripts/verify-linux-e2e.sh './scripts/verify-compositor-socket.sh'
 require_contains scripts/verify-compositor-socket.sh '"demo_client_socket_launch": true'
 require_contains scripts/verify-compositor-socket.sh '"demo_client_surface_mapped": true'
@@ -313,6 +316,9 @@ if [ -n "$artifact_root" ] && [ -d "$artifact_root" ]; then
   require_contains "$artifact_root/gui-preview/manifest.json" '"notification_service": true'
   require_contains "$artifact_root/gui-preview/manifest.json" '"settings_service": true'
   require_contains "$artifact_root/compositor-runtime/manifest.json" '"scripted_client_runtime": true'
+  require_contains "$artifact_root/compositor-runtime/manifest.json" '"runtime_backend_contract": true'
+  require_contains "$artifact_root/compositor-runtime/manifest.json" '"runtime_backend": "headless-compositor"'
+  require_contains "$artifact_root/compositor-runtime/manifest.json" '"runtime_trait": true'
   require_contains "$artifact_root/compositor-runtime/manifest.json" '"app_surface_map": true'
   require_contains "$artifact_root/compositor-runtime/manifest.json" '"surface_policy_preview": true'
   require_contains "$artifact_root/compositor-runtime/manifest.json" '"targeted_surface_damage": true'
@@ -551,6 +557,7 @@ cat > "$out_dir/manifest.json" <<EOF
     "launcher_desktop_discovery": true,
     "resource_budget": true,
     "compositor_runtime": true,
+    "compositor_runtime_trait": true,
     "compositor_socket": true,
     "compositor_service_ready": true,
     "notification_daemon": true,

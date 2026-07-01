@@ -17,7 +17,7 @@ MVP 0 is the development harness:
 - Input event routing smoke for keyboard shortcuts, pointer focus, window move, and resize.
 - xdg-shell-style toplevel and popup lifecycle smoke for configure/ack/map, focus, maximize, fullscreen, and close.
 - Compositor-owned xdg-toplevel and popup smoke that maps configured surfaces into a headless backend frame.
-- Scripted compositor runtime smoke that maps app-like surfaces into managed policy windows, writes a compositor-runtime GUI preview frame, verifies targeted damage and idle no-redraw behavior, closes a surface, and disconnects the client in bounded service mode.
+- Scripted compositor runtime smoke that maps app-like surfaces through the `CompositorRuntime` backend trait into managed policy windows, writes a compositor-runtime GUI preview frame, verifies targeted damage and idle no-redraw behavior, closes a surface, and disconnects the client in bounded service mode.
 - Compositor service socket smoke that binds the configured socket inside `XDG_RUNTIME_DIR`, accepts multiple `backlit-demo-client` windows, maps their announced surfaces and app ids into window policy, focuses the newest app window, moves and resizes it, verifies maximize work-area geometry, verifies fullscreen output geometry, processes a damage event, closes the newest surface, removes its policy window, falls focus back to the older app window, disconnects the closed client, and cleans the socket up on bounded exit.
 - Session interaction smoke for app switching and terminal launch resolution.
 - Session desktop-entry launch smoke that resolves a discovered app entry, spawns it with the session `WAYLAND_DISPLAY`, and maps it into managed focused window policy with app id preserved; package install checks use the installed Settings desktop entry.
@@ -66,4 +66,4 @@ MVP 0 is the development harness:
 - CI.
 - Packaging skeleton.
 
-The real compositor will integrate Smithay behind `backlit-compositor` and keep policy logic testable in `backlit-window-policy`.
+The real compositor will integrate Smithay behind the `CompositorRuntime` boundary in `backlit-compositor` and keep policy logic testable in `backlit-window-policy`.

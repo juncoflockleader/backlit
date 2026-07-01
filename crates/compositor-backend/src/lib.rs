@@ -1139,6 +1139,40 @@ pub struct DirectScanoutReport {
     pub surface_pixels: u64,
 }
 
+pub trait CompositorRuntime {
+    type Error: fmt::Display;
+
+    fn runtime_name(&self) -> &'static str;
+    fn connect_client(&mut self, name: &str) -> ClientId;
+    fn submit_surface(
+        &mut self,
+        client: ClientId,
+        title: &str,
+        width: u32,
+        height: u32,
+    ) -> Result<SurfaceId, Self::Error>;
+    fn submit_surface_with_options(
+        &mut self,
+        client: ClientId,
+        title: &str,
+        width: u32,
+        height: u32,
+        options: SurfaceOptions,
+    ) -> Result<SurfaceId, Self::Error>;
+    fn mark_damaged(&mut self, surface: SurfaceId) -> Result<(), Self::Error>;
+    fn close_surface(&mut self, surface: SurfaceId) -> Result<(), Self::Error>;
+    fn disconnect_client(&mut self, client: ClientId) -> Result<u64, Self::Error>;
+    fn present(&mut self) -> FrameReport;
+    fn direct_scanout_candidate(
+        &self,
+        surface: SurfaceId,
+        output_width: u32,
+        output_height: u32,
+    ) -> Result<DirectScanoutReport, Self::Error>;
+    fn client_count(&self) -> u64;
+    fn surface_count(&self) -> u64;
+}
+
 #[derive(Debug, Clone)]
 pub struct HeadlessCompositor {
     clients: Vec<HeadlessClient>,
@@ -1320,6 +1354,72 @@ impl HeadlessCompositor {
     }
 }
 
+impl CompositorRuntime for HeadlessCompositor {
+    type Error = HeadlessError;
+
+    fn runtime_name(&self) -> &'static str {
+        "headless-compositor"
+    }
+
+    fn connect_client(&mut self, name: &str) -> ClientId {
+        HeadlessCompositor::connect_client(self, name)
+    }
+
+    fn submit_surface(
+        &mut self,
+        client: ClientId,
+        title: &str,
+        width: u32,
+        height: u32,
+    ) -> Result<SurfaceId, Self::Error> {
+        HeadlessCompositor::submit_surface(self, client, title, width, height)
+    }
+
+    fn submit_surface_with_options(
+        &mut self,
+        client: ClientId,
+        title: &str,
+        width: u32,
+        height: u32,
+        options: SurfaceOptions,
+    ) -> Result<SurfaceId, Self::Error> {
+        HeadlessCompositor::submit_surface_with_options(self, client, title, width, height, options)
+    }
+
+    fn mark_damaged(&mut self, surface: SurfaceId) -> Result<(), Self::Error> {
+        HeadlessCompositor::mark_damaged(self, surface)
+    }
+
+    fn close_surface(&mut self, surface: SurfaceId) -> Result<(), Self::Error> {
+        HeadlessCompositor::close_surface(self, surface)
+    }
+
+    fn disconnect_client(&mut self, client: ClientId) -> Result<u64, Self::Error> {
+        HeadlessCompositor::disconnect_client(self, client)
+    }
+
+    fn present(&mut self) -> FrameReport {
+        HeadlessCompositor::present(self)
+    }
+
+    fn direct_scanout_candidate(
+        &self,
+        surface: SurfaceId,
+        output_width: u32,
+        output_height: u32,
+    ) -> Result<DirectScanoutReport, Self::Error> {
+        HeadlessCompositor::direct_scanout_candidate(self, surface, output_width, output_height)
+    }
+
+    fn client_count(&self) -> u64 {
+        self.clients.len() as u64
+    }
+
+    fn surface_count(&self) -> u64 {
+        self.surfaces.len() as u64
+    }
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum HeadlessError {
     UnknownClient(ClientId),
@@ -1339,7 +1439,7 @@ impl fmt::Display for HeadlessError {
 mod tests {
     use super::{
         backend_launch_plan, parse_args, BackendKind, BackendPreflightEnvironment, BufferKind,
-        ClientId, HeadlessCompositor, RunConfig, SurfaceOptions,
+        ClientId, CompositorRuntime, HeadlessCompositor, RunConfig, SurfaceOptions,
     };
 
     #[test]
@@ -1406,6 +1506,43 @@ mod tests {
 
         let second_frame = compositor.present();
         assert_eq!(second_frame.damaged_surfaces, 0);
+    }
+
+    #[test]
+    fn headless_backend_satisfies_compositor_runtime_contract() {
+        fn exercise_runtime<R: CompositorRuntime>(runtime: &mut R) {
+            assert_eq!(runtime.runtime_name(), "headless-compositor");
+            let client = runtime.connect_client("contract-client");
+            let surface = runtime
+                .submit_surface(client, "contract-window", 320, 200)
+                .unwrap_or_else(|error| panic!("{error}"));
+            assert_eq!(runtime.client_count(), 1);
+            assert_eq!(runtime.surface_count(), 1);
+
+            let first_frame = runtime.present();
+            assert_eq!(first_frame.client_count, 1);
+            assert_eq!(first_frame.surface_count, 1);
+            assert_eq!(first_frame.damaged_surfaces, 1);
+
+            runtime
+                .mark_damaged(surface)
+                .unwrap_or_else(|error| panic!("{error}"));
+            let damage_frame = runtime.present();
+            assert_eq!(damage_frame.damaged_surfaces, 1);
+
+            assert_eq!(
+                runtime
+                    .disconnect_client(client)
+                    .unwrap_or_else(|error| panic!("{error}")),
+                1
+            );
+            let cleanup_frame = runtime.present();
+            assert_eq!(cleanup_frame.client_count, 0);
+            assert_eq!(cleanup_frame.surface_count, 0);
+        }
+
+        let mut compositor = HeadlessCompositor::default();
+        exercise_runtime(&mut compositor);
     }
 
     #[test]

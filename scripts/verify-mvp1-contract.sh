@@ -87,6 +87,9 @@ require_contains scripts/verify-compositor-socket.sh '"new_client_focused": true
 require_contains scripts/verify-compositor-socket.sh '"close_fallback_focus": true'
 require_contains scripts/verify-launcher-desktop-discovery.sh '--desktop-entry=org.backlit.SpawnProbe.desktop'
 require_contains scripts/verify-launcher-desktop-discovery.sh '"fixture_desktop_spawn": true'
+require_contains scripts/verify-compositor-runtime.sh '"runtime_backend_contract": true'
+require_contains scripts/verify-compositor-runtime.sh '"runtime_backend": "headless-compositor"'
+require_contains scripts/verify-compositor-runtime.sh '"runtime_trait": true'
 require_contains scripts/verify-linux-e2e.sh './scripts/verify-drm-session-smoke.sh'
 require_contains scripts/verify-linux-e2e.sh './scripts/verify-mvp1-contract.sh'
 
@@ -203,6 +206,9 @@ if [ -n "$artifact_root" ] && [ -d "$artifact_root" ]; then
     require_contains "$artifact_root/compositor-socket/manifest.json" '"socket_blocked_expected": true'
     require_contains "$artifact_root/compositor-socket/manifest.json" '"socket_permission_denied": true'
   fi
+  require_contains "$artifact_root/compositor-runtime/manifest.json" '"runtime_backend_contract": true'
+  require_contains "$artifact_root/compositor-runtime/manifest.json" '"runtime_backend": "headless-compositor"'
+  require_contains "$artifact_root/compositor-runtime/manifest.json" '"runtime_trait": true'
   require_contains "$artifact_root/compositor-runtime/manifest.json" '"surface_policy_preview": true'
   require_contains "$artifact_root/compositor-runtime/manifest.json" '"targeted_surface_damage": true'
   require_contains "$artifact_root/compositor-runtime/manifest.json" '"client_disconnect_cleanup": true'
@@ -274,6 +280,7 @@ cat > "$manifest" <<EOF
     "session_desktop_managed_window_contract": true,
     "package_install_contract": true,
     "resource_budget_contract": true,
+    "compositor_runtime_trait_contract": true,
     "compositor_socket_contract": true,
     "compositor_socket_artifact": $compositor_socket_artifact,
     "drm_launch_ready_artifact": $drm_launch_ready_artifact,
