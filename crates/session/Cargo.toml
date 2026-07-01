@@ -16,3 +16,6 @@ backlit-launcher = { path = "../launcher" }
 backlit-shortcuts = { path = "../shortcuts" }
 backlit-surface = { path = "../surface" }
 backlit-window-policy = { path = "../window-policy" }
+
+[features]
+smithay-backend = ["backlit-compositor-backend/smithay-backend"]

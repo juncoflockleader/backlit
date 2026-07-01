@@ -25,6 +25,7 @@ MVP 0 is the development harness:
 - Session desktop-entry launch smoke that resolves a discovered app entry, spawns it with the session `WAYLAND_DISPLAY`, and maps it into managed focused window policy with app id preserved; package install checks use the installed Settings desktop entry.
 - Scripted session replay frames for focus, terminal launch, move, resize, snap, and workspace switching.
 - Session service orchestration smoke for launching the compositor service, connecting `backlit-demo-client` to its socket with app id preserved, and probing shell/settings daemons from `backlit-session`.
+- Session-owned DRM first-present verification through `backlit-session --verify-drm-first-present`, with `--require-drm-master-present` reserved for dedicated TTY/display-manager sessions where commit/vblank must be observed.
 - Session move/resize smoke through pure window policy.
 - Workspace switching smoke that hides non-active workspace windows from focus and pointer routing.
 - Window snap smoke for left/right work-area tiling.
@@ -42,7 +43,7 @@ MVP 0 is the development harness:
 - Policy-driven session preview renderer that draws visible workspace windows from `WindowPolicy`, including focused-window styling and workspace indicator verification.
 - Headless session launch verification.
 - Backlit user systemd target and dry-run session launch plan for starting/stopping runtime services.
-- Packaged DRM compositor user service selects `--runtime=smithay`, with Linux package-build evidence that `backlit-compositor` is built with the `smithay-backend` feature before entering the `.deb`.
+- Packaged DRM compositor user service selects `--runtime=smithay`, with Linux package-build evidence that `backlit-compositor` and `backlit-session` are built with the `smithay-backend` feature before entering their `.deb` packages.
 - Long-lived `--serve` mode for compositor, shell, notification daemon, and settings daemon, with bounded lifecycle probes for automation.
 - Viewable GUI preview renderer with verified session services.
 - Parallels GUI preview export from Ubuntu guest artifacts to the host workspace.

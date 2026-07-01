@@ -19,6 +19,12 @@ fail() {
   exit 1
 }
 
+require_matches() {
+  file="$1"
+  value="$2"
+  grep -E "$value" "$file" >/dev/null || fail "missing pattern in $file: $value"
+}
+
 count_matching() {
   dir="$1"
   pattern="$2"
@@ -174,13 +180,17 @@ fi
 drm_session_smoke_ready=false
 drm_session_smoke_blocked_expected=false
 drm_session_clean_exit=false
+session_drm_first_present_probe=false
+session_first_present_commit_succeeded=false
+session_first_present_vblank_event_received=false
+session_first_present_blocked_by_drm_master=false
 
 if [ "$drm_expected_ready" = true ]; then
-	  cargo build \
-	    -p backlit-session \
-	    -p backlit-compositor \
-	    -p backlit-demo-client \
-	    -p backlit-shell \
+  cargo build -p backlit-session --features smithay-backend
+  cargo build \
+    -p backlit-compositor \
+    -p backlit-demo-client \
+    -p backlit-shell \
     -p backlit-notification-daemon \
     -p backlit-settings-daemon
   target/debug/backlit-session \
@@ -191,6 +201,7 @@ if [ "$drm_expected_ready" = true ]; then
     --verify-launch-spawn \
     --launch-spawn-program=true \
     --verify-desktop-launch \
+    --verify-drm-first-present \
     --desktop-dir=crates/launcher/fixtures \
     --desktop-entry=org.backlit.SpawnProbe.desktop \
     --wayland-display=backlit-drm-smoke \
@@ -198,6 +209,8 @@ if [ "$drm_expected_ready" = true ]; then
     --verify-clean-exit \
     --service-log-dir="$service_log_dir" > "$session_log" 2> "$session_err"
 
+  grep '"event":"session.launch"' "$session_log" >/dev/null
+  grep '"verify_drm_first_present":true' "$session_log" >/dev/null
   grep '"event":"session.backend_preflight"' "$session_log" >/dev/null
   grep '"backend":"drm"' "$session_log" >/dev/null
   grep '"ready":true' "$session_log" >/dev/null
@@ -215,6 +228,31 @@ if [ "$drm_expected_ready" = true ]; then
   grep '"drm_card_access_ready":true' "$session_log" >/dev/null
   grep '"input_broker_ready":true' "$session_log" >/dev/null
   grep '"input_broker_mode":"' "$session_log" >/dev/null
+  grep '"event":"session.drm_first_present_probe"' "$session_log" >/dev/null
+  grep '"runtime_backend":"smithay-drm-probe"' "$session_log" >/dev/null
+  grep '"feature_enabled":true' "$session_log" >/dev/null
+  grep '"compiled":true' "$session_log" >/dev/null
+  grep '"launch_ready":true' "$session_log" >/dev/null
+  grep '"drm_card_selected":true' "$session_log" >/dev/null
+  grep '"drm_node_resolved":true' "$session_log" >/dev/null
+  grep '"kms_scanout_plan_ready":true' "$session_log" >/dev/null
+  grep '"kms_surface_created":true' "$session_log" >/dev/null
+  grep '"kms_framebuffer_created":true' "$session_log" >/dev/null
+  grep '"kms_framebuffer_added":true' "$session_log" >/dev/null
+  grep '"kms_first_present_framebuffer_filled":true' "$session_log" >/dev/null
+  grep '"kms_first_present_plane_state_ready":true' "$session_log" >/dev/null
+  require_matches "$session_log" '"kms_framebuffer_test_state_(succeeded|permission_denied)":true'
+  require_matches "$session_log" '"kms_first_present_(commit_succeeded|blocked_by_drm_master)":true'
+  if grep -F '"kms_first_present_commit_succeeded":true' "$session_log" >/dev/null; then
+    grep '"kms_first_present_vblank_event_received":true' "$session_log" >/dev/null
+    session_first_present_commit_succeeded=true
+    session_first_present_vblank_event_received=true
+  else
+    grep '"kms_first_present_blocked_by_drm_master":true' "$session_log" >/dev/null
+    grep '"kms_framebuffer_test_state_permission_denied":true' "$session_log" >/dev/null
+    session_first_present_blocked_by_drm_master=true
+  fi
+  grep '"kms_first_present_failure":""' "$session_log" >/dev/null
   grep '"event":"session.gui_ready"' "$session_log" >/dev/null
   grep '"event":"session.verified"' "$session_log" >/dev/null
   grep '"event":"session.launch_spawn"' "$session_log" >/dev/null
@@ -266,6 +304,7 @@ if [ "$drm_expected_ready" = true ]; then
   test "$session_ppm_bytes" = "$expected_ppm_bytes"
   drm_session_smoke_ready=true
   drm_session_clean_exit=true
+  session_drm_first_present_probe=true
 else
   set +e
   cargo run -p backlit-session -- \
@@ -306,6 +345,10 @@ cat > "$out_dir/manifest.json" <<EOF
     "drm_input_selected": $drm_session_smoke_ready,
     "drm_session_smoke_blocked_expected": $drm_session_smoke_blocked_expected,
     "drm_session_clean_exit": $drm_session_clean_exit,
+    "session_drm_first_present_probe": $session_drm_first_present_probe,
+    "session_first_present_commit_succeeded": $session_first_present_commit_succeeded,
+    "session_first_present_vblank_event_received": $session_first_present_vblank_event_received,
+    "session_first_present_blocked_by_drm_master": $session_first_present_blocked_by_drm_master,
 	    "settings_service": $drm_session_smoke_ready,
 	    "session_compositor_demo_client": $drm_session_smoke_ready,
 	    "session_compositor_demo_app_id_preserved": $drm_session_smoke_ready,

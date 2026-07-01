@@ -11,8 +11,8 @@ use backlit_common::metrics::{event_json, FieldValue};
 use backlit_compositor_backend::backend_launch_plan;
 use backlit_compositor_backend::BackendLaunchPlan;
 use backlit_compositor_backend::{
-    preflight_backend_with_environment, BackendKind, BackendPreflightEnvironment,
-    BackendPreflightReport,
+    preflight_backend_with_environment, smithay_runtime_probe, BackendKind,
+    BackendPreflightEnvironment, BackendPreflightReport, SmithayRuntimeProbe,
 };
 use backlit_demo_client::{
     render_policy_gui, render_policy_gui_with_overlay, verify_policy_gui, verify_session_overlay,
@@ -66,6 +66,14 @@ fn run() -> Result<(), String> {
                 FieldValue::Bool(config.verify_systemd_activation),
             ),
             (
+                "verify_drm_first_present",
+                FieldValue::Bool(config.verify_drm_first_present),
+            ),
+            (
+                "require_drm_master_present",
+                FieldValue::Bool(config.require_drm_master_present),
+            ),
+            (
                 "activate_systemd",
                 FieldValue::Bool(config.activate_systemd),
             ),
@@ -88,6 +96,29 @@ fn run() -> Result<(), String> {
             preflight_report.backend.as_str(),
             preflight_report.code,
         ));
+    }
+
+    if config.verify_drm_first_present || config.require_drm_master_present {
+        if config.backend != BackendKind::Drm {
+            return Err(String::from(
+                "DRM first-present verification requires --backend=drm",
+            ));
+        }
+
+        let probe = smithay_runtime_probe(&preflight_environment);
+        emit_drm_first_present_probe(&config, &probe);
+
+        if !probe.passed() {
+            return Err(String::from(
+                "DRM first-present verification did not reach a valid commit or boundary",
+            ));
+        }
+
+        if config.require_drm_master_present && !probe.kms_first_present_commit_succeeded {
+            return Err(String::from(
+                "DRM first-present commit was not observed; run from a dedicated DRM-master session",
+            ));
+        }
     }
 
     let needs_systemd_contract =
@@ -2938,6 +2969,86 @@ fn emit(event: &str, config: &Config, fields: &[(&str, FieldValue<'_>)]) {
     println!("{}", event_json(event, &combined));
 }
 
+fn emit_drm_first_present_probe(config: &Config, probe: &SmithayRuntimeProbe) {
+    let first_present_failure = probe.kms_first_present_failure.as_deref().unwrap_or("");
+
+    emit(
+        "session.drm_first_present_probe",
+        config,
+        &[
+            ("passed", FieldValue::Bool(probe.passed())),
+            ("launch_ready", FieldValue::Bool(probe.launch_ready)),
+            ("runtime_backend", FieldValue::Str(probe.runtime_backend)),
+            ("feature_enabled", FieldValue::Bool(probe.feature_enabled)),
+            ("compiled", FieldValue::Bool(probe.compiled)),
+            (
+                "drm_card_selected",
+                FieldValue::Bool(probe.drm_card_selected),
+            ),
+            (
+                "drm_node_resolved",
+                FieldValue::Bool(probe.drm_node_resolved),
+            ),
+            (
+                "kms_scanout_plan_ready",
+                FieldValue::Bool(probe.kms_scanout_plan_ready),
+            ),
+            (
+                "kms_surface_created",
+                FieldValue::Bool(probe.kms_surface_created),
+            ),
+            (
+                "kms_framebuffer_created",
+                FieldValue::Bool(probe.kms_framebuffer_created),
+            ),
+            (
+                "kms_framebuffer_added",
+                FieldValue::Bool(probe.kms_framebuffer_added),
+            ),
+            (
+                "kms_first_present_framebuffer_filled",
+                FieldValue::Bool(probe.kms_first_present_framebuffer_filled),
+            ),
+            (
+                "kms_first_present_plane_state_ready",
+                FieldValue::Bool(probe.kms_first_present_plane_state_ready),
+            ),
+            (
+                "kms_first_present_commit_attempted",
+                FieldValue::Bool(probe.kms_first_present_commit_attempted),
+            ),
+            (
+                "kms_first_present_commit_succeeded",
+                FieldValue::Bool(probe.kms_first_present_commit_succeeded),
+            ),
+            (
+                "kms_first_present_vblank_event_received",
+                FieldValue::Bool(probe.kms_first_present_vblank_event_received),
+            ),
+            (
+                "kms_first_present_blocked_by_drm_master",
+                FieldValue::Bool(probe.kms_first_present_blocked_by_drm_master),
+            ),
+            (
+                "kms_framebuffer_test_state_succeeded",
+                FieldValue::Bool(probe.kms_framebuffer_test_state_succeeded),
+            ),
+            (
+                "kms_framebuffer_test_state_permission_denied",
+                FieldValue::Bool(probe.kms_framebuffer_test_state_permission_denied),
+            ),
+            (
+                "kms_first_present_failure",
+                FieldValue::Str(first_present_failure),
+            ),
+            (
+                "require_drm_master_present",
+                FieldValue::Bool(config.require_drm_master_present),
+            ),
+        ],
+    );
+}
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 struct Config {
     backend: BackendKind,
@@ -2951,6 +3062,8 @@ struct Config {
     verify_clean_exit: bool,
     verify_systemd_units: bool,
     verify_systemd_activation: bool,
+    verify_drm_first_present: bool,
+    require_drm_master_present: bool,
     activate_systemd: bool,
     scripted_replay_dir: Option<String>,
     systemd_unit_dir: String,
@@ -2980,6 +3093,8 @@ impl Default for Config {
             verify_clean_exit: false,
             verify_systemd_units: false,
             verify_systemd_activation: false,
+            verify_drm_first_present: false,
+            require_drm_master_present: false,
             activate_systemd: false,
             scripted_replay_dir: None,
             systemd_unit_dir: String::from("/usr/lib/systemd/user"),
@@ -3019,6 +3134,11 @@ impl Config {
                 config.verify_systemd_units = true;
             } else if arg == "--verify-systemd-activation" {
                 config.verify_systemd_activation = true;
+            } else if arg == "--verify-drm-first-present" {
+                config.verify_drm_first_present = true;
+            } else if arg == "--require-drm-master-present" {
+                config.verify_drm_first_present = true;
+                config.require_drm_master_present = true;
             } else if arg == "--activate-systemd" {
                 config.activate_systemd = true;
             } else if let Some(value) = arg.strip_prefix("--scripted-replay-dir=") {
@@ -3154,7 +3274,7 @@ fn print_help() {
 backlit-session
 
 Usage:
-  backlit-session [--backend=headless|wayland|drm] [--socket=backlit-0] [--screenshot=target/backlit-session.ppm] [--verify] [--verify-services] [--verify-systemd-units] [--verify-systemd-activation] [--activate-systemd] [--verify-launch-spawn] [--verify-desktop-launch] [--verify-clean-exit] [--scripted-replay-dir=target/session-replay/frames] [--preflight-only]
+  backlit-session [--backend=headless|wayland|drm] [--socket=backlit-0] [--screenshot=target/backlit-session.ppm] [--verify] [--verify-services] [--verify-systemd-units] [--verify-systemd-activation] [--verify-drm-first-present] [--require-drm-master-present] [--activate-systemd] [--verify-launch-spawn] [--verify-desktop-launch] [--verify-clean-exit] [--scripted-replay-dir=target/session-replay/frames] [--preflight-only]
 
 Flags:
   --backend      Select compositor backend. Defaults to headless.
@@ -3182,6 +3302,10 @@ Flags:
                  Verify installed user systemd units for the graphical session.
   --verify-systemd-activation
                  Execute the systemd import/start/stop activation path and exit.
+  --verify-drm-first-present
+                 Probe DRM/KMS first-present readiness through the session entrypoint.
+  --require-drm-master-present
+                 Require first-present commit/vblank instead of accepting the nested-session DRM-master boundary.
   --activate-systemd
                  Start the Backlit user systemd target and keep the session process alive.
   --systemd-unit-dir
@@ -3219,6 +3343,8 @@ mod tests {
             "--verify-clean-exit",
             "--verify-systemd-units",
             "--verify-systemd-activation",
+            "--verify-drm-first-present",
+            "--require-drm-master-present",
             "--activate-systemd",
             "--scripted-replay-dir",
             "target/session-replay/frames",
@@ -3249,6 +3375,8 @@ mod tests {
         assert!(config.verify_clean_exit);
         assert!(config.verify_systemd_units);
         assert!(config.verify_systemd_activation);
+        assert!(config.verify_drm_first_present);
+        assert!(config.require_drm_master_present);
         assert!(config.activate_systemd);
         assert_eq!(
             config.scripted_replay_dir.as_deref(),
