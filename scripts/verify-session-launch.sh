@@ -93,7 +93,7 @@ set -e
 grep '"event":"session.backend_preflight"' "$drm_log" >/dev/null
 grep '"backend":"drm"' "$drm_log" >/dev/null
 grep '"event":"session.backend_launch_plan"' "$drm_log" >/dev/null
-grep '"implementation":"pre-smithay-policy-harness"' "$drm_log" >/dev/null
+grep '"implementation":"smithay-compositor-runtime"' "$drm_log" >/dev/null
 grep '"display_driver":"' "$drm_log" >/dev/null
 grep '"input_driver":"' "$drm_log" >/dev/null
 grep '"event":"session.launch_ready"' "$drm_log" >/dev/null
@@ -178,6 +178,7 @@ cat > "$out_dir/manifest.json" <<EOF
     "session_systemd_launch_plan": true,
     "drm_session_checked": true,
     "drm_backend_launch_plan": true,
+    "drm_smithay_launch_plan": true,
     "drm_device_selected": $drm_session_ready,
     "drm_input_selected": $drm_session_ready,
     "drm_session_ready": $drm_session_ready,

@@ -86,7 +86,7 @@ fn run() -> Result<(), String> {
         preflight_backend_with_environment(config.backend, &preflight_environment);
     emit_backend_preflight(&config, &preflight_report, &preflight_environment);
     let launch_plan =
-        backend_launch_plan(config.backend, &preflight_report, &preflight_environment);
+        backend_launch_plan_for_config(&config, &preflight_report, &preflight_environment);
     emit_backend_launch_plan(&config, &launch_plan);
     emit_launch_ready(&config, preflight_report.ready);
 
@@ -2409,6 +2409,18 @@ fn emit_backend_launch_plan(config: &Config, plan: &BackendLaunchPlan) {
     );
 }
 
+fn backend_launch_plan_for_config(
+    config: &Config,
+    report: &BackendPreflightReport,
+    environment: &BackendPreflightEnvironment,
+) -> BackendLaunchPlan {
+    let mut plan = backend_launch_plan(config.backend, report, environment);
+    if config.backend == BackendKind::Drm {
+        plan.implementation = "smithay-compositor-runtime";
+    }
+    plan
+}
+
 fn emit_launch_ready(config: &Config, passed: bool) {
     emit(
         "session.launch_ready",
@@ -3488,9 +3500,13 @@ mod tests {
     use std::path::Path;
     use std::time::{SystemTime, UNIX_EPOCH};
 
+    use backlit_compositor_backend::{
+        preflight_backend_with_environment, BackendKind, BackendPreflightEnvironment,
+    };
+
     use super::{
-        binary_name, run_systemd_activation, systemd_launch_plan, verify_systemd_units,
-        CompositorServiceVerification, Config, ServiceProbe,
+        backend_launch_plan_for_config, binary_name, run_systemd_activation, systemd_launch_plan,
+        verify_systemd_units, CompositorServiceVerification, Config, ServiceProbe,
     };
 
     #[test]
@@ -3562,6 +3578,31 @@ mod tests {
     #[test]
     fn binary_name_uses_platform_suffix() {
         assert!(binary_name("backlit-compositor").starts_with("backlit-compositor"));
+    }
+
+    #[test]
+    fn drm_session_launch_plan_names_smithay_runtime() {
+        let config = Config {
+            backend: BackendKind::Drm,
+            ..Config::default()
+        };
+        let environment = BackendPreflightEnvironment::for_target("linux")
+            .with_xdg_runtime_dir("/run/user/1000")
+            .with_drm_nodes(1, 1)
+            .with_drm_card_access(1, 1)
+            .with_input_event_nodes(2)
+            .with_input_event_access(1)
+            .with_active_local_session("1", "seat0", "wayland")
+            .with_primary_drm_card("/dev/dri/card0")
+            .with_primary_drm_render_node("/dev/dri/renderD128")
+            .with_primary_input_event("/dev/input/event0");
+        let report = preflight_backend_with_environment(config.backend, &environment);
+        let plan = backend_launch_plan_for_config(&config, &report, &environment);
+
+        assert!(report.ready, "{report:?}");
+        assert_eq!(plan.implementation, "smithay-compositor-runtime");
+        assert_eq!(plan.display_driver, "drm-kms");
+        assert!(plan.uses_drm);
     }
 
     #[test]

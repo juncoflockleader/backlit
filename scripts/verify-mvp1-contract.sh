@@ -70,11 +70,15 @@ require_contains scripts/verify-session-launch.sh 'backlit-session --backend=drm
 require_contains scripts/verify-session-launch.sh '"session_systemd_launch_plan"'
 require_contains scripts/verify-session-launch.sh '"session.backend_launch_plan"'
 require_contains scripts/verify-session-launch.sh '"drm_backend_launch_plan": true'
+require_contains scripts/verify-session-launch.sh '"drm_smithay_launch_plan": true'
+require_contains scripts/verify-session-launch.sh '"implementation":"smithay-compositor-runtime"'
 require_contains scripts/verify-drm-session-smoke.sh '--backend=drm'
 require_contains scripts/verify-drm-session-smoke.sh '"drm_session_smoke_ready"'
 require_contains scripts/verify-drm-session-smoke.sh '"drm_session_clean_exit"'
 require_contains scripts/verify-drm-session-smoke.sh '"session.backend_launch_plan"'
 require_contains scripts/verify-drm-session-smoke.sh '"drm_backend_launch_plan": true'
+require_contains scripts/verify-drm-session-smoke.sh '"drm_smithay_launch_plan": true'
+require_contains scripts/verify-drm-session-smoke.sh '"implementation":"smithay-compositor-runtime"'
 require_contains scripts/verify-drm-session-smoke.sh '--verify-desktop-launch'
 require_contains scripts/verify-drm-session-smoke.sh '--verify-drm-first-present'
 require_contains scripts/verify-drm-session-smoke.sh '"session_drm_first_present_probe": $session_drm_first_present_probe'
@@ -100,6 +104,7 @@ require_contains scripts/verify-drm-master-boundary.sh '"dedicated_session_requi
 require_contains scripts/verify-drm-master-boundary.sh '"current_session_can_present": $current_session_can_present'
 require_contains scripts/verify-dedicated-drm-session.sh '"name": "backlit-dedicated-drm-session"'
 require_contains scripts/verify-dedicated-drm-session.sh '--require-drm-master-present'
+require_contains scripts/verify-dedicated-drm-session.sh '"implementation":"smithay-compositor-runtime"'
 require_contains scripts/verify-dedicated-drm-session.sh '"dedicated_handoff_plan": true'
 require_contains scripts/verify-dedicated-drm-session.sh '"dedicated_handoff_script_checked": true'
 require_contains scripts/verify-dedicated-drm-session.sh '"dedicated_handoff_seat_owner_required": true'
@@ -227,6 +232,7 @@ if [ -n "$artifact_root" ] && [ -d "$artifact_root" ]; then
   require_contains "$artifact_root/session-launch/manifest.json" '"session_systemd_launch_plan": true'
   require_contains "$artifact_root/session-launch/manifest.json" '"drm_session_checked": true'
   require_contains "$artifact_root/session-launch/manifest.json" '"drm_backend_launch_plan": true'
+  require_contains "$artifact_root/session-launch/manifest.json" '"drm_smithay_launch_plan": true'
 
   if grep '"drm_session_expected_ready": true' "$artifact_root/session-launch/manifest.json" >/dev/null; then
     require_contains "$artifact_root/session-launch/manifest.json" '"drm_session_ready": true'
@@ -238,6 +244,7 @@ if [ -n "$artifact_root" ] && [ -d "$artifact_root" ]; then
 
   require_contains "$artifact_root/drm-session-smoke/manifest.json" '"name": "backlit-drm-session-smoke"'
   require_contains "$artifact_root/drm-session-smoke/manifest.json" '"drm_backend_launch_plan": true'
+  require_contains "$artifact_root/drm-session-smoke/manifest.json" '"drm_smithay_launch_plan": true'
   if grep '"drm_session_smoke_ready": true' "$artifact_root/drm-session-smoke/manifest.json" >/dev/null; then
     require_contains "$artifact_root/drm-session-smoke/manifest.json" '"drm_session_clean_exit": true'
     require_contains "$artifact_root/drm-session-smoke/manifest.json" '"drm_device_selected": true'

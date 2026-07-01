@@ -236,6 +236,7 @@ grep '"input_event_selected":true' "$session_log" >/dev/null
 grep '"drm_card_access_ready":true' "$session_log" >/dev/null
 grep '"input_broker_ready":true' "$session_log" >/dev/null
 grep '"event":"session.drm_first_present_probe"' "$session_log" >/dev/null
+grep '"implementation":"smithay-compositor-runtime"' "$session_log" >/dev/null
 grep '"runtime_backend":"smithay-drm-probe"' "$session_log" >/dev/null
 grep '"feature_enabled":true' "$session_log" >/dev/null
 grep '"compiled":true' "$session_log" >/dev/null

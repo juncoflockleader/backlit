@@ -329,6 +329,7 @@ host_smithay_compositor_runtime_manifest="$host_out_dir/smithay-compositor-runti
 host_compositor_socket_manifest="$host_out_dir/compositor-socket-manifest.json"
 host_smithay_runtime_probe_manifest="$host_out_dir/smithay-runtime-probe-manifest.json"
 host_launch_readiness_manifest="$host_out_dir/launch-readiness-manifest.json"
+host_session_launch_manifest="$host_out_dir/session-launch-manifest.json"
 host_session_replay_manifest="$host_out_dir/session-replay-manifest.json"
 host_drm_session_smoke_manifest="$host_out_dir/drm-session-smoke-manifest.json"
 host_drm_master_boundary_manifest="$host_out_dir/drm-master-boundary-manifest.json"
@@ -357,6 +358,7 @@ rm -f \
   "$host_compositor_socket_manifest" \
   "$host_smithay_runtime_probe_manifest" \
   "$host_launch_readiness_manifest" \
+  "$host_session_launch_manifest" \
   "$host_session_replay_manifest" \
   "$host_drm_session_smoke_manifest" \
   "$host_drm_master_boundary_manifest" \
@@ -384,6 +386,7 @@ download_file "$guest_e2e_dir/smithay-compositor-runtime/manifest.json" "$host_s
 download_file "$guest_e2e_dir/compositor-socket/manifest.json" "$host_compositor_socket_manifest"
 download_file "$guest_e2e_dir/smithay-runtime-probe/manifest.json" "$host_smithay_runtime_probe_manifest"
 download_file "$guest_e2e_dir/launch-readiness/manifest.json" "$host_launch_readiness_manifest"
+download_file "$guest_e2e_dir/session-launch/manifest.json" "$host_session_launch_manifest"
 download_file "$guest_e2e_dir/session-replay/manifest.json" "$host_session_replay_manifest"
 download_file "$guest_e2e_dir/drm-session-smoke/manifest.json" "$host_drm_session_smoke_manifest"
 download_file "$guest_e2e_dir/drm-master-boundary/manifest.json" "$host_drm_master_boundary_manifest"
@@ -640,6 +643,8 @@ require_contains "$host_launch_readiness_manifest" '"input_broker_ready": true'
 require_contains "$host_launch_readiness_manifest" '"drm_launch_plan": true'
 require_contains "$host_launch_readiness_manifest" '"drm_device_selected": true'
 require_contains "$host_launch_readiness_manifest" '"drm_input_selected": true'
+require_contains "$host_session_launch_manifest" '"drm_backend_launch_plan": true'
+require_contains "$host_session_launch_manifest" '"drm_smithay_launch_plan": true'
 require_contains "$host_drm_master_boundary_manifest" '"name": "backlit-drm-master-boundary"'
 require_contains "$host_drm_master_boundary_manifest" '"session_entry_drm": true'
 require_contains "$host_drm_master_boundary_manifest" '"compositor_service_drm": true'
@@ -677,6 +682,7 @@ require_contains "$host_dedicated_drm_session_manifest" '"first_present_blocked_
 require_contains "$host_drm_session_smoke_manifest" '"drm_session_smoke_ready": true'
 require_contains "$host_drm_session_smoke_manifest" '"drm_session_clean_exit": true'
 require_contains "$host_drm_session_smoke_manifest" '"drm_backend_launch_plan": true'
+require_contains "$host_drm_session_smoke_manifest" '"drm_smithay_launch_plan": true'
 require_contains "$host_drm_session_smoke_manifest" '"drm_device_selected": true'
 require_contains "$host_drm_session_smoke_manifest" '"drm_input_selected": true'
 require_contains "$host_drm_session_smoke_manifest" '"session_drm_first_present_probe": true'
@@ -756,6 +762,7 @@ cat > "$host_out_dir/manifest.json" <<EOF
     "compositor_socket_manifest": "$host_compositor_socket_manifest",
     "smithay_runtime_probe_manifest": "$host_smithay_runtime_probe_manifest",
     "launch_readiness_manifest": "$host_launch_readiness_manifest",
+    "session_launch_manifest": "$host_session_launch_manifest",
     "session_replay_manifest": "$host_session_replay_manifest",
     "drm_session_smoke_manifest": "$host_drm_session_smoke_manifest",
     "drm_master_boundary_manifest": "$host_drm_master_boundary_manifest",
