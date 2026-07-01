@@ -2059,11 +2059,23 @@ struct WaylandGlobal {
 #[cfg(all(feature = "smithay-backend", target_os = "linux"))]
 #[derive(Debug, Default)]
 struct WaylandClientEventState {
-    buffer: Vec<u8>,
     globals: Vec<WaylandGlobal>,
     wm_base_ping_serials: Vec<u32>,
+    compositor_bound: bool,
+    shm_bound: bool,
+    xdg_wm_base_bound: bool,
+    surface_created: bool,
+    xdg_surface_created: bool,
+    xdg_toplevel_created: bool,
     xdg_toplevel_configures: u64,
     xdg_surface_configure_serial: Option<u32>,
+    configure_acked: bool,
+    surface_committed: bool,
+    compositor: Option<wayland_client::protocol::wl_compositor::WlCompositor>,
+    base_surface: Option<wayland_client::protocol::wl_surface::WlSurface>,
+    wm_base: Option<wayland_protocols::xdg::shell::client::xdg_wm_base::XdgWmBase>,
+    xdg_surface: Option<wayland_protocols::xdg::shell::client::xdg_surface::XdgSurface>,
+    xdg_toplevel: Option<wayland_protocols::xdg::shell::client::xdg_toplevel::XdgToplevel>,
 }
 
 #[cfg(all(feature = "smithay-backend", target_os = "linux"))]
@@ -2080,7 +2092,165 @@ impl WaylandClientEventState {
             && self.global("wl_shm").is_some()
             && self.global("xdg_wm_base").is_some()
     }
+
+    fn init_xdg_toplevel(&mut self, qh: &wayland_client::QueueHandle<Self>) {
+        if self.base_surface.is_none() {
+            if let Some(compositor) = self.compositor.as_ref() {
+                self.base_surface = Some(compositor.create_surface(qh, ()));
+                self.surface_created = true;
+            }
+        }
+
+        if self.xdg_surface.is_none() {
+            let (Some(wm_base), Some(base_surface)) =
+                (self.wm_base.as_ref(), self.base_surface.as_ref())
+            else {
+                return;
+            };
+
+            let xdg_surface = wm_base.get_xdg_surface(base_surface, qh, ());
+            let xdg_toplevel = xdg_surface.get_toplevel(qh, ());
+            xdg_toplevel.set_title(String::from("Backlit Smithay smoke"));
+            base_surface.commit();
+            self.xdg_surface = Some(xdg_surface);
+            self.xdg_toplevel = Some(xdg_toplevel);
+            self.xdg_surface_created = true;
+            self.xdg_toplevel_created = true;
+        }
+    }
 }
+
+#[cfg(all(feature = "smithay-backend", target_os = "linux"))]
+impl wayland_client::Dispatch<wayland_client::protocol::wl_registry::WlRegistry, ()>
+    for WaylandClientEventState
+{
+    fn event(
+        state: &mut Self,
+        registry: &wayland_client::protocol::wl_registry::WlRegistry,
+        event: wayland_client::protocol::wl_registry::Event,
+        _: &(),
+        _: &wayland_client::Connection,
+        qh: &wayland_client::QueueHandle<Self>,
+    ) {
+        use wayland_client::protocol::{wl_compositor, wl_registry, wl_shm};
+        use wayland_protocols::xdg::shell::client::xdg_wm_base;
+
+        let wl_registry::Event::Global {
+            name,
+            interface,
+            version,
+        } = event
+        else {
+            return;
+        };
+
+        if state
+            .globals
+            .iter()
+            .all(|global| global.name != name || global.interface != interface)
+        {
+            state.globals.push(WaylandGlobal {
+                name,
+                interface: interface.clone(),
+                version,
+            });
+        }
+
+        match interface.as_str() {
+            "wl_compositor" if !state.compositor_bound => {
+                let compositor =
+                    registry.bind::<wl_compositor::WlCompositor, _, _>(name, 1, qh, ());
+                state.compositor = Some(compositor);
+                state.compositor_bound = true;
+                state.init_xdg_toplevel(qh);
+            }
+            "wl_shm" if !state.shm_bound => {
+                let _shm = registry.bind::<wl_shm::WlShm, _, _>(name, 1, qh, ());
+                state.shm_bound = true;
+            }
+            "xdg_wm_base" if !state.xdg_wm_base_bound => {
+                let wm_base = registry.bind::<xdg_wm_base::XdgWmBase, _, _>(name, 1, qh, ());
+                state.wm_base = Some(wm_base);
+                state.xdg_wm_base_bound = true;
+                state.init_xdg_toplevel(qh);
+            }
+            _ => {}
+        }
+    }
+}
+
+#[cfg(all(feature = "smithay-backend", target_os = "linux"))]
+impl wayland_client::Dispatch<wayland_protocols::xdg::shell::client::xdg_wm_base::XdgWmBase, ()>
+    for WaylandClientEventState
+{
+    fn event(
+        state: &mut Self,
+        wm_base: &wayland_protocols::xdg::shell::client::xdg_wm_base::XdgWmBase,
+        event: wayland_protocols::xdg::shell::client::xdg_wm_base::Event,
+        _: &(),
+        _: &wayland_client::Connection,
+        _: &wayland_client::QueueHandle<Self>,
+    ) {
+        if let wayland_protocols::xdg::shell::client::xdg_wm_base::Event::Ping { serial } = event {
+            state.wm_base_ping_serials.push(serial);
+            wm_base.pong(serial);
+        }
+    }
+}
+
+#[cfg(all(feature = "smithay-backend", target_os = "linux"))]
+impl wayland_client::Dispatch<wayland_protocols::xdg::shell::client::xdg_surface::XdgSurface, ()>
+    for WaylandClientEventState
+{
+    fn event(
+        state: &mut Self,
+        xdg_surface: &wayland_protocols::xdg::shell::client::xdg_surface::XdgSurface,
+        event: wayland_protocols::xdg::shell::client::xdg_surface::Event,
+        _: &(),
+        _: &wayland_client::Connection,
+        _: &wayland_client::QueueHandle<Self>,
+    ) {
+        if let wayland_protocols::xdg::shell::client::xdg_surface::Event::Configure { serial } =
+            event
+        {
+            state.xdg_surface_configure_serial = Some(serial);
+            xdg_surface.ack_configure(serial);
+            state.configure_acked = true;
+            if let Some(base_surface) = state.base_surface.as_ref() {
+                base_surface.commit();
+                state.surface_committed = true;
+            }
+        }
+    }
+}
+
+#[cfg(all(feature = "smithay-backend", target_os = "linux"))]
+impl wayland_client::Dispatch<wayland_protocols::xdg::shell::client::xdg_toplevel::XdgToplevel, ()>
+    for WaylandClientEventState
+{
+    fn event(
+        state: &mut Self,
+        _: &wayland_protocols::xdg::shell::client::xdg_toplevel::XdgToplevel,
+        event: wayland_protocols::xdg::shell::client::xdg_toplevel::Event,
+        _: &(),
+        _: &wayland_client::Connection,
+        _: &wayland_client::QueueHandle<Self>,
+    ) {
+        if let wayland_protocols::xdg::shell::client::xdg_toplevel::Event::Configure { .. } = event
+        {
+            state.xdg_toplevel_configures += 1;
+        }
+    }
+}
+
+#[cfg(all(feature = "smithay-backend", target_os = "linux"))]
+wayland_client::delegate_noop!(WaylandClientEventState: ignore wayland_client::protocol::wl_compositor::WlCompositor);
+
+#[cfg(all(feature = "smithay-backend", target_os = "linux"))]
+wayland_client::delegate_noop!(WaylandClientEventState: ignore wayland_client::protocol::wl_surface::WlSurface);
+
+#[cfg(all(feature = "smithay-backend", target_os = "linux"))]
+wayland_client::delegate_noop!(WaylandClientEventState: ignore wayland_client::protocol::wl_shm::WlShm);
 
 #[cfg(all(feature = "smithay-backend", target_os = "linux"))]
 impl SmithayCompositorState {
@@ -2264,107 +2434,45 @@ impl SmithayCompositorRuntime {
     pub fn run_wayland_client_smoke(
         &mut self,
     ) -> Result<SmithayWaylandClientSmokeReport, SmithayRuntimeError> {
-        const REGISTRY_ID: u32 = 2;
-        const COMPOSITOR_ID: u32 = 3;
-        const XDG_WM_BASE_ID: u32 = 4;
-        const SURFACE_ID: u32 = 5;
-        const XDG_SURFACE_ID: u32 = 6;
-        const XDG_TOPLEVEL_ID: u32 = 7;
-        const SHM_ID: u32 = 8;
-
-        let mut client_stream = self.connect_and_insert_wayland_client("real-wayland-smoke")?;
-        client_stream
-            .set_nonblocking(true)
-            .map_err(|error| SmithayRuntimeError(format!("client-nonblocking:{error}")))?;
+        let client_stream = self.connect_and_insert_wayland_client("real-wayland-smoke")?;
+        let client_connection = wayland_client::Connection::from_socket(client_stream)
+            .map_err(|error| SmithayRuntimeError(format!("client-connect:{error}")))?;
+        let mut event_queue = client_connection.new_event_queue::<WaylandClientEventState>();
+        let qh = event_queue.handle();
         let mut client_state = WaylandClientEventState::default();
 
-        write_wayland_message(&mut client_stream, 1, 1, &wayland_u32(REGISTRY_ID))?;
-        self.dispatch_wayland();
-        drain_wayland_client_events(&mut client_stream, &mut client_state)?;
-
-        let compositor_global = client_state
-            .global("wl_compositor")
-            .cloned()
-            .ok_or_else(|| {
-                SmithayRuntimeError(String::from("client-smoke:missing-wl-compositor"))
-            })?;
-        let shm_global = client_state
-            .global("wl_shm")
-            .cloned()
-            .ok_or_else(|| SmithayRuntimeError(String::from("client-smoke:missing-wl-shm")))?;
-        let xdg_wm_base_global = client_state
-            .global("xdg_wm_base")
-            .cloned()
-            .ok_or_else(|| SmithayRuntimeError(String::from("client-smoke:missing-xdg-wm-base")))?;
-
-        write_registry_bind(
-            &mut client_stream,
-            REGISTRY_ID,
-            &compositor_global,
-            COMPOSITOR_ID,
-            compositor_global.version.min(5),
-        )?;
-        write_registry_bind(
-            &mut client_stream,
-            REGISTRY_ID,
-            &shm_global,
-            SHM_ID,
-            shm_global.version.min(2),
-        )?;
-        write_registry_bind(
-            &mut client_stream,
-            REGISTRY_ID,
-            &xdg_wm_base_global,
-            XDG_WM_BASE_ID,
-            xdg_wm_base_global.version.min(6),
-        )?;
-        write_wayland_message(
-            &mut client_stream,
-            COMPOSITOR_ID,
-            0,
-            &wayland_u32(SURFACE_ID),
-        )?;
-        write_wayland_message(
-            &mut client_stream,
-            XDG_WM_BASE_ID,
-            2,
-            &wayland_u32_pair(XDG_SURFACE_ID, SURFACE_ID),
-        )?;
-        write_wayland_message(
-            &mut client_stream,
-            XDG_SURFACE_ID,
-            1,
-            &wayland_u32(XDG_TOPLEVEL_ID),
-        )?;
-
-        self.dispatch_wayland();
-        drain_wayland_client_events(&mut client_stream, &mut client_state)?;
-        self.dispatch_wayland();
-        drain_wayland_client_events(&mut client_stream, &mut client_state)?;
-
-        let mut configure_acked = false;
-        if let Some(serial) = client_state.xdg_surface_configure_serial {
-            write_wayland_message(&mut client_stream, XDG_SURFACE_ID, 4, &wayland_u32(serial))?;
-            configure_acked = true;
+        client_connection.display().get_registry(&qh, ());
+        for _ in 0..24 {
+            pump_wayland_client(
+                self,
+                &client_connection,
+                &mut event_queue,
+                &mut client_state,
+            )?;
+            if client_state.registry_announced()
+                && client_state.configure_acked
+                && client_state.surface_committed
+                && self.state.surface_commit_count >= 2
+            {
+                break;
+            }
         }
-        write_wayland_message(&mut client_stream, SURFACE_ID, 6, &[])?;
-
-        self.dispatch_wayland();
-        drain_wayland_client_events(&mut client_stream, &mut client_state)?;
 
         let report = SmithayWaylandClientSmokeReport {
             protocol_globals: self.state.protocol_global_count,
             registry_global_count: client_state.globals.len() as u64,
             registry_announced: client_state.registry_announced(),
-            compositor_bound: true,
-            shm_bound: true,
-            xdg_wm_base_bound: true,
-            surface_created: true,
-            xdg_toplevel_created: self.state.xdg_toplevel_count >= 1,
+            compositor_bound: client_state.compositor_bound,
+            shm_bound: client_state.shm_bound,
+            xdg_wm_base_bound: client_state.xdg_wm_base_bound,
+            surface_created: client_state.surface_created,
+            xdg_toplevel_created: client_state.xdg_toplevel_created
+                && self.state.xdg_toplevel_count >= 1,
             configure_received: client_state.xdg_surface_configure_serial.is_some()
                 && client_state.xdg_toplevel_configures >= 1,
-            configure_acked,
-            surface_committed: self.state.surface_commit_count >= 1,
+            configure_acked: client_state.configure_acked,
+            surface_committed: client_state.surface_committed
+                && self.state.surface_commit_count >= 2,
             inserted_wayland_clients: self.inserted_wayland_clients,
             wayland_dispatch_count: self.wayland_dispatch_count,
             calloop_dispatch_count: self.calloop_dispatch_count,
@@ -2436,208 +2544,60 @@ impl SmithayCompositorRuntime {
 }
 
 #[cfg(all(feature = "smithay-backend", target_os = "linux"))]
-fn write_registry_bind(
-    stream: &mut std::os::unix::net::UnixStream,
-    registry_id: u32,
-    global: &WaylandGlobal,
-    new_id: u32,
-    version: u32,
+fn pump_wayland_client(
+    runtime: &mut SmithayCompositorRuntime,
+    client_connection: &wayland_client::Connection,
+    event_queue: &mut wayland_client::EventQueue<WaylandClientEventState>,
+    client_state: &mut WaylandClientEventState,
 ) -> Result<(), SmithayRuntimeError> {
-    let mut payload = Vec::new();
-    append_wayland_u32(&mut payload, global.name);
-    append_wayland_string(&mut payload, global.interface.as_str());
-    append_wayland_u32(&mut payload, version);
-    append_wayland_u32(&mut payload, new_id);
-    write_wayland_message(stream, registry_id, 0, payload.as_slice())
+    client_connection
+        .flush()
+        .map_err(|error| SmithayRuntimeError(format!("client-flush:{error}")))?;
+    runtime.dispatch_wayland();
+    drain_wayland_client_queue(event_queue, client_state)?;
+    client_connection
+        .flush()
+        .map_err(|error| SmithayRuntimeError(format!("client-flush:{error}")))?;
+    runtime.dispatch_wayland();
+    drain_wayland_client_queue(event_queue, client_state)?;
+    Ok(())
 }
 
 #[cfg(all(feature = "smithay-backend", target_os = "linux"))]
-fn wayland_u32(value: u32) -> Vec<u8> {
-    let mut payload = Vec::new();
-    append_wayland_u32(&mut payload, value);
-    payload
-}
-
-#[cfg(all(feature = "smithay-backend", target_os = "linux"))]
-fn wayland_u32_pair(first: u32, second: u32) -> Vec<u8> {
-    let mut payload = Vec::new();
-    append_wayland_u32(&mut payload, first);
-    append_wayland_u32(&mut payload, second);
-    payload
-}
-
-#[cfg(all(feature = "smithay-backend", target_os = "linux"))]
-fn append_wayland_u32(payload: &mut Vec<u8>, value: u32) {
-    payload.extend_from_slice(&value.to_ne_bytes());
-}
-
-#[cfg(all(feature = "smithay-backend", target_os = "linux"))]
-fn append_wayland_string(payload: &mut Vec<u8>, value: &str) {
-    let length = value.len() + 1;
-    append_wayland_u32(payload, length as u32);
-    payload.extend_from_slice(value.as_bytes());
-    payload.push(0);
-    while payload.len() % 4 != 0 {
-        payload.push(0);
-    }
-}
-
-#[cfg(all(feature = "smithay-backend", target_os = "linux"))]
-fn write_wayland_message(
-    stream: &mut std::os::unix::net::UnixStream,
-    object_id: u32,
-    opcode: u16,
-    payload: &[u8],
+fn drain_wayland_client_queue(
+    event_queue: &mut wayland_client::EventQueue<WaylandClientEventState>,
+    client_state: &mut WaylandClientEventState,
 ) -> Result<(), SmithayRuntimeError> {
-    use std::io::Write;
+    use std::io::ErrorKind;
 
-    debug_assert_eq!(payload.len() % 4, 0);
-    let size = 8 + payload.len();
-    let header = ((size as u32) << 16) | u32::from(opcode);
-    let mut message = Vec::with_capacity(size);
-    message.extend_from_slice(&object_id.to_ne_bytes());
-    message.extend_from_slice(&header.to_ne_bytes());
-    message.extend_from_slice(payload);
-    stream
-        .write_all(message.as_slice())
-        .map_err(|error| SmithayRuntimeError(format!("client-write:{error}")))
-}
+    for _ in 0..16 {
+        let dispatched = event_queue
+            .dispatch_pending(client_state)
+            .map_err(|error| SmithayRuntimeError(format!("client-dispatch:{error}")))?;
 
-#[cfg(all(feature = "smithay-backend", target_os = "linux"))]
-fn drain_wayland_client_events(
-    stream: &mut std::os::unix::net::UnixStream,
-    state: &mut WaylandClientEventState,
-) -> Result<(), SmithayRuntimeError> {
-    use std::io::{ErrorKind, Read};
+        let Some(read_guard) = event_queue.prepare_read() else {
+            continue;
+        };
 
-    let mut chunk = [0_u8; 4096];
-    loop {
-        match stream.read(&mut chunk) {
-            Ok(0) => break,
-            Ok(count) => state.buffer.extend_from_slice(&chunk[..count]),
-            Err(error) if error.kind() == ErrorKind::WouldBlock => break,
-            Err(error) if error.kind() == ErrorKind::Interrupted => continue,
+        match read_guard.read() {
+            Ok(read) => {
+                let pending_after_read = event_queue
+                    .dispatch_pending(client_state)
+                    .map_err(|error| SmithayRuntimeError(format!("client-dispatch:{error}")))?;
+                if dispatched == 0 && read == 0 && pending_after_read == 0 {
+                    break;
+                }
+            }
+            Err(wayland_client::backend::WaylandError::Io(error))
+                if error.kind() == ErrorKind::WouldBlock =>
+            {
+                break;
+            }
             Err(error) => return Err(SmithayRuntimeError(format!("client-read:{error}"))),
         }
     }
 
-    parse_wayland_client_events(stream, state)
-}
-
-#[cfg(all(feature = "smithay-backend", target_os = "linux"))]
-fn parse_wayland_client_events(
-    stream: &mut std::os::unix::net::UnixStream,
-    state: &mut WaylandClientEventState,
-) -> Result<(), SmithayRuntimeError> {
-    while state.buffer.len() >= 8 {
-        let header = read_wayland_u32(state.buffer.as_slice(), 4)
-            .ok_or_else(|| SmithayRuntimeError(String::from("client-event:missing-header")))?;
-        let size = (header >> 16) as usize;
-        if size < 8 || size % 4 != 0 {
-            return Err(SmithayRuntimeError(format!("client-event:bad-size:{size}")));
-        }
-        if state.buffer.len() < size {
-            break;
-        }
-
-        let message = state.buffer.drain(..size).collect::<Vec<_>>();
-        handle_wayland_client_event(stream, state, message.as_slice())?;
-    }
-
     Ok(())
-}
-
-#[cfg(all(feature = "smithay-backend", target_os = "linux"))]
-fn handle_wayland_client_event(
-    stream: &mut std::os::unix::net::UnixStream,
-    state: &mut WaylandClientEventState,
-    message: &[u8],
-) -> Result<(), SmithayRuntimeError> {
-    const REGISTRY_ID: u32 = 2;
-    const XDG_WM_BASE_ID: u32 = 4;
-    const XDG_SURFACE_ID: u32 = 6;
-    const XDG_TOPLEVEL_ID: u32 = 7;
-
-    let object_id = read_wayland_u32(message, 0)
-        .ok_or_else(|| SmithayRuntimeError(String::from("client-event:missing-object")))?;
-    let header = read_wayland_u32(message, 4)
-        .ok_or_else(|| SmithayRuntimeError(String::from("client-event:missing-header")))?;
-    let opcode = (header & 0xffff) as u16;
-    let payload = &message[8..];
-
-    match (object_id, opcode) {
-        (REGISTRY_ID, 0) => {
-            let name = read_wayland_u32(payload, 0).ok_or_else(|| {
-                SmithayRuntimeError(String::from("client-event:registry-global-name"))
-            })?;
-            let (interface, next_offset) = read_wayland_string(payload, 4)?;
-            let version = read_wayland_u32(payload, next_offset).ok_or_else(|| {
-                SmithayRuntimeError(String::from("client-event:registry-global-version"))
-            })?;
-            state.globals.push(WaylandGlobal {
-                name,
-                interface,
-                version,
-            });
-        }
-        (XDG_WM_BASE_ID, 0) => {
-            let serial = read_wayland_u32(payload, 0).ok_or_else(|| {
-                SmithayRuntimeError(String::from("client-event:xdg-wm-base-ping"))
-            })?;
-            state.wm_base_ping_serials.push(serial);
-            write_wayland_message(stream, XDG_WM_BASE_ID, 3, wayland_u32(serial).as_slice())?;
-        }
-        (XDG_TOPLEVEL_ID, 0) => {
-            state.xdg_toplevel_configures += 1;
-        }
-        (XDG_SURFACE_ID, 0) => {
-            let serial = read_wayland_u32(payload, 0).ok_or_else(|| {
-                SmithayRuntimeError(String::from("client-event:xdg-surface-configure"))
-            })?;
-            state.xdg_surface_configure_serial = Some(serial);
-        }
-        _ => {}
-    }
-
-    Ok(())
-}
-
-#[cfg(all(feature = "smithay-backend", target_os = "linux"))]
-fn read_wayland_u32(bytes: &[u8], offset: usize) -> Option<u32> {
-    let value = bytes.get(offset..offset + 4)?;
-    Some(u32::from_ne_bytes(value.try_into().ok()?))
-}
-
-#[cfg(all(feature = "smithay-backend", target_os = "linux"))]
-fn read_wayland_string(
-    bytes: &[u8],
-    offset: usize,
-) -> Result<(String, usize), SmithayRuntimeError> {
-    let length = read_wayland_u32(bytes, offset)
-        .ok_or_else(|| SmithayRuntimeError(String::from("client-event:string-length")))?
-        as usize;
-    if length == 0 {
-        return Err(SmithayRuntimeError(String::from(
-            "client-event:string-empty",
-        )));
-    }
-
-    let start = offset + 4;
-    let end = start + length;
-    let padded_end = start + length.div_ceil(4) * 4;
-    let raw = bytes
-        .get(start..end.saturating_sub(1))
-        .ok_or_else(|| SmithayRuntimeError(String::from("client-event:string-bytes")))?;
-    if bytes.get(end - 1).copied() != Some(0) || padded_end > bytes.len() {
-        return Err(SmithayRuntimeError(String::from(
-            "client-event:string-padding",
-        )));
-    }
-
-    let value = std::str::from_utf8(raw)
-        .map_err(|error| SmithayRuntimeError(format!("client-event:string-utf8:{error}")))?
-        .to_string();
-    Ok((value, padded_end))
 }
 
 #[cfg(all(feature = "smithay-backend", target_os = "linux"))]

@@ -197,7 +197,7 @@ require_line_contains_all "$client_smoke_log" \
   '"configure_received":true' \
   '"configure_acked":true' \
   '"surface_committed":true' \
-  '"surface_commit_count":1' \
+  '"surface_commit_count":2' \
   '"xdg_toplevel_count":1'
 
 runtime_dir="${XDG_RUNTIME_DIR:-}"
