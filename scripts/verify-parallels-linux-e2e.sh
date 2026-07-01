@@ -92,6 +92,15 @@ require_contains() {
   }
 }
 
+require_matches() {
+  local file="$1"
+  local value="$2"
+  grep -E "$value" "$file" >/dev/null || {
+    echo "Parallels E2E export verification failed: missing pattern in $file: $value" >&2
+    exit 1
+  }
+}
+
 tmp_dir="$(mktemp -d "${TMPDIR:-/tmp}/backlit-parallels-e2e.XXXXXX")"
 cleanup() {
   rm -rf "$tmp_dir"
@@ -482,6 +491,17 @@ require_contains "$host_smithay_runtime_probe_manifest" '"smithay_gbm_allocator_
 require_contains "$host_smithay_runtime_probe_manifest" '"smithay_egl_display_component": true'
 require_contains "$host_smithay_runtime_probe_manifest" '"smithay_gles_renderer_component": true'
 require_contains "$host_smithay_runtime_probe_manifest" '"smithay_drm_node_resolved": true'
+require_contains "$host_smithay_runtime_probe_manifest" '"smithay_kms_card_opened": true'
+require_contains "$host_smithay_runtime_probe_manifest" '"smithay_kms_device_created": true'
+require_contains "$host_smithay_runtime_probe_manifest" '"smithay_kms_event_source_inserted": true'
+require_contains "$host_smithay_runtime_probe_manifest" '"smithay_kms_event_loop_dispatched": true'
+require_matches "$host_smithay_runtime_probe_manifest" '"smithay_kms_crtc_count": [1-9][0-9]*'
+require_matches "$host_smithay_runtime_probe_manifest" '"smithay_kms_connector_count": [1-9][0-9]*'
+require_matches "$host_smithay_runtime_probe_manifest" '"smithay_kms_connected_connector_count": [1-9][0-9]*'
+require_matches "$host_smithay_runtime_probe_manifest" '"smithay_kms_mode_count": [1-9][0-9]*'
+require_matches "$host_smithay_runtime_probe_manifest" '"smithay_kms_primary_plane_count": [1-9][0-9]*'
+require_matches "$host_smithay_runtime_probe_manifest" '"smithay_kms_cursor_plane_count": [0-9][0-9]*'
+require_matches "$host_smithay_runtime_probe_manifest" '"smithay_kms_overlay_plane_count": [0-9][0-9]*'
 require_contains "$host_smithay_runtime_probe_manifest" '"smithay_renderer_node_selected": true'
 require_contains "$host_smithay_runtime_probe_manifest" '"smithay_renderer_node_opened": true'
 require_contains "$host_smithay_runtime_probe_manifest" '"smithay_gbm_device_created": true'

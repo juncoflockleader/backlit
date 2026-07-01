@@ -20,6 +20,18 @@ require_contains() {
   grep -F "$value" "$file" >/dev/null || fail "missing text in $file: $value"
 }
 
+require_matches() {
+  file="$1"
+  value="$2"
+  grep -E "$value" "$file" >/dev/null || fail "missing pattern in $file: $value"
+}
+
+extract_u64() {
+  file="$1"
+  key="$2"
+  sed -n "s/.*\"$key\":\([0-9][0-9]*\).*/\1/p" "$file" | tail -n 1
+}
+
 if [ "$(uname -s)" != "Linux" ]; then
   cat > "$out_dir/manifest.json" <<EOF
 {
@@ -35,6 +47,18 @@ if [ "$(uname -s)" != "Linux" ]; then
     "smithay_gbm_allocator_component": false,
     "smithay_egl_display_component": false,
     "smithay_gles_renderer_component": false,
+    "smithay_kms_card_opened": false,
+    "smithay_kms_device_created": false,
+    "smithay_kms_event_source_inserted": false,
+    "smithay_kms_event_loop_dispatched": false,
+    "smithay_kms_atomic_modesetting": false,
+    "smithay_kms_crtc_count": 0,
+    "smithay_kms_connector_count": 0,
+    "smithay_kms_connected_connector_count": 0,
+    "smithay_kms_mode_count": 0,
+    "smithay_kms_primary_plane_count": 0,
+    "smithay_kms_cursor_plane_count": 0,
+    "smithay_kms_overlay_plane_count": 0,
     "smithay_renderer_node_opened": false,
     "smithay_gbm_device_created": false,
     "smithay_gbm_allocator_created": false,
@@ -107,6 +131,18 @@ smithay_runtime_bootstrap=false
 smithay_wayland_socket_bootstrap=false
 smithay_wayland_client_inserted=false
 smithay_drm_node_resolved=false
+smithay_kms_card_opened=false
+smithay_kms_device_created=false
+smithay_kms_event_source_inserted=false
+smithay_kms_event_loop_dispatched=false
+smithay_kms_atomic_modesetting=false
+smithay_kms_crtc_count=0
+smithay_kms_connector_count=0
+smithay_kms_connected_connector_count=0
+smithay_kms_mode_count=0
+smithay_kms_primary_plane_count=0
+smithay_kms_cursor_plane_count=0
+smithay_kms_overlay_plane_count=0
 smithay_renderer_node_selected=false
 smithay_renderer_node_opened=false
 smithay_gbm_device_created=false
@@ -143,6 +179,19 @@ if grep -F '"event":"backend.preflight","backend":"drm","ready":true' "$log" >/d
   require_contains "$log" '"drm_node_type":"primary"'
   require_contains "$log" '"drm_node_primary_path":"/dev/dri/card'
   require_contains "$log" '"drm_node_render_path":"/dev/dri/renderD'
+  require_contains "$log" '"kms_card_opened":true'
+  require_contains "$log" '"kms_device_created":true'
+  require_contains "$log" '"kms_event_source_inserted":true'
+  require_contains "$log" '"kms_event_loop_dispatched":true'
+  require_matches "$log" '"kms_atomic_modesetting":(true|false)'
+  require_matches "$log" '"kms_crtc_count":[1-9][0-9]*'
+  require_matches "$log" '"kms_connector_count":[1-9][0-9]*'
+  require_matches "$log" '"kms_connected_connector_count":[1-9][0-9]*'
+  require_matches "$log" '"kms_mode_count":[1-9][0-9]*'
+  require_matches "$log" '"kms_primary_plane_count":[1-9][0-9]*'
+  require_matches "$log" '"kms_cursor_plane_count":[0-9][0-9]*'
+  require_matches "$log" '"kms_overlay_plane_count":[0-9][0-9]*'
+  require_contains "$log" '"kms_resource_failure":""'
   require_contains "$log" '"renderer_node_selected":true'
   require_contains "$log" '"renderer_node_path":"/dev/dri/renderD'
   require_contains "$log" '"renderer_node_opened":true'
@@ -194,6 +243,20 @@ if grep -F '"event":"backend.preflight","backend":"drm","ready":true' "$log" >/d
   smithay_wayland_socket_bootstrap=true
   smithay_wayland_client_inserted=true
   smithay_drm_node_resolved=true
+  smithay_kms_card_opened=true
+  smithay_kms_device_created=true
+  smithay_kms_event_source_inserted=true
+  smithay_kms_event_loop_dispatched=true
+  if grep -F '"kms_atomic_modesetting":true' "$log" >/dev/null; then
+    smithay_kms_atomic_modesetting=true
+  fi
+  smithay_kms_crtc_count="$(extract_u64 "$log" kms_crtc_count)"
+  smithay_kms_connector_count="$(extract_u64 "$log" kms_connector_count)"
+  smithay_kms_connected_connector_count="$(extract_u64 "$log" kms_connected_connector_count)"
+  smithay_kms_mode_count="$(extract_u64 "$log" kms_mode_count)"
+  smithay_kms_primary_plane_count="$(extract_u64 "$log" kms_primary_plane_count)"
+  smithay_kms_cursor_plane_count="$(extract_u64 "$log" kms_cursor_plane_count)"
+  smithay_kms_overlay_plane_count="$(extract_u64 "$log" kms_overlay_plane_count)"
   smithay_renderer_node_selected=true
   smithay_renderer_node_opened=true
   smithay_gbm_device_created=true
@@ -241,6 +304,18 @@ cat > "$out_dir/manifest.json" <<EOF
     "smithay_gbm_allocator_component": true,
     "smithay_egl_display_component": true,
     "smithay_gles_renderer_component": true,
+    "smithay_kms_card_opened": $smithay_kms_card_opened,
+    "smithay_kms_device_created": $smithay_kms_device_created,
+    "smithay_kms_event_source_inserted": $smithay_kms_event_source_inserted,
+    "smithay_kms_event_loop_dispatched": $smithay_kms_event_loop_dispatched,
+    "smithay_kms_atomic_modesetting": $smithay_kms_atomic_modesetting,
+    "smithay_kms_crtc_count": $smithay_kms_crtc_count,
+    "smithay_kms_connector_count": $smithay_kms_connector_count,
+    "smithay_kms_connected_connector_count": $smithay_kms_connected_connector_count,
+    "smithay_kms_mode_count": $smithay_kms_mode_count,
+    "smithay_kms_primary_plane_count": $smithay_kms_primary_plane_count,
+    "smithay_kms_cursor_plane_count": $smithay_kms_cursor_plane_count,
+    "smithay_kms_overlay_plane_count": $smithay_kms_overlay_plane_count,
     "smithay_renderer_node_opened": $smithay_renderer_node_opened,
     "smithay_gbm_device_created": $smithay_gbm_device_created,
     "smithay_gbm_allocator_created": $smithay_gbm_allocator_created,

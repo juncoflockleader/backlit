@@ -27,6 +27,12 @@ require_contains() {
   grep -F -- "$value" "$file" >/dev/null || fail "missing text in $file: $value"
 }
 
+require_matches() {
+  file="$1"
+  value="$2"
+  grep -E "$value" "$file" >/dev/null || fail "missing pattern in $file: $value"
+}
+
 require_file Cargo.toml
 require_file backlit-design.md
 require_file docs/architecture/mvp-0.md
@@ -397,6 +403,18 @@ if [ -n "$artifact_root" ] && [ -d "$artifact_root" ]; then
     require_contains "$artifact_root/smithay-runtime-probe/manifest.json" '"smithay_gbm_allocator_component": true'
     require_contains "$artifact_root/smithay-runtime-probe/manifest.json" '"smithay_egl_display_component": true'
     require_contains "$artifact_root/smithay-runtime-probe/manifest.json" '"smithay_gles_renderer_component": true'
+    require_contains "$artifact_root/smithay-runtime-probe/manifest.json" '"smithay_kms_card_opened":'
+    require_contains "$artifact_root/smithay-runtime-probe/manifest.json" '"smithay_kms_device_created":'
+    require_contains "$artifact_root/smithay-runtime-probe/manifest.json" '"smithay_kms_event_source_inserted":'
+    require_contains "$artifact_root/smithay-runtime-probe/manifest.json" '"smithay_kms_event_loop_dispatched":'
+    require_contains "$artifact_root/smithay-runtime-probe/manifest.json" '"smithay_kms_atomic_modesetting":'
+    require_contains "$artifact_root/smithay-runtime-probe/manifest.json" '"smithay_kms_crtc_count":'
+    require_contains "$artifact_root/smithay-runtime-probe/manifest.json" '"smithay_kms_connector_count":'
+    require_contains "$artifact_root/smithay-runtime-probe/manifest.json" '"smithay_kms_connected_connector_count":'
+    require_contains "$artifact_root/smithay-runtime-probe/manifest.json" '"smithay_kms_mode_count":'
+    require_contains "$artifact_root/smithay-runtime-probe/manifest.json" '"smithay_kms_primary_plane_count":'
+    require_contains "$artifact_root/smithay-runtime-probe/manifest.json" '"smithay_kms_cursor_plane_count":'
+    require_contains "$artifact_root/smithay-runtime-probe/manifest.json" '"smithay_kms_overlay_plane_count":'
     require_contains "$artifact_root/smithay-runtime-probe/manifest.json" '"smithay_renderer_node_opened":'
     require_contains "$artifact_root/smithay-runtime-probe/manifest.json" '"smithay_gbm_device_created":'
     require_contains "$artifact_root/smithay-runtime-probe/manifest.json" '"smithay_gbm_allocator_created":'
@@ -422,6 +440,17 @@ if [ -n "$artifact_root" ] && [ -d "$artifact_root" ]; then
       require_contains "$artifact_root/smithay-runtime-probe/manifest.json" '"smithay_runtime_probe": true'
       require_contains "$artifact_root/smithay-runtime-probe/manifest.json" '"smithay_runtime_bootstrap": true'
       require_contains "$artifact_root/smithay-runtime-probe/manifest.json" '"smithay_drm_node_resolved": true'
+      require_contains "$artifact_root/smithay-runtime-probe/manifest.json" '"smithay_kms_card_opened": true'
+      require_contains "$artifact_root/smithay-runtime-probe/manifest.json" '"smithay_kms_device_created": true'
+      require_contains "$artifact_root/smithay-runtime-probe/manifest.json" '"smithay_kms_event_source_inserted": true'
+      require_contains "$artifact_root/smithay-runtime-probe/manifest.json" '"smithay_kms_event_loop_dispatched": true'
+      require_matches "$artifact_root/smithay-runtime-probe/manifest.json" '"smithay_kms_crtc_count": [1-9][0-9]*'
+      require_matches "$artifact_root/smithay-runtime-probe/manifest.json" '"smithay_kms_connector_count": [1-9][0-9]*'
+      require_matches "$artifact_root/smithay-runtime-probe/manifest.json" '"smithay_kms_connected_connector_count": [1-9][0-9]*'
+      require_matches "$artifact_root/smithay-runtime-probe/manifest.json" '"smithay_kms_mode_count": [1-9][0-9]*'
+      require_matches "$artifact_root/smithay-runtime-probe/manifest.json" '"smithay_kms_primary_plane_count": [1-9][0-9]*'
+      require_matches "$artifact_root/smithay-runtime-probe/manifest.json" '"smithay_kms_cursor_plane_count": [0-9][0-9]*'
+      require_matches "$artifact_root/smithay-runtime-probe/manifest.json" '"smithay_kms_overlay_plane_count": [0-9][0-9]*'
       require_contains "$artifact_root/smithay-runtime-probe/manifest.json" '"smithay_renderer_node_selected": true'
       require_contains "$artifact_root/smithay-runtime-probe/manifest.json" '"smithay_renderer_node_opened": true'
       require_contains "$artifact_root/smithay-runtime-probe/manifest.json" '"smithay_gbm_device_created": true'

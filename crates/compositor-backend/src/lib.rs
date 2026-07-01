@@ -341,6 +341,19 @@ pub struct SmithayRuntimeProbe {
     pub drm_node_type: &'static str,
     pub drm_node_primary_path: Option<String>,
     pub drm_node_render_path: Option<String>,
+    pub kms_card_opened: bool,
+    pub kms_device_created: bool,
+    pub kms_event_source_inserted: bool,
+    pub kms_event_loop_dispatched: bool,
+    pub kms_atomic_modesetting: bool,
+    pub kms_crtc_count: u64,
+    pub kms_connector_count: u64,
+    pub kms_connected_connector_count: u64,
+    pub kms_mode_count: u64,
+    pub kms_primary_plane_count: u64,
+    pub kms_cursor_plane_count: u64,
+    pub kms_overlay_plane_count: u64,
+    pub kms_resource_failure: Option<String>,
     pub renderer_node_selected: bool,
     pub renderer_node_path: Option<String>,
     pub input_event_selected: bool,
@@ -440,6 +453,16 @@ impl SmithayRuntimeProbe {
             && self.event_loop == "calloop"
             && self.drm_card_selected
             && self.drm_node_resolved
+            && self.kms_card_opened
+            && self.kms_device_created
+            && self.kms_event_source_inserted
+            && self.kms_event_loop_dispatched
+            && self.kms_crtc_count > 0
+            && self.kms_connector_count > 0
+            && self.kms_connected_connector_count > 0
+            && self.kms_mode_count > 0
+            && self.kms_primary_plane_count > 0
+            && self.kms_resource_failure.is_none()
             && self.renderer_node_selected
             && self.input_event_selected
             && self.uses_logind
@@ -828,6 +851,10 @@ pub fn smithay_runtime_probe(environment: &BackendPreflightEnvironment) -> Smith
         environment.input_broker_ready(),
         environment.seat.as_deref(),
     );
+    let kms_runtime_probe = smithay_kms_runtime_probe(
+        environment.target_os.as_str(),
+        environment.primary_drm_card.as_deref(),
+    );
     let renderer_runtime_probe = smithay_renderer_runtime_probe(
         environment.target_os.as_str(),
         renderer_node_path.as_deref(),
@@ -839,6 +866,7 @@ pub fn smithay_runtime_probe(environment: &BackendPreflightEnvironment) -> Smith
         && environment.primary_drm_card.is_some()
         && environment.primary_input_event.is_some()
         && drm_node_probe.resolved
+        && kms_runtime_probe.passed()
         && renderer_node_selected
         && renderer_runtime_probe.passed()
         && input_runtime_probe.passed();
@@ -876,6 +904,19 @@ pub fn smithay_runtime_probe(environment: &BackendPreflightEnvironment) -> Smith
         drm_node_type: drm_node_probe.node_type,
         drm_node_primary_path: drm_node_probe.primary_path,
         drm_node_render_path: drm_node_probe.render_path.clone(),
+        kms_card_opened: kms_runtime_probe.kms_card_opened,
+        kms_device_created: kms_runtime_probe.kms_device_created,
+        kms_event_source_inserted: kms_runtime_probe.kms_event_source_inserted,
+        kms_event_loop_dispatched: kms_runtime_probe.kms_event_loop_dispatched,
+        kms_atomic_modesetting: kms_runtime_probe.kms_atomic_modesetting,
+        kms_crtc_count: kms_runtime_probe.kms_crtc_count,
+        kms_connector_count: kms_runtime_probe.kms_connector_count,
+        kms_connected_connector_count: kms_runtime_probe.kms_connected_connector_count,
+        kms_mode_count: kms_runtime_probe.kms_mode_count,
+        kms_primary_plane_count: kms_runtime_probe.kms_primary_plane_count,
+        kms_cursor_plane_count: kms_runtime_probe.kms_cursor_plane_count,
+        kms_overlay_plane_count: kms_runtime_probe.kms_overlay_plane_count,
+        kms_resource_failure: kms_runtime_probe.failure,
         renderer_node_selected,
         renderer_node_path,
         input_event_selected: environment.primary_input_event.is_some(),
@@ -933,6 +974,23 @@ struct SmithayDrmNodeProbe {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
+struct SmithayKmsRuntimeProbe {
+    kms_card_opened: bool,
+    kms_device_created: bool,
+    kms_event_source_inserted: bool,
+    kms_event_loop_dispatched: bool,
+    kms_atomic_modesetting: bool,
+    kms_crtc_count: u64,
+    kms_connector_count: u64,
+    kms_connected_connector_count: u64,
+    kms_mode_count: u64,
+    kms_primary_plane_count: u64,
+    kms_cursor_plane_count: u64,
+    kms_overlay_plane_count: u64,
+    failure: Option<String>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
 struct SmithayInputRuntimeProbe {
     libseat_session_created: bool,
     libseat_session_active: bool,
@@ -969,6 +1027,21 @@ struct SmithayRendererRuntimeProbe {
     offscreen_sample_blue: u64,
     offscreen_sample_alpha: u64,
     failure: Option<String>,
+}
+
+impl SmithayKmsRuntimeProbe {
+    fn passed(&self) -> bool {
+        self.kms_card_opened
+            && self.kms_device_created
+            && self.kms_event_source_inserted
+            && self.kms_event_loop_dispatched
+            && self.kms_crtc_count > 0
+            && self.kms_connector_count > 0
+            && self.kms_connected_connector_count > 0
+            && self.kms_mode_count > 0
+            && self.kms_primary_plane_count > 0
+            && self.failure.is_none()
+    }
 }
 
 impl SmithayInputRuntimeProbe {
@@ -1049,6 +1122,160 @@ fn unavailable_smithay_drm_node_probe() -> SmithayDrmNodeProbe {
         primary_path: None,
         render_path: None,
         renderer_path: None,
+    }
+}
+
+#[cfg(all(feature = "smithay-backend", target_os = "linux"))]
+fn smithay_kms_runtime_probe(
+    target_os: &str,
+    primary_drm_card: Option<&str>,
+) -> SmithayKmsRuntimeProbe {
+    use std::os::unix::io::OwnedFd;
+    use std::time::Duration;
+
+    use smithay::backend::drm::{DrmDevice, DrmDeviceFd};
+    use smithay::reexports::calloop::EventLoop;
+    use smithay::reexports::drm::control::{connector, Device as ControlDevice};
+    use smithay::utils::DeviceFd;
+
+    let mut probe = SmithayKmsRuntimeProbe {
+        failure: None,
+        ..unavailable_smithay_kms_runtime_probe("unavailable")
+    };
+
+    if target_os != "linux" {
+        return unavailable_smithay_kms_runtime_probe("non-linux-target");
+    }
+
+    let Some(path) = primary_drm_card.filter(|value| !value.trim().is_empty()) else {
+        return unavailable_smithay_kms_runtime_probe("missing-drm-card");
+    };
+
+    let file = match std::fs::File::options().read(true).write(true).open(path) {
+        Ok(file) => file,
+        Err(error) => {
+            probe.failure = Some(format!("kms-card-open:{error}"));
+            return probe;
+        }
+    };
+    probe.kms_card_opened = true;
+
+    let drm_fd = DrmDeviceFd::new(DeviceFd::from(Into::<OwnedFd>::into(file)));
+    let (mut device, notifier) = match DrmDevice::new(drm_fd, false) {
+        Ok(device) => device,
+        Err(error) => {
+            probe.failure = Some(format!("kms-device:{error:?}"));
+            return probe;
+        }
+    };
+    probe.kms_device_created = true;
+    probe.kms_atomic_modesetting = device.is_atomic();
+
+    let resources = match device.resource_handles() {
+        Ok(resources) => resources,
+        Err(error) => {
+            probe.failure = Some(format!("kms-resources:{error:?}"));
+            device.pause();
+            return probe;
+        }
+    };
+
+    probe.kms_crtc_count = device.crtcs().len() as u64;
+    probe.kms_connector_count = resources.connectors().len() as u64;
+    for connector_handle in resources.connectors() {
+        let connector_info = match device.get_connector(*connector_handle, false) {
+            Ok(info) => info,
+            Err(error) => {
+                probe.failure = Some(format!("kms-connector:{error:?}"));
+                device.pause();
+                return probe;
+            }
+        };
+        if connector_info.state() == connector::State::Connected {
+            probe.kms_connected_connector_count += 1;
+            probe.kms_mode_count += connector_info.modes().len() as u64;
+        }
+    }
+
+    for crtc in device.crtcs() {
+        let planes = match device.planes(crtc) {
+            Ok(planes) => planes,
+            Err(error) => {
+                probe.failure = Some(format!("kms-planes:{error:?}"));
+                device.pause();
+                return probe;
+            }
+        };
+        probe.kms_primary_plane_count += planes.primary.len() as u64;
+        probe.kms_cursor_plane_count += planes.cursor.len() as u64;
+        probe.kms_overlay_plane_count += planes.overlay.len() as u64;
+    }
+
+    let mut event_loop = match EventLoop::<()>::try_new() {
+        Ok(event_loop) => event_loop,
+        Err(error) => {
+            probe.failure = Some(format!("kms-event-loop-new:{error}"));
+            device.pause();
+            return probe;
+        }
+    };
+
+    probe.kms_event_source_inserted = event_loop
+        .handle()
+        .insert_source(notifier, |_event, _metadata, _data| {})
+        .is_ok();
+    if !probe.kms_event_source_inserted {
+        probe.failure = Some(String::from("kms-event-source-insert"));
+        device.pause();
+        return probe;
+    }
+
+    let mut data = ();
+    probe.kms_event_loop_dispatched = event_loop
+        .dispatch(Some(Duration::from_millis(0)), &mut data)
+        .is_ok();
+
+    if !probe.kms_event_loop_dispatched {
+        probe.failure = Some(String::from("kms-event-loop-dispatch"));
+    } else if probe.kms_crtc_count == 0 {
+        probe.failure = Some(String::from("kms-no-crtcs"));
+    } else if probe.kms_connector_count == 0 {
+        probe.failure = Some(String::from("kms-no-connectors"));
+    } else if probe.kms_connected_connector_count == 0 {
+        probe.failure = Some(String::from("kms-no-connected-connectors"));
+    } else if probe.kms_mode_count == 0 {
+        probe.failure = Some(String::from("kms-no-modes"));
+    } else if probe.kms_primary_plane_count == 0 {
+        probe.failure = Some(String::from("kms-no-primary-planes"));
+    }
+
+    device.pause();
+    probe
+}
+
+#[cfg(not(all(feature = "smithay-backend", target_os = "linux")))]
+fn smithay_kms_runtime_probe(
+    _target_os: &str,
+    _primary_drm_card: Option<&str>,
+) -> SmithayKmsRuntimeProbe {
+    unavailable_smithay_kms_runtime_probe("unavailable")
+}
+
+fn unavailable_smithay_kms_runtime_probe(reason: impl Into<String>) -> SmithayKmsRuntimeProbe {
+    SmithayKmsRuntimeProbe {
+        kms_card_opened: false,
+        kms_device_created: false,
+        kms_event_source_inserted: false,
+        kms_event_loop_dispatched: false,
+        kms_atomic_modesetting: false,
+        kms_crtc_count: 0,
+        kms_connector_count: 0,
+        kms_connected_connector_count: 0,
+        kms_mode_count: 0,
+        kms_primary_plane_count: 0,
+        kms_cursor_plane_count: 0,
+        kms_overlay_plane_count: 0,
+        failure: Some(reason.into()),
     }
 }
 
@@ -3949,6 +4176,7 @@ mod tests {
             assert_eq!(
                 probe.launch_ready,
                 probe.drm_node_resolved
+                    && probe.kms_resource_failure.is_none()
                     && probe.renderer_node_selected
                     && probe.renderer_runtime_failure.is_none()
                     && probe.input_runtime_failure.is_none()
@@ -3959,6 +4187,19 @@ mod tests {
             assert!(!probe.passed(), "{probe:?}");
             assert!(probe.components.is_empty());
             assert!(!probe.drm_node_resolved);
+            assert!(!probe.kms_card_opened);
+            assert!(!probe.kms_device_created);
+            assert!(!probe.kms_event_source_inserted);
+            assert!(!probe.kms_event_loop_dispatched);
+            assert!(!probe.kms_atomic_modesetting);
+            assert_eq!(probe.kms_crtc_count, 0);
+            assert_eq!(probe.kms_connector_count, 0);
+            assert_eq!(probe.kms_connected_connector_count, 0);
+            assert_eq!(probe.kms_mode_count, 0);
+            assert_eq!(probe.kms_primary_plane_count, 0);
+            assert_eq!(probe.kms_cursor_plane_count, 0);
+            assert_eq!(probe.kms_overlay_plane_count, 0);
+            assert!(probe.kms_resource_failure.is_some());
             assert!(!probe.renderer_node_selected);
             assert!(!probe.gbm_allocator_component);
             assert!(!probe.egl_display_component);

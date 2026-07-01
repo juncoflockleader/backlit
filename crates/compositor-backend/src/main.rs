@@ -235,6 +235,7 @@ fn emit_smithay_runtime_probe(probe: &SmithayRuntimeProbe) {
     let renderer_node_path = probe.renderer_node_path.as_deref().unwrap_or("");
     let libseat_session_seat = probe.libseat_session_seat.as_deref().unwrap_or("");
     let input_runtime_failure = probe.input_runtime_failure.as_deref().unwrap_or("");
+    let kms_resource_failure = probe.kms_resource_failure.as_deref().unwrap_or("");
     let renderer_runtime_failure = probe.renderer_runtime_failure.as_deref().unwrap_or("");
     let primary_input_event = probe.primary_input_event.as_deref().unwrap_or("");
     let components = probe.components.join(",");
@@ -275,6 +276,49 @@ fn emit_smithay_runtime_probe(probe: &SmithayRuntimeProbe) {
                 (
                     "drm_node_render_path",
                     FieldValue::Str(drm_node_render_path),
+                ),
+                ("kms_card_opened", FieldValue::Bool(probe.kms_card_opened)),
+                (
+                    "kms_device_created",
+                    FieldValue::Bool(probe.kms_device_created),
+                ),
+                (
+                    "kms_event_source_inserted",
+                    FieldValue::Bool(probe.kms_event_source_inserted),
+                ),
+                (
+                    "kms_event_loop_dispatched",
+                    FieldValue::Bool(probe.kms_event_loop_dispatched),
+                ),
+                (
+                    "kms_atomic_modesetting",
+                    FieldValue::Bool(probe.kms_atomic_modesetting),
+                ),
+                ("kms_crtc_count", FieldValue::U64(probe.kms_crtc_count)),
+                (
+                    "kms_connector_count",
+                    FieldValue::U64(probe.kms_connector_count),
+                ),
+                (
+                    "kms_connected_connector_count",
+                    FieldValue::U64(probe.kms_connected_connector_count),
+                ),
+                ("kms_mode_count", FieldValue::U64(probe.kms_mode_count)),
+                (
+                    "kms_primary_plane_count",
+                    FieldValue::U64(probe.kms_primary_plane_count),
+                ),
+                (
+                    "kms_cursor_plane_count",
+                    FieldValue::U64(probe.kms_cursor_plane_count),
+                ),
+                (
+                    "kms_overlay_plane_count",
+                    FieldValue::U64(probe.kms_overlay_plane_count),
+                ),
+                (
+                    "kms_resource_failure",
+                    FieldValue::Str(kms_resource_failure),
                 ),
                 (
                     "renderer_node_selected",
