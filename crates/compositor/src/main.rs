@@ -63,7 +63,7 @@ fn run() -> Result<(), String> {
         preflight_backend_with_environment(config.backend, &preflight_environment);
     emit_backend_preflight(&config, &preflight_report, &preflight_environment);
     let launch_plan =
-        backend_launch_plan(config.backend, &preflight_report, &preflight_environment);
+        backend_launch_plan_for_config(&config, &preflight_report, &preflight_environment);
     emit_backend_launch_plan(&config, &launch_plan);
 
     if !preflight_report.ready {
@@ -2733,6 +2733,18 @@ fn emit_backend_launch_plan(config: &RunConfig, plan: &BackendLaunchPlan) {
     );
 }
 
+fn backend_launch_plan_for_config(
+    config: &RunConfig,
+    report: &BackendPreflightReport,
+    environment: &BackendPreflightEnvironment,
+) -> BackendLaunchPlan {
+    let mut plan = backend_launch_plan(config.backend, report, environment);
+    if config.backend == BackendKind::Drm && config.runtime == RuntimeKind::Smithay {
+        plan.implementation = "smithay-compositor-runtime";
+    }
+    plan
+}
+
 fn emit_socket_bound(config: &RunConfig, socket: &BoundSessionSocket) {
     let path = socket.path_string();
     emit(
@@ -3001,11 +3013,14 @@ Backend launch preflight runs before smoke or service readiness events.
 #[cfg(test)]
 mod tests {
     use super::{
-        run_compositor_surface_smoke, run_compositor_surface_smoke_with_backend,
-        run_direct_scanout_smoke_with_backends, run_scripted_client_runtime,
-        run_service_ready_with_backend, DemoSocketAction, DemoSocketCommand, SocketClientRuntime,
+        backend_launch_plan_for_config, run_compositor_surface_smoke,
+        run_compositor_surface_smoke_with_backend, run_direct_scanout_smoke_with_backends,
+        run_scripted_client_runtime, run_service_ready_with_backend, DemoSocketAction,
+        DemoSocketCommand, SocketClientRuntime,
     };
-    use backlit_compositor_backend::HeadlessCompositor;
+    use backlit_compositor_backend::{
+        BackendKind, BackendPreflightEnvironment, HeadlessCompositor, RunConfig, RuntimeKind,
+    };
     use std::fs;
     use std::os::unix::fs::FileTypeExt;
     use std::os::unix::net::UnixStream;
@@ -3040,6 +3055,38 @@ mod tests {
         assert!(report.eligible, "{report:?}");
         assert!(report.overlay_blocked, "{report:?}");
         assert!(report.shm_blocked, "{report:?}");
+    }
+
+    #[test]
+    fn drm_smithay_runtime_launch_plan_names_real_runtime() {
+        let config = RunConfig {
+            backend: BackendKind::Drm,
+            runtime: RuntimeKind::Smithay,
+            ..RunConfig::default()
+        };
+        let environment = BackendPreflightEnvironment::for_target("linux")
+            .with_xdg_runtime_dir("/run/user/1000")
+            .with_drm_nodes(1, 1)
+            .with_drm_card_access(1, 1)
+            .with_drm_render_access(1, 1)
+            .with_input_event_nodes(1)
+            .with_input_event_access(1)
+            .with_primary_drm_card("/dev/dri/card0")
+            .with_primary_drm_render_node("/dev/dri/renderD128")
+            .with_primary_input_event("/dev/input/event0")
+            .with_active_local_session("7", "seat0", "tty");
+        let report = backlit_compositor_backend::preflight_backend_with_environment(
+            config.backend,
+            &environment,
+        );
+
+        let plan = backend_launch_plan_for_config(&config, &report, &environment);
+
+        assert!(plan.ready);
+        assert_eq!(plan.implementation, "smithay-compositor-runtime");
+        assert_eq!(plan.display_driver, "drm-kms");
+        assert!(plan.uses_drm);
+        assert!(plan.uses_libinput);
     }
 
     #[test]

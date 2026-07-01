@@ -480,6 +480,7 @@ require_contains "$host_compositor_runtime_manifest" '"targeted_surface_damage":
 require_contains "$host_compositor_runtime_manifest" '"client_disconnect_cleanup": true'
 require_contains "$host_smithay_compositor_runtime_manifest" '"smithay_compositor_runtime": true'
 require_contains "$host_smithay_compositor_runtime_manifest" '"smithay_runtime_trait": true'
+require_contains "$host_smithay_compositor_runtime_manifest" '"smithay_runtime_launch_plan": true'
 require_contains "$host_smithay_compositor_runtime_manifest" '"smithay_scripted_client": true'
 require_contains "$host_smithay_compositor_runtime_manifest" '"smithay_core_protocol_globals": true'
 require_contains "$host_smithay_compositor_runtime_manifest" '"smithay_seat_global": true'

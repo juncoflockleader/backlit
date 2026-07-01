@@ -154,6 +154,7 @@ require_contains scripts/verify-smithay-compositor-runtime.sh '--features smitha
 require_contains scripts/verify-smithay-compositor-runtime.sh '--runtime=smithay'
 require_contains scripts/verify-smithay-compositor-runtime.sh '--drm-first-present-probe'
 require_contains scripts/verify-smithay-compositor-runtime.sh '"smithay_compositor_runtime": true'
+require_contains scripts/verify-smithay-compositor-runtime.sh '"smithay_runtime_launch_plan": true'
 require_contains scripts/verify-smithay-compositor-runtime.sh '"smithay_core_protocol_globals": true'
 require_contains scripts/verify-smithay-compositor-runtime.sh '"smithay_seat_global": true'
 require_contains scripts/verify-smithay-compositor-runtime.sh '"smithay_keyboard_pointer_capabilities": true'
@@ -388,6 +389,7 @@ if [ -n "$artifact_root" ] && [ -d "$artifact_root" ]; then
   require_contains "$artifact_root/smithay-compositor-runtime/manifest.json" '"name": "backlit-smithay-compositor-runtime"'
   require_contains "$artifact_root/smithay-compositor-runtime/manifest.json" '"smithay_compositor_runtime":'
   require_contains "$artifact_root/smithay-compositor-runtime/manifest.json" '"smithay_runtime_trait":'
+  require_contains "$artifact_root/smithay-compositor-runtime/manifest.json" '"smithay_runtime_launch_plan":'
   require_contains "$artifact_root/smithay-compositor-runtime/manifest.json" '"smithay_scripted_client":'
   require_contains "$artifact_root/smithay-compositor-runtime/manifest.json" '"smithay_core_protocol_globals":'
   require_contains "$artifact_root/smithay-compositor-runtime/manifest.json" '"smithay_seat_global":'
@@ -406,6 +408,7 @@ if [ -n "$artifact_root" ] && [ -d "$artifact_root" ]; then
     if grep '"drm_launch_ready": true' "$artifact_root/smithay-compositor-runtime/manifest.json" >/dev/null; then
       require_contains "$artifact_root/smithay-compositor-runtime/manifest.json" '"smithay_compositor_runtime": true'
       require_contains "$artifact_root/smithay-compositor-runtime/manifest.json" '"smithay_runtime_trait": true'
+      require_contains "$artifact_root/smithay-compositor-runtime/manifest.json" '"smithay_runtime_launch_plan": true'
       require_contains "$artifact_root/smithay-compositor-runtime/manifest.json" '"smithay_scripted_client": true'
       require_contains "$artifact_root/smithay-compositor-runtime/manifest.json" '"smithay_core_protocol_globals": true'
       require_contains "$artifact_root/smithay-compositor-runtime/manifest.json" '"smithay_seat_global": true'

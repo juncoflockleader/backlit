@@ -97,6 +97,7 @@ write_blocked_manifest() {
   "checks": {
     "smithay_compositor_runtime": false,
     "smithay_runtime_trait": false,
+    "smithay_runtime_launch_plan": false,
     "smithay_scripted_client": false,
     "smithay_core_protocol_globals": false,
     "smithay_seat_global": false,
@@ -161,6 +162,8 @@ require_contains "$log" '"event":"compositor.start"'
 require_contains "$log" '"backend":"drm"'
 require_contains "$log" '"runtime":"smithay"'
 require_contains "$log" '"event":"compositor.backend_preflight","backend":"drm","socket":"backlit-0","ready":true'
+require_contains "$log" '"event":"compositor.backend_launch_plan"'
+require_contains "$log" '"implementation":"smithay-compositor-runtime"'
 require_contains "$log" '"event":"compositor.scripted_client"'
 require_contains "$log" '"passed":true'
 require_contains "$log" '"runtime_backend":"smithay-compositor-runtime"'
@@ -208,6 +211,8 @@ fi
 
 require_contains "$first_present_log" '"event":"compositor.start"'
 require_contains "$first_present_log" '"drm_first_present_probe":true'
+require_contains "$first_present_log" '"event":"compositor.backend_launch_plan"'
+require_contains "$first_present_log" '"implementation":"smithay-compositor-runtime"'
 require_contains "$first_present_log" '"event":"compositor.drm_first_present_probe"'
 require_contains "$first_present_log" '"passed":true'
 require_contains "$first_present_log" '"runtime_backend":"smithay-drm-probe"'
@@ -248,6 +253,8 @@ if [ "$client_smoke_status" -ne 0 ]; then
 fi
 
 require_contains "$client_smoke_log" '"event":"compositor.smithay_client_smoke"'
+require_contains "$client_smoke_log" '"event":"compositor.backend_launch_plan"'
+require_contains "$client_smoke_log" '"implementation":"smithay-compositor-runtime"'
 require_contains "$client_smoke_log" '"passed":true'
 require_contains "$client_smoke_log" '"runtime_backend":"smithay-compositor-runtime"'
 require_line_contains_all "$client_smoke_log" \
@@ -363,6 +370,8 @@ test ! -e "$socket_path" || fail "Smithay service socket was not cleaned up: $so
 require_contains "$service_log" '"event":"compositor.start"'
 require_contains "$service_log" '"backend":"drm"'
 require_contains "$service_log" '"runtime":"smithay"'
+require_contains "$service_log" '"event":"compositor.backend_launch_plan"'
+require_contains "$service_log" '"implementation":"smithay-compositor-runtime"'
 require_contains "$service_log" '"event":"compositor.ready"'
 require_contains "$service_log" '"runtime_backend":"smithay-compositor-runtime"'
 require_contains "$service_log" '"ready":true'
@@ -488,6 +497,7 @@ cat > "$out_dir/manifest.json" <<EOF
   "checks": {
     "smithay_compositor_runtime": true,
     "smithay_runtime_trait": true,
+    "smithay_runtime_launch_plan": true,
     "smithay_scripted_client": true,
     "smithay_core_protocol_globals": true,
     "smithay_seat_global": true,
