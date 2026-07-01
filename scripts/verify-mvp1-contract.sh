@@ -49,6 +49,7 @@ require_executable scripts/verify-launch-performance.sh
 require_executable scripts/verify-resource-budget.sh
 require_executable scripts/verify-smithay-runtime-probe.sh
 require_executable scripts/verify-smithay-compositor-runtime.sh
+require_executable scripts/verify-nested-wayland-smoke.sh
 require_executable scripts/verify-linux-e2e.sh
 
 require_contains docs/architecture/mvp-1.md 'MVP 1 is the bare graphical session'
@@ -58,6 +59,7 @@ require_contains docs/architecture/mvp-1.md 'Wayland app windows'
 require_contains docs/architecture/mvp-1.md 'terminal hotkey'
 require_contains docs/architecture/mvp-1.md 'app switcher'
 require_contains docs/architecture/mvp-1.md 'clean exit'
+require_contains docs/architecture/mvp-1.md 'managed desktop-launch window'
 require_contains docs/architecture/mvp-1.md 'does not claim the real DRM compositor loop is complete'
 require_contains scripts/verify-launch-readiness.sh '"drm_expected_ready"'
 require_contains scripts/verify-launch-readiness.sh '"drm_card_access_ready"'
@@ -86,6 +88,10 @@ require_contains scripts/verify-drm-session-smoke.sh '"session_compositor_smitha
 require_contains scripts/verify-drm-session-smoke.sh '"session_compositor_smithay_input_event_loop": $drm_session_smoke_ready'
 require_contains scripts/verify-drm-session-smoke.sh '"session_compositor_smithay_input_seat_handles": $drm_session_smoke_ready'
 require_contains scripts/verify-drm-session-smoke.sh '"session_compositor_smithay_input_seat_dispatch": $drm_session_smoke_ready'
+require_contains scripts/verify-nested-wayland-smoke.sh '--verify-desktop-launch'
+require_contains scripts/verify-nested-wayland-smoke.sh '"session_wayland_desktop_launch": true'
+require_contains scripts/verify-nested-wayland-smoke.sh '"session_wayland_desktop_managed_window": true'
+require_contains scripts/verify-nested-wayland-smoke.sh '"session_wayland_demo_app_id_preserved": $session_compositor_demo_client'
 require_contains scripts/verify-drm-master-boundary.sh '"name": "backlit-drm-master-boundary"'
 require_contains scripts/verify-drm-master-boundary.sh '"session_entry_drm": true'
 require_contains scripts/verify-drm-master-boundary.sh '"compositor_service_drm": true'
@@ -614,6 +620,10 @@ if [ -n "$artifact_root" ] && [ -d "$artifact_root" ]; then
   if [ -f "$artifact_root/nested-wayland/manifest.json" ]; then
     require_contains "$artifact_root/nested-wayland/manifest.json" '"wayland_preflight_ready": true'
     require_contains "$artifact_root/nested-wayland/manifest.json" '"launcher_terminal_wayland_spawn": true'
+    require_contains "$artifact_root/nested-wayland/manifest.json" '"session_wayland_desktop_launch": true'
+    require_contains "$artifact_root/nested-wayland/manifest.json" '"session_wayland_desktop_managed_window": true'
+    require_contains "$artifact_root/nested-wayland/manifest.json" '"session_wayland_demo_client": true'
+    require_contains "$artifact_root/nested-wayland/manifest.json" '"session_wayland_demo_app_id_preserved": true'
     require_contains "$artifact_root/nested-wayland/manifest.json" '"session_wayland_clean_exit": true'
     nested_wayland_artifact=true
   fi

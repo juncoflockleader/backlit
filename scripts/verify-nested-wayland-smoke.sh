@@ -96,6 +96,9 @@ WAYLAND_DISPLAY="$socket_name" cargo run -p backlit-session -- \
   --verify \
   --verify-launch-spawn \
   --launch-spawn-program="$info_tool" \
+  --verify-desktop-launch \
+  --desktop-dir=crates/launcher/fixtures \
+  --desktop-entry=org.backlit.SpawnProbe.desktop \
   --wayland-display="$socket_name" \
   --verify-services \
   --verify-clean-exit \
@@ -125,12 +128,21 @@ else
 fi
 grep '"event":"session.services_verified"' "$out_dir/session.jsonl" >/dev/null
 grep '"event":"session.launch_spawn"' "$out_dir/session.jsonl" >/dev/null
+grep '"event":"session.desktop_launch"' "$out_dir/session.jsonl" >/dev/null
 grep '"event":"session.clean_exit"' "$out_dir/session.jsonl" >/dev/null
 grep '"backend":"wayland"' "$out_dir/session.jsonl" >/dev/null
 grep '"shortcut_resolved":true' "$out_dir/session.jsonl" >/dev/null
 grep '"spawned":true' "$out_dir/session.jsonl" >/dev/null
 grep '"exit_success":true' "$out_dir/session.jsonl" >/dev/null
 grep '"wayland_display_set":true' "$out_dir/session.jsonl" >/dev/null
+grep '"entry_selector":"org.backlit.SpawnProbe.desktop"' "$out_dir/session.jsonl" >/dev/null
+grep '"entry_resolved":true' "$out_dir/session.jsonl" >/dev/null
+grep '"entry_program":"sh"' "$out_dir/session.jsonl" >/dev/null
+grep '"program_resolved":true' "$out_dir/session.jsonl" >/dev/null
+grep '"managed_window_mapped":true' "$out_dir/session.jsonl" >/dev/null
+grep '"managed_window_app_id":"org.backlit.SpawnProbe.desktop"' "$out_dir/session.jsonl" >/dev/null
+grep '"managed_windows_after_launch":4' "$out_dir/session.jsonl" >/dev/null
+grep '"focused_launched_window":true' "$out_dir/session.jsonl" >/dev/null
 grep '"compositor_ready":true' "$out_dir/session.jsonl" >/dev/null
 grep '"shell_ready":true' "$out_dir/session.jsonl" >/dev/null
 grep '"notification_ready":true' "$out_dir/session.jsonl" >/dev/null
@@ -144,6 +156,21 @@ grep '"windows_closed":3' "$out_dir/session.jsonl" >/dev/null
 grep '"windows_after_shutdown":0' "$out_dir/session.jsonl" >/dev/null
 grep '"focus_cleared":true' "$out_dir/session.jsonl" >/dev/null
 test -s "$out_dir/session.ppm"
+
+session_compositor_demo_client=false
+session_compositor_client_blocked_expected=false
+if grep '"compositor_demo_surface_mapped":true' "$out_dir/session.jsonl" >/dev/null; then
+  grep '"compositor_service_socket_bound":true' "$out_dir/session.jsonl" >/dev/null
+  grep '"compositor_demo_client_resolved":true' "$out_dir/session.jsonl" >/dev/null
+  grep '"compositor_demo_client_exit_ok":true' "$out_dir/session.jsonl" >/dev/null
+  grep '"compositor_demo_client_connected":true' "$out_dir/session.jsonl" >/dev/null
+  grep '"compositor_service_socket_cleanup":true' "$out_dir/session.jsonl" >/dev/null
+  grep '"compositor_demo_app_id_preserved":true' "$out_dir/session.jsonl" >/dev/null
+  session_compositor_demo_client=true
+else
+  grep '"compositor_client_blocked_expected":true' "$out_dir/session.jsonl" >/dev/null
+  session_compositor_client_blocked_expected=true
+fi
 
 cat > "$out_dir/manifest.json" <<EOF
 {
@@ -172,7 +199,12 @@ cat > "$out_dir/manifest.json" <<EOF
     "launcher_terminal_wayland_spawn": true,
     "launcher_terminal_no_seat_expected": $terminal_no_seat_expected,
     "session_wayland_client_spawn": true,
+    "session_wayland_desktop_launch": true,
+    "session_wayland_desktop_managed_window": true,
     "session_wayland_services": true,
+    "session_wayland_demo_client": $session_compositor_demo_client,
+    "session_wayland_demo_app_id_preserved": $session_compositor_demo_client,
+    "session_wayland_demo_client_blocked_expected": $session_compositor_client_blocked_expected,
     "session_notification_service": true,
     "session_settings_service": true,
     "session_workspace_switch": true,

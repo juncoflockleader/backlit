@@ -155,7 +155,7 @@ The nested Wayland path can be checked without a visible VM desktop by running W
 ./scripts/verify-nested-wayland-smoke.sh
 ```
 
-This starts a temporary parent Weston compositor, verifies the parent socket with `wayland-info` or `weston-info`, launches the real terminal target (`foot`) against that socket with a short-lived command, then runs Backlit's Wayland backend preflight, compositor smoke path, and `backlit-session --backend=wayland --verify-services --verify-clean-exit` path. Weston headless does not expose a usable input seat in this setup, so the terminal check accepts `foot`'s known no-seat exit code while still requiring that the real terminal process was spawned with `WAYLAND_DISPLAY`.
+This starts a temporary parent Weston compositor, verifies the parent socket with `wayland-info` or `weston-info`, launches the real terminal target (`foot`) against that socket with a short-lived command, then runs Backlit's Wayland backend preflight, compositor smoke path, and `backlit-session --backend=wayland --verify-services --verify-desktop-launch --verify-clean-exit` path. The session portion requires a managed desktop-launch window and the demo client to preserve its app id through the compositor service socket. Weston headless does not expose a usable input seat in this setup, so the terminal check accepts `foot`'s known no-seat exit code while still requiring that the real terminal process was spawned with `WAYLAND_DISPLAY`.
 
 When the real compositor loop lands, launch clients into Backlit with:
 

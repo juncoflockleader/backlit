@@ -722,6 +722,10 @@ require_contains "$host_debian_system_install_manifest" '"packages_purged_after_
 require_contains "$host_debian_system_install_replay_manifest" '"frame_count": 9'
 require_contains "$host_debian_system_install_replay_manifest" '"launcher_overlay_frame": true'
 require_contains "$host_debian_system_install_replay_manifest" '"app_switcher_overlay_frame": true'
+require_contains "$host_nested_wayland_manifest" '"session_wayland_desktop_launch": true'
+require_contains "$host_nested_wayland_manifest" '"session_wayland_desktop_managed_window": true'
+require_contains "$host_nested_wayland_manifest" '"session_wayland_demo_client": true'
+require_contains "$host_nested_wayland_manifest" '"session_wayland_demo_app_id_preserved": true'
 require_contains "$host_nested_wayland_manifest" '"session_wayland_clean_exit": true'
 require_contains "$host_mvp0_contract_manifest" '"artifact_manifests_checked": true'
 require_contains "$host_mvp0_contract_manifest" '"drm_master_boundary": true'
@@ -804,6 +808,8 @@ cat > "$host_out_dir/manifest.json" <<EOF
 	    "debian_system_install_replay": true,
     "actual_system_dpkg_install": true,
     "nested_wayland": true,
+    "nested_wayland_desktop_managed_window": true,
+    "nested_wayland_demo_client_app_id": true,
     "mvp0_contract": true,
     "mvp1_contract": true,
     "ppm_bytes": $ppm_bytes,
