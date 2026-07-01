@@ -17,8 +17,8 @@ use backlit_compositor_backend::SmithayCompositorRuntime;
 use backlit_compositor_backend::{
     backend_launch_plan, parse_args, preflight_backend_with_environment, smithay_runtime_probe,
     BackendKind, BackendLaunchPlan, BackendPreflightEnvironment, BackendPreflightReport, ClientId,
-    CompositorRuntime, HeadlessCompositor, RunConfig, RuntimeKind, SmithayRuntimeProbe,
-    SurfaceId as BackendSurfaceId, SurfaceOptions,
+    CompositorRuntime, HeadlessCompositor, InputEventCounters, RunConfig, RuntimeKind,
+    SmithayRuntimeProbe, SurfaceId as BackendSurfaceId, SurfaceOptions,
 };
 use backlit_demo_client::{render_policy_gui, verify_policy_gui};
 use backlit_surface::{SurfaceManager, SurfacePhase, SurfaceRole};
@@ -200,6 +200,42 @@ fn run() -> Result<(), String> {
                     FieldValue::U64(smoke.input_event_loop_dispatch_count),
                 ),
                 (
+                    "input_event_count",
+                    FieldValue::U64(smoke.input_event_counters.total),
+                ),
+                (
+                    "input_device_event_count",
+                    FieldValue::U64(smoke.input_event_counters.device),
+                ),
+                (
+                    "input_keyboard_event_count",
+                    FieldValue::U64(smoke.input_event_counters.keyboard),
+                ),
+                (
+                    "input_pointer_event_count",
+                    FieldValue::U64(smoke.input_event_counters.pointer),
+                ),
+                (
+                    "input_touch_event_count",
+                    FieldValue::U64(smoke.input_event_counters.touch),
+                ),
+                (
+                    "input_gesture_event_count",
+                    FieldValue::U64(smoke.input_event_counters.gesture),
+                ),
+                (
+                    "input_tablet_event_count",
+                    FieldValue::U64(smoke.input_event_counters.tablet),
+                ),
+                (
+                    "input_switch_event_count",
+                    FieldValue::U64(smoke.input_event_counters.switch),
+                ),
+                (
+                    "input_special_event_count",
+                    FieldValue::U64(smoke.input_event_counters.special),
+                ),
+                (
                     "surface_commit_count",
                     FieldValue::U64(smoke.surface_commit_count),
                 ),
@@ -323,6 +359,42 @@ fn run() -> Result<(), String> {
                 (
                     "input_event_loop_dispatch_count",
                     FieldValue::U64(runtime.input_event_loop_dispatch_count),
+                ),
+                (
+                    "input_event_count",
+                    FieldValue::U64(runtime.input_event_counters.total),
+                ),
+                (
+                    "input_device_event_count",
+                    FieldValue::U64(runtime.input_event_counters.device),
+                ),
+                (
+                    "input_keyboard_event_count",
+                    FieldValue::U64(runtime.input_event_counters.keyboard),
+                ),
+                (
+                    "input_pointer_event_count",
+                    FieldValue::U64(runtime.input_event_counters.pointer),
+                ),
+                (
+                    "input_touch_event_count",
+                    FieldValue::U64(runtime.input_event_counters.touch),
+                ),
+                (
+                    "input_gesture_event_count",
+                    FieldValue::U64(runtime.input_event_counters.gesture),
+                ),
+                (
+                    "input_tablet_event_count",
+                    FieldValue::U64(runtime.input_event_counters.tablet),
+                ),
+                (
+                    "input_switch_event_count",
+                    FieldValue::U64(runtime.input_event_counters.switch),
+                ),
+                (
+                    "input_special_event_count",
+                    FieldValue::U64(runtime.input_event_counters.special),
                 ),
                 (
                     "smithay_protocol_globals",
@@ -472,6 +544,42 @@ fn run() -> Result<(), String> {
                 (
                     "input_event_loop_dispatch_count",
                     FieldValue::U64(readiness.input_event_loop_dispatch_count),
+                ),
+                (
+                    "input_event_count",
+                    FieldValue::U64(readiness.input_event_counters.total),
+                ),
+                (
+                    "input_device_event_count",
+                    FieldValue::U64(readiness.input_event_counters.device),
+                ),
+                (
+                    "input_keyboard_event_count",
+                    FieldValue::U64(readiness.input_event_counters.keyboard),
+                ),
+                (
+                    "input_pointer_event_count",
+                    FieldValue::U64(readiness.input_event_counters.pointer),
+                ),
+                (
+                    "input_touch_event_count",
+                    FieldValue::U64(readiness.input_event_counters.touch),
+                ),
+                (
+                    "input_gesture_event_count",
+                    FieldValue::U64(readiness.input_event_counters.gesture),
+                ),
+                (
+                    "input_tablet_event_count",
+                    FieldValue::U64(readiness.input_event_counters.tablet),
+                ),
+                (
+                    "input_switch_event_count",
+                    FieldValue::U64(readiness.input_event_counters.switch),
+                ),
+                (
+                    "input_special_event_count",
+                    FieldValue::U64(readiness.input_event_counters.special),
                 ),
                 (
                     "smithay_protocol_globals",
@@ -838,6 +946,7 @@ impl<B: CompositorRuntime> SocketClientRuntime<B> {
             input_sources_ready: self.backend.input_sources_ready(),
             input_source_count: self.backend.input_source_count(),
             input_event_loop_dispatch_count: self.backend.input_event_loop_dispatch_count(),
+            input_event_counters: self.backend.input_event_counters(),
             smithay_protocol_globals: self.backend.smithay_protocol_global_count(),
             policy_windows: self.manager.policy().windows().len() as u64,
             visible_windows: self.manager.policy().visible_windows().count() as u64,
@@ -940,6 +1049,7 @@ impl<B: CompositorRuntime> SocketClientRuntime<B> {
             input_sources_ready: self.backend.input_sources_ready(),
             input_source_count: self.backend.input_source_count(),
             input_event_loop_dispatch_count: self.backend.input_event_loop_dispatch_count(),
+            input_event_counters: self.backend.input_event_counters(),
             smithay_protocol_globals: self.backend.smithay_protocol_global_count(),
             policy_windows: self.manager.policy().windows().len() as u64,
             visible_windows: self.manager.policy().visible_windows().count() as u64,
@@ -1001,6 +1111,7 @@ impl<B: CompositorRuntime> SocketClientRuntime<B> {
             input_sources_ready: self.backend.input_sources_ready(),
             input_source_count: self.backend.input_source_count(),
             input_event_loop_dispatch_count: self.backend.input_event_loop_dispatch_count(),
+            input_event_counters: self.backend.input_event_counters(),
             smithay_protocol_globals: self.backend.smithay_protocol_global_count(),
             policy_windows: self.manager.policy().windows().len() as u64,
             visible_windows: self.manager.policy().visible_windows().count() as u64,
@@ -1077,6 +1188,7 @@ impl<B: CompositorRuntime> SocketClientRuntime<B> {
             input_sources_ready: self.backend.input_sources_ready(),
             input_source_count: self.backend.input_source_count(),
             input_event_loop_dispatch_count: self.backend.input_event_loop_dispatch_count(),
+            input_event_counters: self.backend.input_event_counters(),
             smithay_protocol_globals: self.backend.smithay_protocol_global_count(),
             policy_windows: self.manager.policy().windows().len() as u64,
             visible_windows: self.manager.policy().visible_windows().count() as u64,
@@ -1178,6 +1290,7 @@ struct SocketClientReport {
     input_sources_ready: bool,
     input_source_count: u64,
     input_event_loop_dispatch_count: u64,
+    input_event_counters: InputEventCounters,
     smithay_protocol_globals: u64,
     policy_windows: u64,
     visible_windows: u64,
@@ -1221,6 +1334,7 @@ impl SocketClientReport {
             input_sources_ready: false,
             input_source_count: 0,
             input_event_loop_dispatch_count: 0,
+            input_event_counters: InputEventCounters::default(),
             smithay_protocol_globals: 0,
             policy_windows: 0,
             visible_windows: 0,
@@ -1533,6 +1647,7 @@ struct SmithayClientSmoke {
     input_sources_ready: bool,
     input_source_count: u64,
     input_event_loop_dispatch_count: u64,
+    input_event_counters: InputEventCounters,
     surface_commit_count: u64,
     xdg_toplevel_count: u64,
     xdg_popup_count: u64,
@@ -1661,6 +1776,7 @@ fn run_smithay_client_smoke_for_config(config: &RunConfig) -> Result<SmithayClie
         input_sources_ready: report.input_sources_ready,
         input_source_count: report.input_source_count,
         input_event_loop_dispatch_count: report.input_event_loop_dispatch_count,
+        input_event_counters: report.input_event_counters,
         surface_commit_count: report.surface_commit_count,
         xdg_toplevel_count: report.xdg_toplevel_count,
         xdg_popup_count: report.xdg_popup_count,
@@ -1754,6 +1870,7 @@ struct ScriptedClientRuntime {
     input_sources_ready: bool,
     input_source_count: u64,
     input_event_loop_dispatch_count: u64,
+    input_event_counters: InputEventCounters,
     smithay_protocol_globals: u64,
     client_connected: bool,
     surfaces_after_map: u64,
@@ -1944,6 +2061,7 @@ fn run_scripted_client_runtime_with_backend<B: CompositorRuntime>(
         input_sources_ready: backend.input_sources_ready(),
         input_source_count: backend.input_source_count(),
         input_event_loop_dispatch_count: backend.input_event_loop_dispatch_count(),
+        input_event_counters: backend.input_event_counters(),
         smithay_protocol_globals: backend.smithay_protocol_global_count(),
         client_connected: first_frame.client_count == 1,
         surfaces_after_map: first_frame.surface_count,
@@ -2193,6 +2311,7 @@ struct CompositorReadyReport {
     input_sources_ready: bool,
     input_source_count: u64,
     input_event_loop_dispatch_count: u64,
+    input_event_counters: InputEventCounters,
     smithay_protocol_globals: u64,
     accepting_clients: bool,
     bootstrap_client_connected: bool,
@@ -2276,6 +2395,7 @@ fn run_service_ready_with_backend<B: CompositorRuntime>(mut backend: B) -> Compo
         input_sources_ready: backend.input_sources_ready(),
         input_source_count: backend.input_source_count(),
         input_event_loop_dispatch_count: backend.input_event_loop_dispatch_count(),
+        input_event_counters: backend.input_event_counters(),
         smithay_protocol_globals: backend.smithay_protocol_global_count(),
         accepting_clients: backend.client_count() > 0,
         bootstrap_client_connected: backend.client_count() == 1,
@@ -2873,6 +2993,42 @@ fn emit_socket_client(config: &RunConfig, runtime_backend: &str, report: &Socket
                 FieldValue::U64(report.input_event_loop_dispatch_count),
             ),
             (
+                "input_event_count",
+                FieldValue::U64(report.input_event_counters.total),
+            ),
+            (
+                "input_device_event_count",
+                FieldValue::U64(report.input_event_counters.device),
+            ),
+            (
+                "input_keyboard_event_count",
+                FieldValue::U64(report.input_event_counters.keyboard),
+            ),
+            (
+                "input_pointer_event_count",
+                FieldValue::U64(report.input_event_counters.pointer),
+            ),
+            (
+                "input_touch_event_count",
+                FieldValue::U64(report.input_event_counters.touch),
+            ),
+            (
+                "input_gesture_event_count",
+                FieldValue::U64(report.input_event_counters.gesture),
+            ),
+            (
+                "input_tablet_event_count",
+                FieldValue::U64(report.input_event_counters.tablet),
+            ),
+            (
+                "input_switch_event_count",
+                FieldValue::U64(report.input_event_counters.switch),
+            ),
+            (
+                "input_special_event_count",
+                FieldValue::U64(report.input_event_counters.special),
+            ),
+            (
                 "smithay_protocol_globals",
                 FieldValue::U64(report.smithay_protocol_globals),
             ),
@@ -2969,6 +3125,42 @@ fn emit_drm_first_present_probe(config: &RunConfig, probe: &SmithayRuntimeProbe)
             (
                 "kms_framebuffer_test_state_permission_denied",
                 FieldValue::Bool(probe.kms_framebuffer_test_state_permission_denied),
+            ),
+            (
+                "libinput_event_count",
+                FieldValue::U64(probe.libinput_event_count),
+            ),
+            (
+                "libinput_device_event_count",
+                FieldValue::U64(probe.libinput_event_counters.device),
+            ),
+            (
+                "libinput_keyboard_event_count",
+                FieldValue::U64(probe.libinput_event_counters.keyboard),
+            ),
+            (
+                "libinput_pointer_event_count",
+                FieldValue::U64(probe.libinput_event_counters.pointer),
+            ),
+            (
+                "libinput_touch_event_count",
+                FieldValue::U64(probe.libinput_event_counters.touch),
+            ),
+            (
+                "libinput_gesture_event_count",
+                FieldValue::U64(probe.libinput_event_counters.gesture),
+            ),
+            (
+                "libinput_tablet_event_count",
+                FieldValue::U64(probe.libinput_event_counters.tablet),
+            ),
+            (
+                "libinput_switch_event_count",
+                FieldValue::U64(probe.libinput_event_counters.switch),
+            ),
+            (
+                "libinput_special_event_count",
+                FieldValue::U64(probe.libinput_event_counters.special),
             ),
             (
                 "kms_first_present_failure",

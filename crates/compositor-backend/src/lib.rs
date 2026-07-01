@@ -429,6 +429,7 @@ pub struct SmithayRuntimeProbe {
     pub libinput_event_source_inserted: bool,
     pub libinput_event_loop_dispatched: bool,
     pub libinput_event_count: u64,
+    pub libinput_event_counters: InputEventCounters,
     pub input_runtime_failure: Option<String>,
     pub primary_drm_card: Option<String>,
     pub primary_drm_render_node: Option<String>,
@@ -1067,6 +1068,7 @@ pub fn smithay_runtime_probe(environment: &BackendPreflightEnvironment) -> Smith
         libinput_event_source_inserted: input_runtime_probe.libinput_event_source_inserted,
         libinput_event_loop_dispatched: input_runtime_probe.libinput_event_loop_dispatched,
         libinput_event_count: input_runtime_probe.libinput_event_count,
+        libinput_event_counters: input_runtime_probe.libinput_event_counters,
         input_runtime_failure: input_runtime_probe.failure,
         primary_drm_card: environment.primary_drm_card.clone(),
         primary_drm_render_node: environment.primary_drm_render_node.clone(),
@@ -1151,6 +1153,7 @@ struct SmithayInputRuntimeProbe {
     libinput_event_source_inserted: bool,
     libinput_event_loop_dispatched: bool,
     libinput_event_count: u64,
+    libinput_event_counters: InputEventCounters,
     failure: Option<String>,
 }
 
@@ -2181,7 +2184,7 @@ fn smithay_input_runtime_probe(
 ) -> SmithayInputRuntimeProbe {
     use std::sync::{
         atomic::{AtomicU64, Ordering},
-        Arc,
+        Arc, Mutex,
     };
     use std::time::Duration;
 
@@ -2250,7 +2253,7 @@ fn smithay_input_runtime_probe(
     };
 
     let libseat_session_events = Arc::new(AtomicU64::new(0));
-    let libinput_events = Arc::new(AtomicU64::new(0));
+    let libinput_events = Arc::new(Mutex::new(InputEventCounters::default()));
     let session_events_for_callback = Arc::clone(&libseat_session_events);
     let input_events_for_callback = Arc::clone(&libinput_events);
 
@@ -2276,8 +2279,10 @@ fn smithay_input_runtime_probe(
 
     let libinput_event_source_inserted = event_loop
         .handle()
-        .insert_source(libinput_backend, move |_event, _metadata, _data| {
-            input_events_for_callback.fetch_add(1, Ordering::SeqCst);
+        .insert_source(libinput_backend, move |event, _metadata, _data| {
+            if let Ok(mut counters) = input_events_for_callback.lock() {
+                counters.record_smithay_libinput_event(&event);
+            }
         })
         .is_ok();
 
@@ -2300,6 +2305,11 @@ fn smithay_input_runtime_probe(
         .dispatch(Some(Duration::from_millis(0)), &mut data)
         .is_ok();
 
+    let libinput_event_counters = libinput_events
+        .lock()
+        .map(|counters| *counters)
+        .unwrap_or_default();
+
     SmithayInputRuntimeProbe {
         libseat_session_created: true,
         libseat_session_active: session_active,
@@ -2312,7 +2322,8 @@ fn smithay_input_runtime_probe(
         libinput_backend_created: true,
         libinput_event_source_inserted: true,
         libinput_event_loop_dispatched: dispatched,
-        libinput_event_count: libinput_events.load(Ordering::SeqCst),
+        libinput_event_count: libinput_event_counters.total,
+        libinput_event_counters,
         failure: if dispatched {
             None
         } else {
@@ -2344,6 +2355,7 @@ fn unavailable_smithay_input_runtime_probe(reason: impl Into<String>) -> Smithay
         libinput_event_source_inserted: false,
         libinput_event_loop_dispatched: false,
         libinput_event_count: 0,
+        libinput_event_counters: InputEventCounters::default(),
         failure: Some(reason.into()),
     }
 }
@@ -3242,6 +3254,76 @@ pub struct DirectScanoutReport {
     pub surface_pixels: u64,
 }
 
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub struct InputEventCounters {
+    pub total: u64,
+    pub device: u64,
+    pub keyboard: u64,
+    pub pointer: u64,
+    pub touch: u64,
+    pub gesture: u64,
+    pub tablet: u64,
+    pub switch: u64,
+    pub special: u64,
+}
+
+impl InputEventCounters {
+    #[cfg(all(feature = "smithay-backend", target_os = "linux"))]
+    fn record_smithay_libinput_event(
+        &mut self,
+        event: &smithay::backend::input::InputEvent<
+            smithay::backend::libinput::LibinputInputBackend,
+        >,
+    ) {
+        use smithay::backend::input::InputEvent;
+
+        self.total += 1;
+        match event {
+            InputEvent::DeviceAdded { .. } | InputEvent::DeviceRemoved { .. } => {
+                self.device += 1;
+            }
+            InputEvent::Keyboard { .. } => {
+                self.keyboard += 1;
+            }
+            InputEvent::PointerMotion { .. }
+            | InputEvent::PointerMotionAbsolute { .. }
+            | InputEvent::PointerButton { .. }
+            | InputEvent::PointerAxis { .. } => {
+                self.pointer += 1;
+            }
+            InputEvent::TouchDown { .. }
+            | InputEvent::TouchMotion { .. }
+            | InputEvent::TouchUp { .. }
+            | InputEvent::TouchCancel { .. }
+            | InputEvent::TouchFrame { .. } => {
+                self.touch += 1;
+            }
+            InputEvent::GestureSwipeBegin { .. }
+            | InputEvent::GestureSwipeUpdate { .. }
+            | InputEvent::GestureSwipeEnd { .. }
+            | InputEvent::GesturePinchBegin { .. }
+            | InputEvent::GesturePinchUpdate { .. }
+            | InputEvent::GesturePinchEnd { .. }
+            | InputEvent::GestureHoldBegin { .. }
+            | InputEvent::GestureHoldEnd { .. } => {
+                self.gesture += 1;
+            }
+            InputEvent::TabletToolAxis { .. }
+            | InputEvent::TabletToolProximity { .. }
+            | InputEvent::TabletToolTip { .. }
+            | InputEvent::TabletToolButton { .. } => {
+                self.tablet += 1;
+            }
+            InputEvent::SwitchToggle { .. } => {
+                self.switch += 1;
+            }
+            InputEvent::Special(_) => {
+                self.special += 1;
+            }
+        }
+    }
+}
+
 pub trait CompositorRuntime {
     type Error: fmt::Display;
 
@@ -3266,6 +3348,9 @@ pub trait CompositorRuntime {
     }
     fn input_sources_ready(&self) -> bool {
         false
+    }
+    fn input_event_counters(&self) -> InputEventCounters {
+        InputEventCounters::default()
     }
     fn connect_client(&mut self, name: &str) -> ClientId;
     fn submit_surface(
@@ -3580,6 +3665,7 @@ struct SmithayCompositorState {
     libinput_backend_created: bool,
     libinput_event_source_inserted: bool,
     libinput_event_count: u64,
+    libinput_event_counters: InputEventCounters,
     input_runtime_failure: Option<String>,
     surface_commit_count: u64,
     xdg_toplevel_count: u64,
@@ -3646,6 +3732,7 @@ pub struct SmithayWaylandClientSmokeReport {
     pub input_sources_ready: bool,
     pub input_source_count: u64,
     pub input_event_loop_dispatch_count: u64,
+    pub input_event_counters: InputEventCounters,
     pub surface_commit_count: u64,
     pub xdg_toplevel_count: u64,
     pub xdg_popup_count: u64,
@@ -4127,6 +4214,7 @@ impl SmithayCompositorState {
             libinput_backend_created: false,
             libinput_event_source_inserted: false,
             libinput_event_count: 0,
+            libinput_event_counters: InputEventCounters::default(),
             input_runtime_failure: None,
             surface_commit_count: 0,
             xdg_toplevel_count: 0,
@@ -4374,8 +4462,11 @@ fn install_smithay_input_sources(
 
     state.libinput_event_source_inserted = event_loop
         .handle()
-        .insert_source(libinput_backend, |_event, _metadata, state| {
-            state.libinput_event_count += 1;
+        .insert_source(libinput_backend, |event, _metadata, state| {
+            state
+                .libinput_event_counters
+                .record_smithay_libinput_event(&event);
+            state.libinput_event_count = state.libinput_event_counters.total;
         })
         .is_ok();
     if !state.libinput_event_source_inserted {
@@ -4454,6 +4545,10 @@ impl SmithayCompositorRuntime {
         self.state.input_sources_ready && self.state.input_runtime_failure.is_none()
     }
 
+    pub fn input_event_counters(&self) -> InputEventCounters {
+        self.state.libinput_event_counters
+    }
+
     pub fn last_error(&self) -> Option<&str> {
         self.last_error.as_deref()
     }
@@ -4524,6 +4619,7 @@ impl SmithayCompositorRuntime {
             input_sources_ready: self.input_sources_ready(),
             input_source_count: self.input_source_count(),
             input_event_loop_dispatch_count: self.input_event_loop_dispatch_count(),
+            input_event_counters: self.input_event_counters(),
             surface_commit_count: self.state.surface_commit_count,
             xdg_toplevel_count: self.state.xdg_toplevel_count,
             xdg_popup_count: self.state.xdg_popup_count,
@@ -4695,6 +4791,10 @@ impl CompositorRuntime for SmithayCompositorRuntime {
 
     fn input_sources_ready(&self) -> bool {
         SmithayCompositorRuntime::input_sources_ready(self)
+    }
+
+    fn input_event_counters(&self) -> InputEventCounters {
+        SmithayCompositorRuntime::input_event_counters(self)
     }
 
     fn connect_client(&mut self, name: &str) -> ClientId {

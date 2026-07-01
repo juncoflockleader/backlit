@@ -118,6 +118,15 @@ if [ "$(uname -s)" != "Linux" ]; then
     "smithay_libinput_backend_created": false,
     "smithay_libinput_event_source_inserted": false,
     "smithay_libinput_event_loop_dispatched": false,
+    "smithay_libinput_event_count": 0,
+    "smithay_libinput_device_event_count": 0,
+    "smithay_libinput_keyboard_event_count": 0,
+    "smithay_libinput_pointer_event_count": 0,
+    "smithay_libinput_touch_event_count": 0,
+    "smithay_libinput_gesture_event_count": 0,
+    "smithay_libinput_tablet_event_count": 0,
+    "smithay_libinput_switch_event_count": 0,
+    "smithay_libinput_special_event_count": 0,
     "smithay_libinput_component": false,
     "smithay_libseat_session_component": false,
     "smithay_calloop_component": false,
@@ -233,6 +242,15 @@ smithay_libinput_seat_assigned=false
 smithay_libinput_backend_created=false
 smithay_libinput_event_source_inserted=false
 smithay_libinput_event_loop_dispatched=false
+smithay_libinput_event_count=0
+smithay_libinput_device_event_count=0
+smithay_libinput_keyboard_event_count=0
+smithay_libinput_pointer_event_count=0
+smithay_libinput_touch_event_count=0
+smithay_libinput_gesture_event_count=0
+smithay_libinput_tablet_event_count=0
+smithay_libinput_switch_event_count=0
+smithay_libinput_special_event_count=0
 if grep -F '"event":"backend.preflight","backend":"drm","ready":true' "$log" >/dev/null; then
   launch_ready=true
   expected_blocked=false
@@ -330,6 +348,15 @@ if grep -F '"event":"backend.preflight","backend":"drm","ready":true' "$log" >/d
   require_contains "$log" '"libinput_backend_created":true'
   require_contains "$log" '"libinput_event_source_inserted":true'
   require_contains "$log" '"libinput_event_loop_dispatched":true'
+  require_matches "$log" '"libinput_event_count":[0-9][0-9]*'
+  require_matches "$log" '"libinput_device_event_count":[0-9][0-9]*'
+  require_matches "$log" '"libinput_keyboard_event_count":[0-9][0-9]*'
+  require_matches "$log" '"libinput_pointer_event_count":[0-9][0-9]*'
+  require_matches "$log" '"libinput_touch_event_count":[0-9][0-9]*'
+  require_matches "$log" '"libinput_gesture_event_count":[0-9][0-9]*'
+  require_matches "$log" '"libinput_tablet_event_count":[0-9][0-9]*'
+  require_matches "$log" '"libinput_switch_event_count":[0-9][0-9]*'
+  require_matches "$log" '"libinput_special_event_count":[0-9][0-9]*'
   require_contains "$log" '"input_runtime_failure":""'
   require_contains "$log" '"display_created":true'
   require_contains "$log" '"display_handle_created":true'
@@ -440,6 +467,15 @@ if grep -F '"event":"backend.preflight","backend":"drm","ready":true' "$log" >/d
   smithay_libinput_backend_created=true
   smithay_libinput_event_source_inserted=true
   smithay_libinput_event_loop_dispatched=true
+  smithay_libinput_event_count="$(extract_u64 "$log" libinput_event_count)"
+  smithay_libinput_device_event_count="$(extract_u64 "$log" libinput_device_event_count)"
+  smithay_libinput_keyboard_event_count="$(extract_u64 "$log" libinput_keyboard_event_count)"
+  smithay_libinput_pointer_event_count="$(extract_u64 "$log" libinput_pointer_event_count)"
+  smithay_libinput_touch_event_count="$(extract_u64 "$log" libinput_touch_event_count)"
+  smithay_libinput_gesture_event_count="$(extract_u64 "$log" libinput_gesture_event_count)"
+  smithay_libinput_tablet_event_count="$(extract_u64 "$log" libinput_tablet_event_count)"
+  smithay_libinput_switch_event_count="$(extract_u64 "$log" libinput_switch_event_count)"
+  smithay_libinput_special_event_count="$(extract_u64 "$log" libinput_special_event_count)"
 else
   require_contains "$log" '"event":"backend.preflight","backend":"drm","ready":false'
   require_contains "$log" '"launch_ready":false'
@@ -532,6 +568,15 @@ cat > "$out_dir/manifest.json" <<EOF
     "smithay_libinput_backend_created": $smithay_libinput_backend_created,
     "smithay_libinput_event_source_inserted": $smithay_libinput_event_source_inserted,
     "smithay_libinput_event_loop_dispatched": $smithay_libinput_event_loop_dispatched,
+    "smithay_libinput_event_count": $smithay_libinput_event_count,
+    "smithay_libinput_device_event_count": $smithay_libinput_device_event_count,
+    "smithay_libinput_keyboard_event_count": $smithay_libinput_keyboard_event_count,
+    "smithay_libinput_pointer_event_count": $smithay_libinput_pointer_event_count,
+    "smithay_libinput_touch_event_count": $smithay_libinput_touch_event_count,
+    "smithay_libinput_gesture_event_count": $smithay_libinput_gesture_event_count,
+    "smithay_libinput_tablet_event_count": $smithay_libinput_tablet_event_count,
+    "smithay_libinput_switch_event_count": $smithay_libinput_switch_event_count,
+    "smithay_libinput_special_event_count": $smithay_libinput_special_event_count,
     "smithay_libinput_component": true,
     "smithay_libseat_session_component": true,
     "smithay_calloop_component": true,

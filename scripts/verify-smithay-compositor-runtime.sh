@@ -104,6 +104,7 @@ write_blocked_manifest() {
     "smithay_keyboard_pointer_capabilities": false,
     "smithay_input_sources": false,
     "smithay_input_event_loop": false,
+    "smithay_input_event_classification": false,
     "smithay_real_wayland_client": false,
     "smithay_real_wayland_metadata": false,
     "smithay_real_shm_buffer": false,
@@ -176,7 +177,11 @@ require_line_contains_all "$log" \
   '"calloop_dispatch_count":7' \
   '"input_sources_ready":true' \
   '"input_source_count":2' \
-  '"input_event_loop_dispatch_count":7'
+  '"input_event_loop_dispatch_count":7' \
+  '"input_event_count":' \
+  '"input_keyboard_event_count":' \
+  '"input_pointer_event_count":' \
+  '"input_special_event_count":'
 require_contains "$log" '"client_connected":true'
 require_contains "$log" '"surfaces_after_map":2'
 require_contains "$log" '"targeted_damage_ok":true'
@@ -191,7 +196,11 @@ require_line_contains_all "$log" \
   '"calloop_dispatch_count":1' \
   '"input_sources_ready":true' \
   '"input_source_count":2' \
-  '"input_event_loop_dispatch_count":1'
+  '"input_event_loop_dispatch_count":1' \
+  '"input_event_count":' \
+  '"input_keyboard_event_count":' \
+  '"input_pointer_event_count":' \
+  '"input_special_event_count":'
 require_contains "$log" '"bootstrap_client_connected":true'
 require_contains "$log" '"bootstrap_surface_presented":true'
 
@@ -236,6 +245,10 @@ else
   require_contains "$first_present_log" '"kms_framebuffer_test_state_permission_denied":true'
 fi
 require_contains "$first_present_log" '"kms_first_present_failure":""'
+require_matches "$first_present_log" '"libinput_event_count":[0-9][0-9]*'
+require_matches "$first_present_log" '"libinput_keyboard_event_count":[0-9][0-9]*'
+require_matches "$first_present_log" '"libinput_pointer_event_count":[0-9][0-9]*'
+require_matches "$first_present_log" '"libinput_special_event_count":[0-9][0-9]*'
 require_contains "$first_present_log" '"event":"compositor.exit"'
 
 set +e
@@ -271,6 +284,10 @@ require_line_contains_all "$client_smoke_log" \
   '"pointer_bound":true' \
   '"input_sources_ready":true' \
   '"input_source_count":2' \
+  '"input_event_count":' \
+  '"input_keyboard_event_count":' \
+  '"input_pointer_event_count":' \
+  '"input_special_event_count":' \
   '"compositor_bound":true' \
   '"shm_bound":true' \
   '"shm_buffer_created":true' \
@@ -383,7 +400,11 @@ require_line_contains_all "$service_log" \
   '"calloop_dispatch_count":1' \
   '"input_sources_ready":true' \
   '"input_source_count":2' \
-  '"input_event_loop_dispatch_count":1'
+  '"input_event_loop_dispatch_count":1' \
+  '"input_event_count":' \
+  '"input_keyboard_event_count":' \
+  '"input_pointer_event_count":' \
+  '"input_special_event_count":'
 require_contains "$service_log" '"event":"compositor.socket_bound"'
 require_contains "$service_log" "\"socket_name\":\"$socket_name\""
 require_contains "$service_log" "\"socket_path\":\"$socket_path\""
@@ -402,6 +423,10 @@ require_line_contains_all "$service_log" \
   '"input_sources_ready":true' \
   '"input_source_count":2' \
   '"input_event_loop_dispatch_count":1' \
+  '"input_event_count":' \
+  '"input_keyboard_event_count":' \
+  '"input_pointer_event_count":' \
+  '"input_special_event_count":' \
   '"policy_window_mapped":true' \
   '"policy_app_id_preserved":true'
 require_line_contains_all "$service_log" \
@@ -504,6 +529,7 @@ cat > "$out_dir/manifest.json" <<EOF
     "smithay_keyboard_pointer_capabilities": true,
     "smithay_input_sources": true,
     "smithay_input_event_loop": true,
+    "smithay_input_event_classification": true,
     "smithay_real_wayland_client": true,
     "smithay_real_wayland_metadata": true,
     "smithay_real_shm_buffer": true,

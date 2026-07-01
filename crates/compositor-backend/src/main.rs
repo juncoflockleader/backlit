@@ -610,6 +610,38 @@ fn emit_smithay_runtime_probe(probe: &SmithayRuntimeProbe) {
                     FieldValue::U64(probe.libinput_event_count),
                 ),
                 (
+                    "libinput_device_event_count",
+                    FieldValue::U64(probe.libinput_event_counters.device),
+                ),
+                (
+                    "libinput_keyboard_event_count",
+                    FieldValue::U64(probe.libinput_event_counters.keyboard),
+                ),
+                (
+                    "libinput_pointer_event_count",
+                    FieldValue::U64(probe.libinput_event_counters.pointer),
+                ),
+                (
+                    "libinput_touch_event_count",
+                    FieldValue::U64(probe.libinput_event_counters.touch),
+                ),
+                (
+                    "libinput_gesture_event_count",
+                    FieldValue::U64(probe.libinput_event_counters.gesture),
+                ),
+                (
+                    "libinput_tablet_event_count",
+                    FieldValue::U64(probe.libinput_event_counters.tablet),
+                ),
+                (
+                    "libinput_switch_event_count",
+                    FieldValue::U64(probe.libinput_event_counters.switch),
+                ),
+                (
+                    "libinput_special_event_count",
+                    FieldValue::U64(probe.libinput_event_counters.special),
+                ),
+                (
                     "input_runtime_failure",
                     FieldValue::Str(input_runtime_failure),
                 ),
