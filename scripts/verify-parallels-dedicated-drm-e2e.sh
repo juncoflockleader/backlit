@@ -93,6 +93,31 @@ require_contains() {
   }
 }
 
+check_guest_writable() {
+  local probe_path="/tmp/backlit-dedicated-drm-write-check-$$"
+  local probe_log="$tmp_dir/guest-writeability.log"
+
+  if "$prlctl_bin" exec "$vm_name" --user root sh -lc \
+    "mount | grep ' / ' || true; if touch '$probe_path'; then rm -f '$probe_path'; echo write_probe=ok; else echo write_probe=failed; exit 1; fi" \
+    > "$probe_log" 2>&1; then
+    return 0
+  fi
+
+  cat >&2 <<EOF
+Parallels dedicated DRM E2E cannot start because the Ubuntu guest is not writable.
+
+VM: $vm_name
+Probe output:
+EOF
+  cat "$probe_log" >&2
+  cat >&2 <<EOF
+
+Restart or repair the Ubuntu VM so its root filesystem mounts read-write, then rerun:
+  $0 $host_out_dir
+EOF
+  exit 2
+}
+
 tmp_dir="$(mktemp -d "${TMPDIR:-/tmp}/backlit-parallels-dedicated-drm.XXXXXX")"
 cleanup() {
   rm -rf "$tmp_dir"
@@ -293,6 +318,7 @@ chmod 700 "$root_runner"
 
 printf 'Using Parallels VM: %s\n' "$vm_name"
 "$prlctl_bin" list --all | grep -F "$vm_name" >/dev/null
+check_guest_writable
 
 upload_script "$root_runner" "/tmp/backlit-parallels-dedicated-drm-root-runner.sh"
 "$prlctl_bin" exec "$vm_name" --user root /tmp/backlit-parallels-dedicated-drm-root-runner.sh
