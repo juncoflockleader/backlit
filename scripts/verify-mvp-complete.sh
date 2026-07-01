@@ -159,13 +159,13 @@ pushed_commit=true
 source_tree_ready=true
 
 require_file "$parallels_manifest" missing-parallels-linux-e2e-manifest
-require_file "$launch_performance_manifest" missing-parallels-launch-performance-manifest
-require_file "$resource_budget_manifest" missing-parallels-resource-budget-manifest
 require_file "$parallels_health_manifest" missing-parallels-linux-health-manifest
 require_file "$dedicated_manifest" missing-parallels-dedicated-drm-manifest
+require_file "$dedicated_health_manifest" missing-parallels-dedicated-health-manifest
+require_file "$launch_performance_manifest" missing-parallels-launch-performance-manifest
+require_file "$resource_budget_manifest" missing-parallels-resource-budget-manifest
 require_file "$dedicated_session_manifest" missing-parallels-dedicated-session-manifest
 require_file "$package_build_manifest" missing-parallels-dedicated-package-build-manifest
-require_file "$dedicated_health_manifest" missing-parallels-dedicated-health-manifest
 require_file "$dedicated_dpkg_install_log" missing-parallels-dedicated-dpkg-install-log
 require_file "$dedicated_dpkg_purge_log" missing-parallels-dedicated-dpkg-purge-log
 
