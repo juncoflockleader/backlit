@@ -101,6 +101,8 @@ write_blocked_manifest() {
     "smithay_core_protocol_globals": false,
     "smithay_seat_global": false,
     "smithay_keyboard_pointer_capabilities": false,
+    "smithay_input_sources": false,
+    "smithay_input_event_loop": false,
     "smithay_real_wayland_client": false,
     "smithay_real_wayland_metadata": false,
     "smithay_real_shm_buffer": false,
@@ -168,7 +170,10 @@ require_line_contains_all "$log" \
   '"inserted_wayland_clients":1' \
   '"smithay_protocol_globals":5' \
   '"wayland_dispatch_count":7' \
-  '"calloop_dispatch_count":7'
+  '"calloop_dispatch_count":7' \
+  '"input_sources_ready":true' \
+  '"input_source_count":2' \
+  '"input_event_loop_dispatch_count":7'
 require_contains "$log" '"client_connected":true'
 require_contains "$log" '"surfaces_after_map":2'
 require_contains "$log" '"targeted_damage_ok":true'
@@ -180,7 +185,10 @@ require_line_contains_all "$log" \
   '"inserted_wayland_clients":1' \
   '"smithay_protocol_globals":5' \
   '"wayland_dispatch_count":1' \
-  '"calloop_dispatch_count":1'
+  '"calloop_dispatch_count":1' \
+  '"input_sources_ready":true' \
+  '"input_source_count":2' \
+  '"input_event_loop_dispatch_count":1'
 require_contains "$log" '"bootstrap_client_connected":true'
 require_contains "$log" '"bootstrap_surface_presented":true'
 
@@ -254,6 +262,8 @@ require_line_contains_all "$client_smoke_log" \
   '"seat_pointer_capability":true' \
   '"keyboard_bound":true' \
   '"pointer_bound":true' \
+  '"input_sources_ready":true' \
+  '"input_source_count":2' \
   '"compositor_bound":true' \
   '"shm_bound":true' \
   '"shm_buffer_created":true' \
@@ -283,6 +293,7 @@ require_line_contains_all "$client_smoke_log" \
   '"policy_windows":1' \
   '"policy_backend_surface_presented":true' \
   '"policy_presented_pixels":76800'
+require_matches "$client_smoke_log" '"input_event_loop_dispatch_count":[3-9][0-9]*'
 
 runtime_dir="${XDG_RUNTIME_DIR:-}"
 test -n "$runtime_dir" || fail "XDG_RUNTIME_DIR missing on launch-ready Linux host"
@@ -360,7 +371,10 @@ require_line_contains_all "$service_log" \
   '"inserted_wayland_clients":1' \
   '"smithay_protocol_globals":5' \
   '"wayland_dispatch_count":1' \
-  '"calloop_dispatch_count":1'
+  '"calloop_dispatch_count":1' \
+  '"input_sources_ready":true' \
+  '"input_source_count":2' \
+  '"input_event_loop_dispatch_count":1'
 require_contains "$service_log" '"event":"compositor.socket_bound"'
 require_contains "$service_log" "\"socket_name\":\"$socket_name\""
 require_contains "$service_log" "\"socket_path\":\"$socket_path\""
@@ -376,6 +390,9 @@ require_line_contains_all "$service_log" \
   '"smithay_protocol_globals":5' \
   '"wayland_dispatch_count":1' \
   '"calloop_dispatch_count":1' \
+  '"input_sources_ready":true' \
+  '"input_source_count":2' \
+  '"input_event_loop_dispatch_count":1' \
   '"policy_window_mapped":true' \
   '"policy_app_id_preserved":true'
 require_line_contains_all "$service_log" \
@@ -391,7 +408,10 @@ require_line_contains_all "$service_log" \
   '"inserted_wayland_clients":2' \
   '"smithay_protocol_globals":5' \
   '"wayland_dispatch_count":2' \
-  '"calloop_dispatch_count":2'
+  '"calloop_dispatch_count":2' \
+  '"input_sources_ready":true' \
+  '"input_source_count":2' \
+  '"input_event_loop_dispatch_count":2'
 require_line_contains_all "$service_log" \
   '"action":"move"' \
   '"title":"smithay-socket-browser"' \
@@ -431,6 +451,9 @@ require_line_contains_all "$service_log" \
   '"smithay_protocol_globals":5' \
   '"wayland_dispatch_count":8' \
   '"calloop_dispatch_count":8' \
+  '"input_sources_ready":true' \
+  '"input_source_count":2' \
+  '"input_event_loop_dispatch_count":8' \
   '"policy_windows":1'
 require_contains "$service_log" '"event":"compositor.socket_unbound"'
 require_contains "$service_log" '"removed":true'
@@ -469,6 +492,8 @@ cat > "$out_dir/manifest.json" <<EOF
     "smithay_core_protocol_globals": true,
     "smithay_seat_global": true,
     "smithay_keyboard_pointer_capabilities": true,
+    "smithay_input_sources": true,
+    "smithay_input_event_loop": true,
     "smithay_real_wayland_client": true,
     "smithay_real_wayland_metadata": true,
     "smithay_real_shm_buffer": true,

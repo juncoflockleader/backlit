@@ -3258,6 +3258,15 @@ pub trait CompositorRuntime {
     fn calloop_dispatch_count(&self) -> u64 {
         0
     }
+    fn input_source_count(&self) -> u64 {
+        0
+    }
+    fn input_event_loop_dispatch_count(&self) -> u64 {
+        0
+    }
+    fn input_sources_ready(&self) -> bool {
+        false
+    }
     fn connect_client(&mut self, name: &str) -> ClientId;
     fn submit_surface(
         &mut self,
@@ -3560,6 +3569,18 @@ struct SmithayCompositorState {
     seat_global_count: u64,
     seat_keyboard_capability: bool,
     seat_pointer_capability: bool,
+    input_source_count: u64,
+    input_sources_ready: bool,
+    input_event_loop_dispatch_count: u64,
+    libseat_session_created: bool,
+    libseat_event_source_inserted: bool,
+    libseat_session_event_count: u64,
+    libinput_context_created: bool,
+    libinput_seat_assigned: bool,
+    libinput_backend_created: bool,
+    libinput_event_source_inserted: bool,
+    libinput_event_count: u64,
+    input_runtime_failure: Option<String>,
     surface_commit_count: u64,
     xdg_toplevel_count: u64,
     xdg_popup_count: u64,
@@ -3622,6 +3643,9 @@ pub struct SmithayWaylandClientSmokeReport {
     pub inserted_wayland_clients: u64,
     pub wayland_dispatch_count: u64,
     pub calloop_dispatch_count: u64,
+    pub input_sources_ready: bool,
+    pub input_source_count: u64,
+    pub input_event_loop_dispatch_count: u64,
     pub surface_commit_count: u64,
     pub xdg_toplevel_count: u64,
     pub xdg_popup_count: u64,
@@ -3663,6 +3687,9 @@ impl SmithayWaylandClientSmokeReport {
             && self.inserted_wayland_clients >= 1
             && self.wayland_dispatch_count >= 3
             && self.calloop_dispatch_count >= 3
+            && self.input_sources_ready
+            && self.input_source_count >= 2
+            && self.input_event_loop_dispatch_count >= 3
             && self.surface_commit_count >= 1
             && self.xdg_toplevel_count >= 1
             && self.title_changed_count >= 1
@@ -4089,6 +4116,18 @@ impl SmithayCompositorState {
             seat_global_count: 1,
             seat_keyboard_capability: true,
             seat_pointer_capability: true,
+            input_source_count: 0,
+            input_sources_ready: false,
+            input_event_loop_dispatch_count: 0,
+            libseat_session_created: false,
+            libseat_event_source_inserted: false,
+            libseat_session_event_count: 0,
+            libinput_context_created: false,
+            libinput_seat_assigned: false,
+            libinput_backend_created: false,
+            libinput_event_source_inserted: false,
+            libinput_event_count: 0,
+            input_runtime_failure: None,
             surface_commit_count: 0,
             xdg_toplevel_count: 0,
             xdg_popup_count: 0,
@@ -4273,6 +4312,82 @@ smithay::delegate_xdg_shell!(SmithayCompositorState);
 smithay::delegate_seat!(SmithayCompositorState);
 
 #[cfg(all(feature = "smithay-backend", target_os = "linux"))]
+fn install_smithay_input_sources(
+    event_loop: &smithay::reexports::calloop::EventLoop<'static, SmithayCompositorState>,
+    state: &mut SmithayCompositorState,
+) {
+    use smithay::backend::libinput::{LibinputInputBackend, LibinputSessionInterface};
+    use smithay::backend::session::{libseat::LibSeatSession, Session};
+
+    let environment = BackendPreflightEnvironment::from_host();
+    if !environment.input_broker_ready() {
+        state.input_runtime_failure = Some(String::from("input-broker-not-ready"));
+        return;
+    }
+
+    let Some(expected_seat) = environment
+        .seat
+        .as_deref()
+        .filter(|seat| !seat.trim().is_empty())
+    else {
+        state.input_runtime_failure = Some(String::from("missing-seat"));
+        return;
+    };
+
+    let (session, session_notifier) = match LibSeatSession::new() {
+        Ok(session) => session,
+        Err(error) => {
+            state.input_runtime_failure = Some(format!("libseat-session:{error:?}"));
+            return;
+        }
+    };
+    state.libseat_session_created = true;
+
+    let session_seat = session.seat();
+    if session_seat != expected_seat {
+        state.input_runtime_failure = Some(format!("seat-mismatch:expected-{expected_seat}"));
+        return;
+    }
+
+    let mut libinput_context =
+        input::Libinput::new_with_udev(LibinputSessionInterface::from(session));
+    state.libinput_context_created = true;
+    if libinput_context.udev_assign_seat(expected_seat).is_err() {
+        state.input_runtime_failure = Some(String::from("libinput-assign-seat"));
+        return;
+    }
+    state.libinput_seat_assigned = true;
+
+    let libinput_backend = LibinputInputBackend::new(libinput_context);
+    state.libinput_backend_created = true;
+
+    state.libseat_event_source_inserted = event_loop
+        .handle()
+        .insert_source(session_notifier, |_event, _metadata, state| {
+            state.libseat_session_event_count += 1;
+        })
+        .is_ok();
+    if !state.libseat_event_source_inserted {
+        state.input_runtime_failure = Some(String::from("libseat-event-source-insert"));
+        return;
+    }
+
+    state.libinput_event_source_inserted = event_loop
+        .handle()
+        .insert_source(libinput_backend, |_event, _metadata, state| {
+            state.libinput_event_count += 1;
+        })
+        .is_ok();
+    if !state.libinput_event_source_inserted {
+        state.input_runtime_failure = Some(String::from("libinput-event-source-insert"));
+        return;
+    }
+
+    state.input_source_count = 2;
+    state.input_sources_ready = true;
+}
+
+#[cfg(all(feature = "smithay-backend", target_os = "linux"))]
 impl SmithayCompositorRuntime {
     pub fn try_new() -> Result<Self, SmithayRuntimeError> {
         use smithay::reexports::calloop::EventLoop;
@@ -4281,9 +4396,10 @@ impl SmithayCompositorRuntime {
         let display = Display::<SmithayCompositorState>::new()
             .map_err(|error| SmithayRuntimeError(format!("display-new:{error}")))?;
         let display_handle = display.handle();
-        let state = SmithayCompositorState::new(&display_handle)?;
+        let mut state = SmithayCompositorState::new(&display_handle)?;
         let event_loop = EventLoop::<SmithayCompositorState>::try_new()
             .map_err(|error| SmithayRuntimeError(format!("event-loop-new:{error}")))?;
+        install_smithay_input_sources(&event_loop, &mut state);
         let listening_socket = ListeningSocket::bind_auto("backlit-smithay-runtime", 0..64)
             .map_err(|error| SmithayRuntimeError(format!("socket-bind:{error}")))?;
         let socket_name = listening_socket
@@ -4324,6 +4440,18 @@ impl SmithayCompositorRuntime {
 
     pub fn calloop_dispatch_count(&self) -> u64 {
         self.calloop_dispatch_count
+    }
+
+    pub fn input_source_count(&self) -> u64 {
+        self.state.input_source_count
+    }
+
+    pub fn input_event_loop_dispatch_count(&self) -> u64 {
+        self.state.input_event_loop_dispatch_count
+    }
+
+    pub fn input_sources_ready(&self) -> bool {
+        self.state.input_sources_ready && self.state.input_runtime_failure.is_none()
     }
 
     pub fn last_error(&self) -> Option<&str> {
@@ -4393,6 +4521,9 @@ impl SmithayCompositorRuntime {
             inserted_wayland_clients: self.inserted_wayland_clients,
             wayland_dispatch_count: self.wayland_dispatch_count,
             calloop_dispatch_count: self.calloop_dispatch_count,
+            input_sources_ready: self.input_sources_ready(),
+            input_source_count: self.input_source_count(),
+            input_event_loop_dispatch_count: self.input_event_loop_dispatch_count(),
             surface_commit_count: self.state.surface_commit_count,
             xdg_toplevel_count: self.state.xdg_toplevel_count,
             xdg_popup_count: self.state.xdg_popup_count,
@@ -4462,6 +4593,9 @@ impl SmithayCompositorRuntime {
         {
             Ok(()) => {
                 self.calloop_dispatch_count += 1;
+                if self.state.input_sources_ready {
+                    self.state.input_event_loop_dispatch_count += 1;
+                }
             }
             Err(error) => {
                 self.last_error = Some(format!("event-loop-dispatch:{error}"));
@@ -4549,6 +4683,18 @@ impl CompositorRuntime for SmithayCompositorRuntime {
 
     fn calloop_dispatch_count(&self) -> u64 {
         SmithayCompositorRuntime::calloop_dispatch_count(self)
+    }
+
+    fn input_source_count(&self) -> u64 {
+        SmithayCompositorRuntime::input_source_count(self)
+    }
+
+    fn input_event_loop_dispatch_count(&self) -> u64 {
+        SmithayCompositorRuntime::input_event_loop_dispatch_count(self)
+    }
+
+    fn input_sources_ready(&self) -> bool {
+        SmithayCompositorRuntime::input_sources_ready(self)
     }
 
     fn connect_client(&mut self, name: &str) -> ClientId {

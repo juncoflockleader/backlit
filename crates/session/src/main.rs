@@ -892,6 +892,8 @@ struct CompositorServiceVerification {
     runtime_backend: String,
     runtime_backend_ok: bool,
     smithay_protocol_globals: bool,
+    smithay_input_sources: bool,
+    smithay_input_event_loop: bool,
     socket_bound: bool,
     demo_client_connected: bool,
     demo_surface_mapped: bool,
@@ -909,6 +911,8 @@ impl CompositorServiceVerification {
             runtime_backend: String::new(),
             runtime_backend_ok: false,
             smithay_protocol_globals: false,
+            smithay_input_sources: false,
+            smithay_input_event_loop: false,
             socket_bound: false,
             demo_client_connected: false,
             demo_surface_mapped: false,
@@ -1167,6 +1171,17 @@ fn run_compositor_service_client_probe(
     } else {
         true
     };
+    let smithay_input_sources = if compositor_runtime == "smithay" {
+        stdout.contains("\"input_sources_ready\":true")
+            && stdout.contains("\"input_source_count\":2")
+    } else {
+        false
+    };
+    let smithay_input_event_loop = if compositor_runtime == "smithay" {
+        stdout.contains("\"input_event_loop_dispatch_count\":")
+    } else {
+        false
+    };
     let socket_bound = stdout.contains("\"event\":\"compositor.socket_bound\"");
     let demo_client_connected =
         demo_client.ready && stdout.contains("\"event\":\"compositor.socket_client\"");
@@ -1194,6 +1209,9 @@ fn run_compositor_service_client_probe(
     ];
     if compositor_runtime == "smithay" {
         required_stdout.push(String::from("\"smithay_protocol_globals\":5"));
+        required_stdout.push(String::from("\"input_sources_ready\":true"));
+        required_stdout.push(String::from("\"input_source_count\":2"));
+        required_stdout.push(String::from("\"input_event_loop_dispatch_count\":"));
     }
     let service = service_probe_from_output(output, elapsed_ms, &required_stdout);
 
@@ -1204,6 +1222,8 @@ fn run_compositor_service_client_probe(
         runtime_backend,
         runtime_backend_ok,
         smithay_protocol_globals,
+        smithay_input_sources,
+        smithay_input_event_loop,
         socket_bound,
         demo_client_connected,
         demo_surface_mapped,
@@ -1487,6 +1507,14 @@ fn emit_service_verification(config: &Config, report: &ServiceVerification, elap
                     report.compositor.runtime_backend == "smithay-compositor-runtime"
                         && report.compositor.smithay_protocol_globals,
                 ),
+            ),
+            (
+                "compositor_smithay_input_sources",
+                FieldValue::Bool(report.compositor.smithay_input_sources),
+            ),
+            (
+                "compositor_smithay_input_event_loop",
+                FieldValue::Bool(report.compositor.smithay_input_event_loop),
             ),
             (
                 "compositor_service_socket_bound",
@@ -3511,6 +3539,8 @@ mod tests {
             runtime_backend: String::from("headless-compositor"),
             runtime_backend_ok: true,
             smithay_protocol_globals: true,
+            smithay_input_sources: false,
+            smithay_input_event_loop: false,
             socket_bound: true,
             demo_client_connected: true,
             demo_surface_mapped: true,
@@ -3527,6 +3557,8 @@ mod tests {
             runtime_backend: String::new(),
             runtime_backend_ok: false,
             smithay_protocol_globals: false,
+            smithay_input_sources: false,
+            smithay_input_event_loop: false,
             socket_bound: false,
             demo_client_connected: false,
             demo_surface_mapped: false,

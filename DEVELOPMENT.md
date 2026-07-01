@@ -391,6 +391,8 @@ The packaging contract verifier checks that the session desktop entry, Backlit s
 
 The DRM session smoke also launches its sibling compositor service with `--runtime=smithay` for `--backend=drm` and requires the session log plus manifest to report `session_compositor_smithay_runtime: true` and `session_compositor_smithay_protocol_globals: true`.
 
+The Smithay compositor runtime also installs libseat and libinput event sources into its calloop loop on launch-ready Linux. The Smithay and DRM session manifests require `smithay_input_sources: true`, `smithay_input_event_loop: true`, `session_compositor_smithay_input_sources: true`, and `session_compositor_smithay_input_event_loop: true` before treating the runtime/session path as input-ready.
+
 ```bash
 ./scripts/verify-packaging-contract.sh
 ```
