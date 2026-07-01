@@ -8,6 +8,7 @@ out_dir="${1:-${BACKLIT_PARALLELS_MVP_E2E_OUT_DIR:-target/parallels-mvp-e2e}}"
 normal_e2e_dir="${BACKLIT_PARALLELS_E2E_HOST_OUT_DIR:-target/linux-e2e-parallels}"
 dedicated_e2e_dir="${BACKLIT_PARALLELS_DEDICATED_DRM_HOST_OUT_DIR:-target/parallels-dedicated-drm-e2e}"
 mvp_complete_dir="${BACKLIT_MVP_COMPLETE_OUT_DIR:-target/mvp-complete}"
+local_gui_dir="$out_dir/local-gui-preview"
 normal_health_dir="$normal_e2e_dir/parallels-ubuntu-health"
 dedicated_health_dir="$dedicated_e2e_dir/parallels-ubuntu-health"
 manifest="$out_dir/manifest.json"
@@ -21,6 +22,7 @@ upstream_commit="$(git rev-parse --short '@{u}' 2>/dev/null || printf unknown)"
 worktree_clean=false
 pushed_commit=false
 source_tree_ready=false
+local_gui_status=-1
 normal_health_status=-1
 dedicated_health_status=-1
 normal_e2e_status=-1
@@ -79,9 +81,12 @@ write_manifest() {
   "artifacts": {
     "normal_health_manifest": $(json_string "$normal_health_dir/manifest.json"),
     "dedicated_health_manifest": $(json_string "$dedicated_health_dir/manifest.json"),
+    "local_gui_preview_manifest": $(json_string "$local_gui_dir/manifest.json"),
+    "local_gui_preview_image": $(json_string "$local_gui_dir/backlit-session.png"),
     "normal_e2e_manifest": $(json_string "$normal_e2e_dir/manifest.json"),
     "dedicated_e2e_manifest": $(json_string "$dedicated_e2e_dir/manifest.json"),
     "mvp_complete_manifest": $(json_string "$mvp_complete_dir/manifest.json"),
+    "local_gui_preview_log": $(json_string "$out_dir/local-gui-preview.log"),
     "normal_health_log": $(json_string "$out_dir/normal-health.log"),
     "dedicated_health_log": $(json_string "$out_dir/dedicated-health.log"),
     "normal_e2e_log": $(json_string "$out_dir/normal-e2e.log"),
@@ -90,6 +95,8 @@ write_manifest() {
   },
   "checks": {
     "source_tree_ready": $(json_bool "$source_tree_ready"),
+    "local_gui_status": $(status_json "$local_gui_status"),
+    "local_gui_preview": $(json_bool "$local_gui_preview_passed"),
     "normal_health_status": $(status_json "$normal_health_status"),
     "dedicated_health_status": $(status_json "$dedicated_health_status"),
     "normal_e2e_status": $(status_json "$normal_e2e_status"),
@@ -105,6 +112,7 @@ EOF
 }
 
 health_preflight=false
+local_gui_preview_passed=false
 normal_e2e_passed=false
 dedicated_e2e_passed=false
 mvp_complete_passed=false
@@ -155,6 +163,17 @@ EOF
   exit 2
 fi
 source_tree_ready=true
+
+if run_step local-gui-preview ./scripts/render-gui-preview.sh "$local_gui_dir"; then
+  local_gui_status=0
+  local_gui_preview_passed=true
+else
+  local_gui_status="$?"
+  reason="local-gui-preview-failed"
+  write_manifest
+  echo "Parallels MVP E2E stopped because the local GUI preview did not verify. Manifest: $manifest" >&2
+  exit "$local_gui_status"
+fi
 
 if run_step normal-health ./scripts/verify-parallels-ubuntu-health.sh "$normal_health_dir"; then
   normal_health_status=0
