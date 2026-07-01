@@ -15,9 +15,10 @@ use backlit_common::metrics::{event_json, FieldValue};
 #[cfg(all(feature = "smithay-backend", target_os = "linux"))]
 use backlit_compositor_backend::SmithayCompositorRuntime;
 use backlit_compositor_backend::{
-    backend_launch_plan, parse_args, preflight_backend_with_environment, BackendLaunchPlan,
-    BackendPreflightEnvironment, BackendPreflightReport, ClientId, CompositorRuntime,
-    HeadlessCompositor, RunConfig, RuntimeKind, SurfaceId as BackendSurfaceId, SurfaceOptions,
+    backend_launch_plan, parse_args, preflight_backend_with_environment, smithay_runtime_probe,
+    BackendKind, BackendLaunchPlan, BackendPreflightEnvironment, BackendPreflightReport, ClientId,
+    CompositorRuntime, HeadlessCompositor, RunConfig, RuntimeKind, SmithayRuntimeProbe,
+    SurfaceId as BackendSurfaceId, SurfaceOptions,
 };
 use backlit_demo_client::{render_policy_gui, verify_policy_gui};
 use backlit_surface::{SurfaceManager, SurfacePhase, SurfaceRole};
@@ -50,6 +51,10 @@ fn run() -> Result<(), String> {
                 "smithay_client_smoke",
                 FieldValue::Bool(config.smithay_client_smoke),
             ),
+            (
+                "drm_first_present_probe",
+                FieldValue::Bool(config.drm_first_present_probe),
+            ),
         ],
     );
 
@@ -67,6 +72,40 @@ fn run() -> Result<(), String> {
             preflight_report.backend.as_str(),
             preflight_report.code,
         ));
+    }
+
+    if config.drm_first_present_probe {
+        if config.backend != BackendKind::Drm || config.runtime != RuntimeKind::Smithay {
+            return Err(String::from(
+                "DRM first-present probe requires --backend=drm --runtime=smithay",
+            ));
+        }
+
+        let probe = smithay_runtime_probe(&preflight_environment);
+        emit_drm_first_present_probe(&config, &probe);
+
+        if !probe.passed() {
+            return Err(String::from(
+                "DRM first-present probe did not reach a valid commit or boundary",
+            ));
+        }
+
+        if !config.scripted_client
+            && !config.smithay_client_smoke
+            && !config.smoke_test
+            && !config.serve
+            && config.idle_probe_ms.is_none()
+        {
+            emit(
+                "compositor.exit",
+                &config,
+                &[(
+                    "elapsed_ms",
+                    FieldValue::U64(started.elapsed().as_millis() as u64),
+                )],
+            );
+            return Ok(());
+        }
     }
 
     if config.smithay_client_smoke {
@@ -2718,13 +2757,89 @@ fn emit_socket_client(config: &RunConfig, runtime_backend: &str, report: &Socket
     );
 }
 
+fn emit_drm_first_present_probe(config: &RunConfig, probe: &SmithayRuntimeProbe) {
+    let first_present_failure = probe.kms_first_present_failure.as_deref().unwrap_or("");
+
+    emit(
+        "compositor.drm_first_present_probe",
+        config,
+        &[
+            ("passed", FieldValue::Bool(probe.passed())),
+            ("launch_ready", FieldValue::Bool(probe.launch_ready)),
+            ("runtime_backend", FieldValue::Str(probe.runtime_backend)),
+            ("feature_enabled", FieldValue::Bool(probe.feature_enabled)),
+            ("compiled", FieldValue::Bool(probe.compiled)),
+            (
+                "drm_card_selected",
+                FieldValue::Bool(probe.drm_card_selected),
+            ),
+            (
+                "drm_node_resolved",
+                FieldValue::Bool(probe.drm_node_resolved),
+            ),
+            (
+                "kms_scanout_plan_ready",
+                FieldValue::Bool(probe.kms_scanout_plan_ready),
+            ),
+            (
+                "kms_surface_created",
+                FieldValue::Bool(probe.kms_surface_created),
+            ),
+            (
+                "kms_framebuffer_created",
+                FieldValue::Bool(probe.kms_framebuffer_created),
+            ),
+            (
+                "kms_framebuffer_added",
+                FieldValue::Bool(probe.kms_framebuffer_added),
+            ),
+            (
+                "kms_first_present_framebuffer_filled",
+                FieldValue::Bool(probe.kms_first_present_framebuffer_filled),
+            ),
+            (
+                "kms_first_present_plane_state_ready",
+                FieldValue::Bool(probe.kms_first_present_plane_state_ready),
+            ),
+            (
+                "kms_first_present_commit_attempted",
+                FieldValue::Bool(probe.kms_first_present_commit_attempted),
+            ),
+            (
+                "kms_first_present_commit_succeeded",
+                FieldValue::Bool(probe.kms_first_present_commit_succeeded),
+            ),
+            (
+                "kms_first_present_vblank_event_received",
+                FieldValue::Bool(probe.kms_first_present_vblank_event_received),
+            ),
+            (
+                "kms_first_present_blocked_by_drm_master",
+                FieldValue::Bool(probe.kms_first_present_blocked_by_drm_master),
+            ),
+            (
+                "kms_framebuffer_test_state_succeeded",
+                FieldValue::Bool(probe.kms_framebuffer_test_state_succeeded),
+            ),
+            (
+                "kms_framebuffer_test_state_permission_denied",
+                FieldValue::Bool(probe.kms_framebuffer_test_state_permission_denied),
+            ),
+            (
+                "kms_first_present_failure",
+                FieldValue::Str(first_present_failure),
+            ),
+        ],
+    );
+}
+
 fn print_help() {
     println!(
         "\
 backlit-compositor
 
 Usage:
-  backlit-compositor [--backend=headless|wayland|drm] [--runtime=headless|smithay] [--socket=backlit-0] [--smoke-test] [--scripted-client] [--smithay-client-smoke] [--scripted-client-preview=path] [--serve] [--serve-for-ms=1000] [--idle-probe-ms=1000]
+  backlit-compositor [--backend=headless|wayland|drm] [--runtime=headless|smithay] [--socket=backlit-0] [--smoke-test] [--scripted-client] [--smithay-client-smoke] [--drm-first-present-probe] [--scripted-client-preview=path] [--serve] [--serve-for-ms=1000] [--idle-probe-ms=1000]
 
 Flags:
   --backend      Select compositor backend. Defaults to headless.
@@ -2735,6 +2850,8 @@ Flags:
                  Run a deterministic app-client lifecycle through the compositor runtime.
   --smithay-client-smoke
                  Run a real Wayland registry/surface/xdg-toplevel protocol smoke through Smithay.
+  --drm-first-present-probe
+                 Probe Smithay DRM/KMS first-present framebuffer, plane state, and commit boundary.
   --scripted-client-preview
                  Write the scripted client policy preview frame to a PPM file.
   --serve        Stay alive after readiness for systemd session service mode.

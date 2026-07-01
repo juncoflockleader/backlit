@@ -480,6 +480,7 @@ require_contains "$host_smithay_compositor_runtime_manifest" '"smithay_real_wayl
 require_contains "$host_smithay_compositor_runtime_manifest" '"smithay_real_shm_buffer": true'
 require_contains "$host_smithay_compositor_runtime_manifest" '"smithay_real_wayland_policy_window": true'
 require_contains "$host_smithay_compositor_runtime_manifest" '"smithay_event_loop_runtime": true'
+require_contains "$host_smithay_compositor_runtime_manifest" '"smithay_drm_first_present_probe": true'
 require_contains "$host_smithay_compositor_runtime_manifest" '"smithay_service_ready": true'
 require_contains "$host_smithay_compositor_runtime_manifest" '"smithay_service_socket": true'
 require_contains "$host_smithay_compositor_runtime_manifest" '"smithay_service_socket_runtime_trait": true'

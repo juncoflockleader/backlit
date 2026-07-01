@@ -3024,6 +3024,7 @@ pub struct RunConfig {
     pub scripted_client: bool,
     pub scripted_client_preview: Option<String>,
     pub smithay_client_smoke: bool,
+    pub drm_first_present_probe: bool,
     pub serve: bool,
     pub serve_for_ms: Option<u64>,
     pub idle_probe_ms: Option<u64>,
@@ -3040,6 +3041,7 @@ impl Default for RunConfig {
             scripted_client: false,
             scripted_client_preview: None,
             smithay_client_smoke: false,
+            drm_first_present_probe: false,
             serve: false,
             serve_for_ms: None,
             idle_probe_ms: None,
@@ -3086,6 +3088,8 @@ where
             config.scripted_client = true;
         } else if arg == "--smithay-client-smoke" {
             config.smithay_client_smoke = true;
+        } else if arg == "--drm-first-present-probe" {
+            config.drm_first_present_probe = true;
         } else if let Some(value) = arg.strip_prefix("--scripted-client-preview=") {
             config.scripted_client = true;
             config.scripted_client_preview = Some(value.to_string());
@@ -4570,6 +4574,7 @@ mod tests {
             "--smoke-test",
             "--scripted-client",
             "--smithay-client-smoke",
+            "--drm-first-present-probe",
             "--scripted-client-preview",
             "target/compositor-runtime/preview.ppm",
             "--idle-probe-ms",
@@ -4585,6 +4590,7 @@ mod tests {
         assert!(config.smoke_test);
         assert!(config.scripted_client);
         assert!(config.smithay_client_smoke);
+        assert!(config.drm_first_present_probe);
         assert_eq!(
             config.scripted_client_preview.as_deref(),
             Some("target/compositor-runtime/preview.ppm")

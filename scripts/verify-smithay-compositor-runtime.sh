@@ -11,6 +11,8 @@ log="$out_dir/smithay-compositor-runtime.jsonl"
 err="$out_dir/smithay-compositor-runtime.stderr"
 client_smoke_log="$out_dir/smithay-wayland-client-smoke.jsonl"
 client_smoke_err="$out_dir/smithay-wayland-client-smoke.stderr"
+first_present_log="$out_dir/smithay-first-present-probe.jsonl"
+first_present_err="$out_dir/smithay-first-present-probe.stderr"
 service_log="$out_dir/smithay-compositor-service.jsonl"
 service_err="$out_dir/smithay-compositor-service.stderr"
 first_demo_client_log="$out_dir/demo-client-first-socket.jsonl"
@@ -29,6 +31,12 @@ require_contains() {
   file="$1"
   value="$2"
   grep -F -- "$value" "$file" >/dev/null || fail "missing text in $file: $value"
+}
+
+require_matches() {
+  file="$1"
+  value="$2"
+  grep -E "$value" "$file" >/dev/null || fail "missing pattern in $file: $value"
 }
 
 require_line_contains_all() {
@@ -79,6 +87,8 @@ write_blocked_manifest() {
     "compositor_stderr": "$err",
     "client_smoke_log": "$client_smoke_log",
     "client_smoke_stderr": "$client_smoke_err",
+    "first_present_log": "$first_present_log",
+    "first_present_stderr": "$first_present_err",
     "service_log": "$service_log",
     "service_stderr": "$service_err",
     "first_demo_client_log": "$first_demo_client_log",
@@ -94,6 +104,7 @@ write_blocked_manifest() {
     "smithay_real_shm_buffer": false,
     "smithay_real_wayland_policy_window": false,
     "smithay_event_loop_runtime": false,
+    "smithay_drm_first_present_probe": false,
     "smithay_service_ready": false,
     "smithay_service_socket": false,
     "smithay_service_socket_runtime_trait": false,
@@ -170,6 +181,47 @@ require_line_contains_all "$log" \
   '"calloop_dispatch_count":1'
 require_contains "$log" '"bootstrap_client_connected":true'
 require_contains "$log" '"bootstrap_surface_presented":true'
+
+set +e
+target/debug/backlit-compositor \
+  --backend=drm \
+  --runtime=smithay \
+  --drm-first-present-probe > "$first_present_log" 2> "$first_present_err"
+first_present_status=$?
+set -e
+
+if [ "$first_present_status" -ne 0 ]; then
+  cat "$first_present_log" >&2 || true
+  cat "$first_present_err" >&2 || true
+  fail "DRM first-present probe exited with status $first_present_status on a launch-ready host"
+fi
+
+require_contains "$first_present_log" '"event":"compositor.start"'
+require_contains "$first_present_log" '"drm_first_present_probe":true'
+require_contains "$first_present_log" '"event":"compositor.drm_first_present_probe"'
+require_contains "$first_present_log" '"passed":true'
+require_contains "$first_present_log" '"runtime_backend":"smithay-drm-probe"'
+require_contains "$first_present_log" '"feature_enabled":true'
+require_contains "$first_present_log" '"compiled":true'
+require_contains "$first_present_log" '"launch_ready":true'
+require_contains "$first_present_log" '"drm_card_selected":true'
+require_contains "$first_present_log" '"drm_node_resolved":true'
+require_contains "$first_present_log" '"kms_scanout_plan_ready":true'
+require_contains "$first_present_log" '"kms_surface_created":true'
+require_contains "$first_present_log" '"kms_framebuffer_created":true'
+require_contains "$first_present_log" '"kms_framebuffer_added":true'
+require_contains "$first_present_log" '"kms_first_present_framebuffer_filled":true'
+require_contains "$first_present_log" '"kms_first_present_plane_state_ready":true'
+require_matches "$first_present_log" '"kms_framebuffer_test_state_(succeeded|permission_denied)":true'
+require_matches "$first_present_log" '"kms_first_present_(commit_succeeded|blocked_by_drm_master)":true'
+if grep -F '"kms_first_present_commit_succeeded":true' "$first_present_log" >/dev/null; then
+  require_contains "$first_present_log" '"kms_first_present_vblank_event_received":true'
+else
+  require_contains "$first_present_log" '"kms_first_present_blocked_by_drm_master":true'
+  require_contains "$first_present_log" '"kms_framebuffer_test_state_permission_denied":true'
+fi
+require_contains "$first_present_log" '"kms_first_present_failure":""'
+require_contains "$first_present_log" '"event":"compositor.exit"'
 
 set +e
 target/debug/backlit-compositor \
@@ -393,6 +445,8 @@ cat > "$out_dir/manifest.json" <<EOF
     "compositor_stderr": "$err",
     "client_smoke_log": "$client_smoke_log",
     "client_smoke_stderr": "$client_smoke_err",
+    "first_present_log": "$first_present_log",
+    "first_present_stderr": "$first_present_err",
     "service_log": "$service_log",
     "service_stderr": "$service_err",
     "first_demo_client_log": "$first_demo_client_log",
@@ -408,6 +462,7 @@ cat > "$out_dir/manifest.json" <<EOF
     "smithay_real_shm_buffer": true,
     "smithay_real_wayland_policy_window": true,
     "smithay_event_loop_runtime": true,
+    "smithay_drm_first_present_probe": true,
     "smithay_service_ready": true,
     "smithay_service_socket": true,
     "smithay_service_socket_runtime_trait": true,
