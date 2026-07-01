@@ -251,6 +251,7 @@ Restart or repair the Ubuntu VM so its root filesystem mounts read-write before 
   ./scripts/verify-parallels-linux-e2e.sh
   ./scripts/verify-parallels-dedicated-drm-e2e.sh
 
+Runbook: docs/runbooks/parallels-ubuntu-readonly.md
 Manifest: $manifest
 EOF
 exit 2

@@ -35,6 +35,7 @@ require_matches() {
 }
 
 require_file docs/architecture/mvp-1.md
+require_file docs/runbooks/parallels-ubuntu-readonly.md
 require_executable scripts/verify-launch-readiness.sh
 require_executable scripts/verify-session-launch.sh
 require_executable scripts/verify-drm-session-smoke.sh
@@ -65,6 +66,13 @@ require_contains docs/architecture/mvp-1.md 'clean exit'
 require_contains docs/architecture/mvp-1.md 'managed desktop-launch window'
 require_contains docs/architecture/mvp-1.md 'verify-mvp-complete.sh'
 require_contains docs/architecture/mvp-1.md 'does not claim the real DRM compositor loop is complete'
+require_contains docs/architecture/mvp-1.md 'parallels-ubuntu-health/manifest.json'
+require_contains docs/architecture/mvp-1.md 'docs/runbooks/parallels-ubuntu-readonly.md'
+require_contains docs/runbooks/parallels-ubuntu-readonly.md 'guest-root-read-only'
+require_contains docs/runbooks/parallels-ubuntu-readonly.md 'Do not run `fsck` against a'
+require_contains docs/runbooks/parallels-ubuntu-readonly.md 'mounted root filesystem'
+require_contains docs/runbooks/parallels-ubuntu-readonly.md './scripts/verify-parallels-linux-e2e.sh target/linux-e2e-parallels'
+require_contains docs/runbooks/parallels-ubuntu-readonly.md './scripts/verify-mvp-complete.sh target/mvp-complete target/linux-e2e-parallels target/parallels-dedicated-drm-e2e'
 require_contains scripts/verify-launch-readiness.sh '"drm_expected_ready"'
 require_contains scripts/verify-launch-readiness.sh '"drm_card_access_ready"'
 require_contains scripts/verify-launch-readiness.sh '"input_broker_ready"'
@@ -154,6 +162,7 @@ require_contains scripts/verify-parallels-ubuntu-health.sh '"tmp_writable": $(js
 require_contains scripts/verify-parallels-ubuntu-health.sh 'guest-root-read-only'
 require_contains scripts/verify-parallels-ubuntu-health.sh 'verify-parallels-linux-e2e.sh'
 require_contains scripts/verify-parallels-ubuntu-health.sh 'verify-parallels-dedicated-drm-e2e.sh'
+require_contains scripts/verify-parallels-ubuntu-health.sh 'docs/runbooks/parallels-ubuntu-readonly.md'
 require_contains scripts/verify-mvp-complete.sh '"name": "backlit-mvp-complete"'
 require_contains scripts/verify-mvp-complete.sh '"source_tree_ready": $source_tree_ready'
 require_contains scripts/verify-mvp-complete.sh '"worktree_clean": $worktree_clean'
