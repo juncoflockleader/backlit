@@ -78,6 +78,18 @@ fn run() -> Result<(), String> {
                 ("runtime_backend", FieldValue::Str(runtime.runtime_backend)),
                 ("runtime_trait", FieldValue::Bool(runtime.runtime_trait)),
                 (
+                    "inserted_wayland_clients",
+                    FieldValue::U64(runtime.inserted_wayland_clients),
+                ),
+                (
+                    "wayland_dispatch_count",
+                    FieldValue::U64(runtime.wayland_dispatch_count),
+                ),
+                (
+                    "calloop_dispatch_count",
+                    FieldValue::U64(runtime.calloop_dispatch_count),
+                ),
+                (
                     "client_connected",
                     FieldValue::Bool(runtime.client_connected),
                 ),
@@ -198,6 +210,18 @@ fn run() -> Result<(), String> {
                     FieldValue::Str(readiness.runtime_backend),
                 ),
                 ("runtime_trait", FieldValue::Bool(readiness.runtime_trait)),
+                (
+                    "inserted_wayland_clients",
+                    FieldValue::U64(readiness.inserted_wayland_clients),
+                ),
+                (
+                    "wayland_dispatch_count",
+                    FieldValue::U64(readiness.wayland_dispatch_count),
+                ),
+                (
+                    "calloop_dispatch_count",
+                    FieldValue::U64(readiness.calloop_dispatch_count),
+                ),
                 (
                     "accepting_clients",
                     FieldValue::Bool(readiness.accepting_clients),
@@ -553,6 +577,9 @@ impl<B: CompositorRuntime> SocketClientRuntime<B> {
             damaged_surfaces: frame.damaged_surfaces,
             backend_clients: frame.client_count,
             backend_surfaces: frame.surface_count,
+            inserted_wayland_clients: self.backend.inserted_wayland_clients(),
+            wayland_dispatch_count: self.backend.wayland_dispatch_count(),
+            calloop_dispatch_count: self.backend.calloop_dispatch_count(),
             policy_windows: self.manager.policy().windows().len() as u64,
             visible_windows: self.manager.policy().visible_windows().count() as u64,
             policy_state: geometry.state,
@@ -648,6 +675,9 @@ impl<B: CompositorRuntime> SocketClientRuntime<B> {
             damaged_surfaces: frame.damaged_surfaces,
             backend_clients: frame.client_count,
             backend_surfaces: frame.surface_count,
+            inserted_wayland_clients: self.backend.inserted_wayland_clients(),
+            wayland_dispatch_count: self.backend.wayland_dispatch_count(),
+            calloop_dispatch_count: self.backend.calloop_dispatch_count(),
             policy_windows: self.manager.policy().windows().len() as u64,
             visible_windows: self.manager.policy().visible_windows().count() as u64,
             policy_state: geometry.state,
@@ -702,6 +732,9 @@ impl<B: CompositorRuntime> SocketClientRuntime<B> {
             damaged_surfaces: frame.damaged_surfaces,
             backend_clients: frame.client_count,
             backend_surfaces: frame.surface_count,
+            inserted_wayland_clients: self.backend.inserted_wayland_clients(),
+            wayland_dispatch_count: self.backend.wayland_dispatch_count(),
+            calloop_dispatch_count: self.backend.calloop_dispatch_count(),
             policy_windows: self.manager.policy().windows().len() as u64,
             visible_windows: self.manager.policy().visible_windows().count() as u64,
             policy_state: geometry.state,
@@ -771,6 +804,9 @@ impl<B: CompositorRuntime> SocketClientRuntime<B> {
             damaged_surfaces: frame.damaged_surfaces,
             backend_clients: frame.client_count,
             backend_surfaces: frame.surface_count,
+            inserted_wayland_clients: self.backend.inserted_wayland_clients(),
+            wayland_dispatch_count: self.backend.wayland_dispatch_count(),
+            calloop_dispatch_count: self.backend.calloop_dispatch_count(),
             policy_windows: self.manager.policy().windows().len() as u64,
             visible_windows: self.manager.policy().visible_windows().count() as u64,
             policy_state: geometry.state,
@@ -865,6 +901,9 @@ struct SocketClientReport {
     damaged_surfaces: u64,
     backend_clients: u64,
     backend_surfaces: u64,
+    inserted_wayland_clients: u64,
+    wayland_dispatch_count: u64,
+    calloop_dispatch_count: u64,
     policy_windows: u64,
     visible_windows: u64,
     policy_state: &'static str,
@@ -901,6 +940,9 @@ impl SocketClientReport {
             damaged_surfaces: 0,
             backend_clients: 0,
             backend_surfaces: 0,
+            inserted_wayland_clients: 0,
+            wayland_dispatch_count: 0,
+            calloop_dispatch_count: 0,
             policy_windows: 0,
             visible_windows: 0,
             policy_state: "none",
@@ -1187,6 +1229,9 @@ fn poll_socket_clients<B: CompositorRuntime>(
 struct ScriptedClientRuntime {
     runtime_backend: &'static str,
     runtime_trait: bool,
+    inserted_wayland_clients: u64,
+    wayland_dispatch_count: u64,
+    calloop_dispatch_count: u64,
     client_connected: bool,
     surfaces_after_map: u64,
     first_frame_damaged_surfaces: u64,
@@ -1220,6 +1265,7 @@ impl ScriptedClientRuntime {
     fn passed(self) -> bool {
         self.runtime_trait
             && !self.runtime_backend.is_empty()
+            && self.smithay_event_loop_runtime_ok()
             && self.client_connected
             && self.surfaces_after_map == 2
             && self.first_frame_damaged_surfaces == 2
@@ -1245,6 +1291,13 @@ impl ScriptedClientRuntime {
             && (!self.policy_preview_requested || self.policy_preview_written)
             && self.policy_preview_verified
             && self.policy_preview_non_background_pixels > 10_000
+    }
+
+    fn smithay_event_loop_runtime_ok(self) -> bool {
+        self.runtime_backend != "smithay-compositor-runtime"
+            || (self.inserted_wayland_clients >= 1
+                && self.wayland_dispatch_count >= self.frames
+                && self.calloop_dispatch_count >= self.frames)
     }
 }
 
@@ -1354,6 +1407,9 @@ fn run_scripted_client_runtime_with_backend<B: CompositorRuntime>(
     Ok(ScriptedClientRuntime {
         runtime_backend,
         runtime_trait: true,
+        inserted_wayland_clients: backend.inserted_wayland_clients(),
+        wayland_dispatch_count: backend.wayland_dispatch_count(),
+        calloop_dispatch_count: backend.calloop_dispatch_count(),
         client_connected: first_frame.client_count == 1,
         surfaces_after_map: first_frame.surface_count,
         first_frame_damaged_surfaces: first_frame.damaged_surfaces,
@@ -1596,6 +1652,9 @@ fn run_smoke_test(config: &RunConfig) {
 struct CompositorReadyReport {
     runtime_backend: &'static str,
     runtime_trait: bool,
+    inserted_wayland_clients: u64,
+    wayland_dispatch_count: u64,
+    calloop_dispatch_count: u64,
     accepting_clients: bool,
     bootstrap_client_connected: bool,
     bootstrap_surface_presented: bool,
@@ -1610,6 +1669,7 @@ impl CompositorReadyReport {
     fn passed(self) -> bool {
         self.runtime_trait
             && !self.runtime_backend.is_empty()
+            && self.smithay_event_loop_runtime_ok()
             && self.accepting_clients
             && self.bootstrap_client_connected
             && self.bootstrap_surface_presented
@@ -1618,6 +1678,13 @@ impl CompositorReadyReport {
             && self.frames == 1
             && self.damaged_surfaces == 1
             && self.presented_pixels == 1
+    }
+
+    fn smithay_event_loop_runtime_ok(self) -> bool {
+        self.runtime_backend != "smithay-compositor-runtime"
+            || (self.inserted_wayland_clients >= 1
+                && self.wayland_dispatch_count >= self.frames
+                && self.calloop_dispatch_count >= self.frames)
     }
 }
 
@@ -1656,6 +1723,9 @@ fn run_service_ready_with_backend<B: CompositorRuntime>(mut backend: B) -> Compo
     CompositorReadyReport {
         runtime_backend,
         runtime_trait: true,
+        inserted_wayland_clients: backend.inserted_wayland_clients(),
+        wayland_dispatch_count: backend.wayland_dispatch_count(),
+        calloop_dispatch_count: backend.calloop_dispatch_count(),
         accepting_clients: backend.client_count() > 0,
         bootstrap_client_connected: backend.client_count() == 1,
         bootstrap_surface_presented,
@@ -2215,6 +2285,18 @@ fn emit_socket_client(config: &RunConfig, runtime_backend: &str, report: &Socket
             ("damaged_surfaces", FieldValue::U64(report.damaged_surfaces)),
             ("backend_clients", FieldValue::U64(report.backend_clients)),
             ("backend_surfaces", FieldValue::U64(report.backend_surfaces)),
+            (
+                "inserted_wayland_clients",
+                FieldValue::U64(report.inserted_wayland_clients),
+            ),
+            (
+                "wayland_dispatch_count",
+                FieldValue::U64(report.wayland_dispatch_count),
+            ),
+            (
+                "calloop_dispatch_count",
+                FieldValue::U64(report.calloop_dispatch_count),
+            ),
             ("policy_windows", FieldValue::U64(report.policy_windows)),
             ("visible_windows", FieldValue::U64(report.visible_windows)),
             ("policy_state", FieldValue::Str(report.policy_state)),

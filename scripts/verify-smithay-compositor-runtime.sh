@@ -84,9 +84,11 @@ write_blocked_manifest() {
     "smithay_compositor_runtime": false,
     "smithay_runtime_trait": false,
     "smithay_scripted_client": false,
+    "smithay_event_loop_runtime": false,
     "smithay_service_ready": false,
     "smithay_service_socket": false,
     "smithay_service_socket_runtime_trait": false,
+    "smithay_event_loop_service_socket": false,
     "smithay_demo_client_socket_lifecycle": false,
     "drm_launch_ready": false
   }
@@ -139,12 +141,22 @@ require_contains "$log" '"event":"compositor.scripted_client"'
 require_contains "$log" '"passed":true'
 require_contains "$log" '"runtime_backend":"smithay-compositor-runtime"'
 require_contains "$log" '"runtime_trait":true'
+require_line_contains_all "$log" \
+  '"event":"compositor.scripted_client"' \
+  '"inserted_wayland_clients":1' \
+  '"wayland_dispatch_count":7' \
+  '"calloop_dispatch_count":7'
 require_contains "$log" '"client_connected":true'
 require_contains "$log" '"surfaces_after_map":2'
 require_contains "$log" '"targeted_damage_ok":true'
 require_contains "$log" '"clean_disconnect":true'
 require_contains "$log" '"event":"compositor.ready"'
 require_contains "$log" '"ready":true'
+require_line_contains_all "$log" \
+  '"event":"compositor.ready"' \
+  '"inserted_wayland_clients":1' \
+  '"wayland_dispatch_count":1' \
+  '"calloop_dispatch_count":1'
 require_contains "$log" '"bootstrap_client_connected":true'
 require_contains "$log" '"bootstrap_surface_presented":true'
 
@@ -219,6 +231,11 @@ require_contains "$service_log" '"runtime":"smithay"'
 require_contains "$service_log" '"event":"compositor.ready"'
 require_contains "$service_log" '"runtime_backend":"smithay-compositor-runtime"'
 require_contains "$service_log" '"ready":true'
+require_line_contains_all "$service_log" \
+  '"event":"compositor.ready"' \
+  '"inserted_wayland_clients":1' \
+  '"wayland_dispatch_count":1' \
+  '"calloop_dispatch_count":1'
 require_contains "$service_log" '"event":"compositor.socket_bound"'
 require_contains "$service_log" "\"socket_name\":\"$socket_name\""
 require_contains "$service_log" "\"socket_path\":\"$socket_path\""
@@ -230,6 +247,9 @@ require_line_contains_all "$service_log" \
   '"app_id":"org.backlit.SmithaySocketTerminal"' \
   '"runtime_backend":"smithay-compositor-runtime"' \
   '"backend_surface_presented":true' \
+  '"inserted_wayland_clients":1' \
+  '"wayland_dispatch_count":1' \
+  '"calloop_dispatch_count":1' \
   '"policy_window_mapped":true' \
   '"policy_app_id_preserved":true'
 require_line_contains_all "$service_log" \
@@ -241,7 +261,10 @@ require_line_contains_all "$service_log" \
   '"policy_window_mapped":true' \
   '"policy_app_id_preserved":true' \
   '"backend_clients":2' \
-  '"backend_surfaces":2'
+  '"backend_surfaces":2' \
+  '"inserted_wayland_clients":2' \
+  '"wayland_dispatch_count":2' \
+  '"calloop_dispatch_count":2'
 require_line_contains_all "$service_log" \
   '"action":"move"' \
   '"title":"smithay-socket-browser"' \
@@ -277,6 +300,9 @@ require_line_contains_all "$service_log" \
   '"client_disconnected":true' \
   '"backend_clients":1' \
   '"backend_surfaces":1' \
+  '"inserted_wayland_clients":2' \
+  '"wayland_dispatch_count":8' \
+  '"calloop_dispatch_count":8' \
   '"policy_windows":1'
 require_contains "$service_log" '"event":"compositor.socket_unbound"'
 require_contains "$service_log" '"removed":true'
@@ -308,9 +334,11 @@ cat > "$out_dir/manifest.json" <<EOF
     "smithay_compositor_runtime": true,
     "smithay_runtime_trait": true,
     "smithay_scripted_client": true,
+    "smithay_event_loop_runtime": true,
     "smithay_service_ready": true,
     "smithay_service_socket": true,
     "smithay_service_socket_runtime_trait": true,
+    "smithay_event_loop_service_socket": true,
     "smithay_demo_client_socket_lifecycle": true,
     "drm_launch_ready": $drm_launch_ready
   }

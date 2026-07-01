@@ -1675,6 +1675,15 @@ pub trait CompositorRuntime {
     type Error: fmt::Display;
 
     fn runtime_name(&self) -> &'static str;
+    fn inserted_wayland_clients(&self) -> u64 {
+        0
+    }
+    fn wayland_dispatch_count(&self) -> u64 {
+        0
+    }
+    fn calloop_dispatch_count(&self) -> u64 {
+        0
+    }
     fn connect_client(&mut self, name: &str) -> ClientId;
     fn submit_surface(
         &mut self,
@@ -1956,10 +1965,12 @@ impl CompositorRuntime for HeadlessCompositor {
 pub struct SmithayCompositorRuntime {
     inner: HeadlessCompositor,
     display: smithay::reexports::wayland_server::Display<SmithayCompositorState>,
+    event_loop: smithay::reexports::calloop::EventLoop<SmithayCompositorState>,
     listening_socket: smithay::reexports::wayland_server::ListeningSocket,
     socket_name: String,
     inserted_wayland_clients: u64,
-    dispatch_count: u64,
+    wayland_dispatch_count: u64,
+    calloop_dispatch_count: u64,
     last_error: Option<String>,
 }
 
@@ -1970,10 +1981,13 @@ struct SmithayCompositorState;
 #[cfg(all(feature = "smithay-backend", target_os = "linux"))]
 impl SmithayCompositorRuntime {
     pub fn try_new() -> Result<Self, SmithayRuntimeError> {
+        use smithay::reexports::calloop::EventLoop;
         use smithay::reexports::wayland_server::{Display, ListeningSocket};
 
         let display = Display::<SmithayCompositorState>::new()
             .map_err(|error| SmithayRuntimeError(format!("display-new:{error}")))?;
+        let event_loop = EventLoop::<SmithayCompositorState>::try_new()
+            .map_err(|error| SmithayRuntimeError(format!("event-loop-new:{error}")))?;
         let listening_socket = ListeningSocket::bind_auto("backlit-smithay-runtime", 0..64)
             .map_err(|error| SmithayRuntimeError(format!("socket-bind:{error}")))?;
         let socket_name = listening_socket
@@ -1985,10 +1999,12 @@ impl SmithayCompositorRuntime {
         Ok(Self {
             inner: HeadlessCompositor::default(),
             display,
+            event_loop,
             listening_socket,
             socket_name,
             inserted_wayland_clients: 0,
-            dispatch_count: 0,
+            wayland_dispatch_count: 0,
+            calloop_dispatch_count: 0,
             last_error: None,
         })
     }
@@ -2001,8 +2017,12 @@ impl SmithayCompositorRuntime {
         self.inserted_wayland_clients
     }
 
-    pub fn dispatch_count(&self) -> u64 {
-        self.dispatch_count
+    pub fn wayland_dispatch_count(&self) -> u64 {
+        self.wayland_dispatch_count
+    }
+
+    pub fn calloop_dispatch_count(&self) -> u64 {
+        self.calloop_dispatch_count
     }
 
     pub fn last_error(&self) -> Option<&str> {
@@ -2032,16 +2052,30 @@ impl SmithayCompositorRuntime {
     }
 
     fn dispatch_wayland(&mut self) {
+        use std::time::Duration;
+
         let mut state = SmithayCompositorState;
         match self.display.dispatch_clients(&mut state) {
-            Ok(count) => {
-                self.dispatch_count += count as u64;
+            Ok(_count) => {
+                self.wayland_dispatch_count += 1;
                 if let Err(error) = self.display.flush_clients() {
                     self.last_error = Some(format!("display-flush:{error}"));
                 }
             }
             Err(error) => {
                 self.last_error = Some(format!("display-dispatch:{error}"));
+            }
+        }
+
+        match self
+            .event_loop
+            .dispatch(Some(Duration::from_millis(0)), &mut state)
+        {
+            Ok(()) => {
+                self.calloop_dispatch_count += 1;
+            }
+            Err(error) => {
+                self.last_error = Some(format!("event-loop-dispatch:{error}"));
             }
         }
     }
@@ -2053,6 +2087,18 @@ impl CompositorRuntime for SmithayCompositorRuntime {
 
     fn runtime_name(&self) -> &'static str {
         "smithay-compositor-runtime"
+    }
+
+    fn inserted_wayland_clients(&self) -> u64 {
+        SmithayCompositorRuntime::inserted_wayland_clients(self)
+    }
+
+    fn wayland_dispatch_count(&self) -> u64 {
+        SmithayCompositorRuntime::wayland_dispatch_count(self)
+    }
+
+    fn calloop_dispatch_count(&self) -> u64 {
+        SmithayCompositorRuntime::calloop_dispatch_count(self)
     }
 
     fn connect_client(&mut self, name: &str) -> ClientId {

@@ -348,15 +348,19 @@ if [ -n "$artifact_root" ] && [ -d "$artifact_root" ]; then
   require_contains "$artifact_root/smithay-compositor-runtime/manifest.json" '"smithay_compositor_runtime":'
   require_contains "$artifact_root/smithay-compositor-runtime/manifest.json" '"smithay_runtime_trait":'
   require_contains "$artifact_root/smithay-compositor-runtime/manifest.json" '"smithay_scripted_client":'
+  require_contains "$artifact_root/smithay-compositor-runtime/manifest.json" '"smithay_event_loop_runtime":'
   require_contains "$artifact_root/smithay-compositor-runtime/manifest.json" '"smithay_service_ready":'
+  require_contains "$artifact_root/smithay-compositor-runtime/manifest.json" '"smithay_event_loop_service_socket":'
   if grep '"checked": true' "$artifact_root/smithay-compositor-runtime/manifest.json" >/dev/null; then
     if grep '"drm_launch_ready": true' "$artifact_root/smithay-compositor-runtime/manifest.json" >/dev/null; then
       require_contains "$artifact_root/smithay-compositor-runtime/manifest.json" '"smithay_compositor_runtime": true'
       require_contains "$artifact_root/smithay-compositor-runtime/manifest.json" '"smithay_runtime_trait": true'
       require_contains "$artifact_root/smithay-compositor-runtime/manifest.json" '"smithay_scripted_client": true'
+      require_contains "$artifact_root/smithay-compositor-runtime/manifest.json" '"smithay_event_loop_runtime": true'
       require_contains "$artifact_root/smithay-compositor-runtime/manifest.json" '"smithay_service_ready": true'
       require_contains "$artifact_root/smithay-compositor-runtime/manifest.json" '"smithay_service_socket": true'
       require_contains "$artifact_root/smithay-compositor-runtime/manifest.json" '"smithay_service_socket_runtime_trait": true'
+      require_contains "$artifact_root/smithay-compositor-runtime/manifest.json" '"smithay_event_loop_service_socket": true'
       require_contains "$artifact_root/smithay-compositor-runtime/manifest.json" '"smithay_demo_client_socket_lifecycle": true'
     else
       require_contains "$artifact_root/smithay-compositor-runtime/manifest.json" '"expected_blocked": true'
