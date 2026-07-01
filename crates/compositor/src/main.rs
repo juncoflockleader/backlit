@@ -505,6 +505,7 @@ impl SocketClientRuntime {
             });
         }
         let frame = self.backend.present();
+        let focused = self.focused_window_state();
 
         SocketClientReport {
             message_valid: true,
@@ -526,7 +527,14 @@ impl SocketClientRuntime {
             backend_surfaces: frame.surface_count,
             policy_windows: self.manager.policy().windows().len() as u64,
             visible_windows: self.manager.policy().visible_windows().count() as u64,
-            focused_window: self.manager.policy().focused().is_some(),
+            focused_window: focused.is_some(),
+            focused_title: focused
+                .as_ref()
+                .map(|window| window.title.clone())
+                .unwrap_or_default(),
+            focused_app_id: focused
+                .and_then(|window| window.app_id.clone())
+                .unwrap_or_default(),
         }
     }
 
@@ -538,6 +546,7 @@ impl SocketClientRuntime {
             .map(|surface| self.backend.mark_damaged(surface).is_ok())
             .unwrap_or(false);
         let frame = self.backend.present();
+        let focused = self.focused_window_state();
 
         SocketClientReport {
             message_valid: true,
@@ -559,7 +568,14 @@ impl SocketClientRuntime {
             backend_surfaces: frame.surface_count,
             policy_windows: self.manager.policy().windows().len() as u64,
             visible_windows: self.manager.policy().visible_windows().count() as u64,
-            focused_window: self.manager.policy().focused().is_some(),
+            focused_window: focused.is_some(),
+            focused_title: focused
+                .as_ref()
+                .map(|window| window.title.clone())
+                .unwrap_or_default(),
+            focused_app_id: focused
+                .and_then(|window| window.app_id.clone())
+                .unwrap_or_default(),
         }
     }
 
@@ -586,6 +602,7 @@ impl SocketClientRuntime {
             .map(|record| self.backend.disconnect_client(record.client).is_ok())
             .unwrap_or(false);
         let frame = self.backend.present();
+        let focused = self.focused_window_state();
 
         SocketClientReport {
             message_valid: true,
@@ -607,8 +624,22 @@ impl SocketClientRuntime {
             backend_surfaces: frame.surface_count,
             policy_windows: self.manager.policy().windows().len() as u64,
             visible_windows: self.manager.policy().visible_windows().count() as u64,
-            focused_window: self.manager.policy().focused().is_some(),
+            focused_window: focused.is_some(),
+            focused_title: focused
+                .as_ref()
+                .map(|window| window.title.clone())
+                .unwrap_or_default(),
+            focused_app_id: focused
+                .and_then(|window| window.app_id.clone())
+                .unwrap_or_default(),
         }
+    }
+
+    fn focused_window_state(&self) -> Option<&backlit_window_policy::Window> {
+        self.manager
+            .policy()
+            .focused()
+            .and_then(|window| self.manager.policy().window(window))
     }
 
     fn find_client(&self, app_id: &str, title: &str) -> Option<&SocketClientRecord> {
@@ -660,6 +691,8 @@ struct SocketClientReport {
     policy_windows: u64,
     visible_windows: u64,
     focused_window: bool,
+    focused_title: String,
+    focused_app_id: String,
 }
 
 impl SocketClientReport {
@@ -685,6 +718,8 @@ impl SocketClientReport {
             policy_windows: 0,
             visible_windows: 0,
             focused_window: false,
+            focused_title: String::new(),
+            focused_app_id: String::new(),
         }
     }
 }
@@ -1682,6 +1717,14 @@ fn emit_socket_client(config: &RunConfig, report: &SocketClientReport) {
             ("policy_windows", FieldValue::U64(report.policy_windows)),
             ("visible_windows", FieldValue::U64(report.visible_windows)),
             ("focused_window", FieldValue::Bool(report.focused_window)),
+            (
+                "focused_title",
+                FieldValue::Str(report.focused_title.as_str()),
+            ),
+            (
+                "focused_app_id",
+                FieldValue::Str(report.focused_app_id.as_str()),
+            ),
         ],
     );
 }
@@ -1849,6 +1892,8 @@ mod tests {
         assert_eq!(report.policy_windows, 1);
         assert_eq!(report.visible_windows, 1);
         assert!(report.focused_window);
+        assert_eq!(report.focused_title, "socket-demo");
+        assert_eq!(report.focused_app_id, "org.backlit.SocketDemo");
     }
 
     #[test]
@@ -1878,5 +1923,44 @@ BACKLIT_DEMO_CLIENT close app_id=org.backlit.SocketDemo
         assert_eq!(reports[2].backend_surfaces, 0);
         assert_eq!(reports[2].policy_windows, 0);
         assert_eq!(reports[2].visible_windows, 0);
+    }
+
+    #[test]
+    fn socket_client_runtime_focuses_new_window_and_falls_back_after_close() {
+        let mut runtime = SocketClientRuntime::new();
+        let terminal = runtime.handle_stream(
+            "BACKLIT_DEMO_CLIENT surface title=socket-terminal app_id=org.backlit.SocketTerminal width=640 height=480\n",
+        );
+        let browser = runtime.handle_stream(
+            "\
+BACKLIT_DEMO_CLIENT surface title=socket-browser app_id=org.backlit.SocketBrowser width=900 height=600
+BACKLIT_DEMO_CLIENT damage app_id=org.backlit.SocketBrowser
+BACKLIT_DEMO_CLIENT close app_id=org.backlit.SocketBrowser
+",
+        );
+
+        assert_eq!(terminal.len(), 1);
+        assert_eq!(terminal[0].action, DemoSocketAction::Surface);
+        assert_eq!(terminal[0].backend_clients, 1);
+        assert_eq!(terminal[0].backend_surfaces, 1);
+        assert_eq!(terminal[0].policy_windows, 1);
+        assert_eq!(terminal[0].focused_app_id, "org.backlit.SocketTerminal");
+
+        assert_eq!(browser.len(), 3);
+        assert_eq!(browser[0].action, DemoSocketAction::Surface);
+        assert_eq!(browser[0].backend_clients, 2);
+        assert_eq!(browser[0].backend_surfaces, 2);
+        assert_eq!(browser[0].policy_windows, 2);
+        assert_eq!(browser[0].focused_app_id, "org.backlit.SocketBrowser");
+        assert_eq!(browser[1].action, DemoSocketAction::Damage);
+        assert!(browser[1].backend_surface_damaged);
+        assert_eq!(browser[2].action, DemoSocketAction::Close);
+        assert!(browser[2].policy_window_closed);
+        assert_eq!(browser[2].backend_clients, 1);
+        assert_eq!(browser[2].backend_surfaces, 1);
+        assert_eq!(browser[2].policy_windows, 1);
+        assert_eq!(browser[2].visible_windows, 1);
+        assert_eq!(browser[2].focused_title, "socket-terminal");
+        assert_eq!(browser[2].focused_app_id, "org.backlit.SocketTerminal");
     }
 }
