@@ -33,6 +33,30 @@ require_contains() {
   grep -F "$value" "$file" >/dev/null || fail "missing text in $file: $value"
 }
 
+require_line_contains_all() {
+  file="$1"
+  shift
+
+  while IFS= read -r line; do
+    line_matches=true
+    for value in "$@"; do
+      case "$line" in
+        *"$value"*) ;;
+        *)
+          line_matches=false
+          break
+          ;;
+      esac
+    done
+
+    if [ "$line_matches" = true ]; then
+      return 0
+    fi
+  done < "$file"
+
+  fail "missing line in $file containing: $*"
+}
+
 cleanup() {
   if [ -n "${compositor_pid:-}" ] && kill -0 "$compositor_pid" 2>/dev/null; then
     kill "$compositor_pid" 2>/dev/null || true
@@ -69,6 +93,10 @@ write_blocked_manifest() {
 	    "demo_client_app_id_preserved": false,
 	    "demo_client_surface_damaged": false,
 	    "demo_client_surface_closed": false,
+	    "demo_client_window_moved": false,
+	    "demo_client_window_resized": false,
+	    "demo_client_window_maximized": false,
+	    "demo_client_window_fullscreen": false,
 	    "demo_client_window_removed": false,
 	    "demo_client_disconnected": false,
 	    "multi_client_windows_mapped": false,
@@ -136,6 +164,7 @@ XDG_RUNTIME_DIR="$runtime_dir" target/debug/backlit-demo-client \
 	  --connect-socket "$socket_name" \
 	  --connect-title socket-browser \
 	  --connect-app-id org.backlit.SocketBrowser \
+	  --connect-management \
 	  --connect-lifecycle \
 	  --connect-only \
   --width 900 \
@@ -181,7 +210,56 @@ require_contains "$compositor_log" '"policy_windows":2'
 require_contains "$compositor_log" '"visible_windows":2'
 require_contains "$compositor_log" '"focused_title":"socket-browser"'
 require_contains "$compositor_log" '"focused_app_id":"org.backlit.SocketBrowser"'
-require_contains "$compositor_log" '"action":"surface","title":"socket-browser","app_id":"org.backlit.SocketBrowser","width":900,"height":600,"backend_surface_presented":true,"backend_surface_damaged":false,"backend_surface_closed":false,"policy_window_mapped":true,"policy_app_id_preserved":true,"policy_window_closed":false,"client_disconnected":false,"frame":2,"damaged_surfaces":1,"backend_clients":2,"backend_surfaces":2,"policy_windows":2,"visible_windows":2,"focused_window":true,"focused_title":"socket-browser","focused_app_id":"org.backlit.SocketBrowser"'
+require_line_contains_all "$compositor_log" \
+  '"action":"surface"' \
+  '"title":"socket-browser"' \
+  '"app_id":"org.backlit.SocketBrowser"' \
+  '"policy_window_mapped":true' \
+  '"policy_app_id_preserved":true' \
+  '"policy_state":"normal"' \
+  '"policy_width":900' \
+  '"policy_height":600' \
+  '"focused_title":"socket-browser"'
+require_line_contains_all "$compositor_log" \
+  '"action":"move"' \
+  '"title":"socket-browser"' \
+  '"app_id":"org.backlit.SocketBrowser"' \
+  '"backend_surface_damaged":true' \
+  '"policy_window_moved":true' \
+  '"policy_state":"normal"' \
+  '"policy_x":120' \
+  '"policy_y":140'
+require_line_contains_all "$compositor_log" \
+  '"action":"resize"' \
+  '"title":"socket-browser"' \
+  '"app_id":"org.backlit.SocketBrowser"' \
+  '"backend_surface_damaged":true' \
+  '"policy_window_resized":true' \
+  '"policy_state":"normal"' \
+  '"policy_width":960' \
+  '"policy_height":620'
+require_line_contains_all "$compositor_log" \
+  '"action":"maximize"' \
+  '"title":"socket-browser"' \
+  '"app_id":"org.backlit.SocketBrowser"' \
+  '"backend_surface_damaged":true' \
+  '"policy_window_maximized":true' \
+  '"policy_state":"maximized"' \
+  '"policy_x":0' \
+  '"policy_y":42' \
+  '"policy_width":1400' \
+  '"policy_height":858'
+require_line_contains_all "$compositor_log" \
+  '"action":"fullscreen"' \
+  '"title":"socket-browser"' \
+  '"app_id":"org.backlit.SocketBrowser"' \
+  '"backend_surface_damaged":true' \
+  '"policy_window_fullscreen":true' \
+  '"policy_state":"fullscreen"' \
+  '"policy_x":0' \
+  '"policy_y":0' \
+  '"policy_width":1400' \
+  '"policy_height":900'
 require_contains "$compositor_log" '"action":"damage"'
 require_contains "$compositor_log" '"backend_surface_damaged":true'
 require_contains "$compositor_log" '"damaged_surfaces":1'
@@ -195,7 +273,20 @@ require_contains "$compositor_log" '"policy_windows":1'
 require_contains "$compositor_log" '"visible_windows":1'
 require_contains "$compositor_log" '"focused_title":"socket-terminal"'
 require_contains "$compositor_log" '"focused_app_id":"org.backlit.SocketTerminal"'
-require_contains "$compositor_log" '"action":"close","title":"socket-browser","app_id":"org.backlit.SocketBrowser","width":1,"height":1,"backend_surface_presented":false,"backend_surface_damaged":false,"backend_surface_closed":true,"policy_window_mapped":false,"policy_app_id_preserved":false,"policy_window_closed":true,"client_disconnected":true,"frame":4,"damaged_surfaces":1,"backend_clients":1,"backend_surfaces":1,"policy_windows":1,"visible_windows":1,"focused_window":true,"focused_title":"socket-terminal","focused_app_id":"org.backlit.SocketTerminal"'
+require_line_contains_all "$compositor_log" \
+  '"action":"close"' \
+  '"title":"socket-browser"' \
+  '"app_id":"org.backlit.SocketBrowser"' \
+  '"backend_surface_closed":true' \
+  '"policy_window_closed":true' \
+  '"client_disconnected":true' \
+  '"frame":8' \
+  '"backend_clients":1' \
+  '"backend_surfaces":1' \
+  '"policy_windows":1' \
+  '"visible_windows":1' \
+  '"focused_title":"socket-terminal"' \
+  '"focused_app_id":"org.backlit.SocketTerminal"'
 require_contains "$compositor_log" '"event":"compositor.socket_unbound"'
 require_contains "$compositor_log" '"removed":true'
 require_contains "$compositor_log" '"event":"compositor.service_exit"'
@@ -207,6 +298,7 @@ require_contains "$first_demo_client_log" '"app_id":"org.backlit.SocketTerminal"
 require_contains "$first_demo_client_log" '"width":640'
 require_contains "$first_demo_client_log" '"height":480'
 require_contains "$first_demo_client_log" '"lifecycle":false'
+require_contains "$first_demo_client_log" '"management":false'
 require_contains "$first_demo_client_log" '"connected":true'
 require_contains "$first_demo_client_log" '"messages_written":1'
 require_contains "$demo_client_log" '"event":"demo_client.socket_connected"'
@@ -217,8 +309,9 @@ require_contains "$demo_client_log" '"app_id":"org.backlit.SocketBrowser"'
 require_contains "$demo_client_log" '"width":900'
 require_contains "$demo_client_log" '"height":600'
 require_contains "$demo_client_log" '"lifecycle":true'
+require_contains "$demo_client_log" '"management":true'
 require_contains "$demo_client_log" '"connected":true'
-require_contains "$demo_client_log" '"messages_written":3'
+require_contains "$demo_client_log" '"messages_written":7'
 
 cat > "$out_dir/manifest.json" <<EOF
 {
@@ -244,6 +337,10 @@ cat > "$out_dir/manifest.json" <<EOF
 	    "demo_client_app_id_preserved": true,
 	    "demo_client_surface_damaged": true,
 	    "demo_client_surface_closed": true,
+	    "demo_client_window_moved": true,
+	    "demo_client_window_resized": true,
+	    "demo_client_window_maximized": true,
+	    "demo_client_window_fullscreen": true,
 	    "demo_client_window_removed": true,
 	    "demo_client_disconnected": true,
 	    "multi_client_windows_mapped": true,

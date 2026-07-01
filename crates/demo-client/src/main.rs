@@ -39,6 +39,7 @@ fn run() -> Result<(), String> {
                     ("width", FieldValue::U64(config.width as u64)),
                     ("height", FieldValue::U64(config.height as u64)),
                     ("lifecycle", FieldValue::Bool(config.connect_lifecycle),),
+                    ("management", FieldValue::Bool(config.connect_management),),
                     ("connected", FieldValue::Bool(report.connected)),
                     ("bytes_written", FieldValue::U64(report.bytes_written)),
                     ("messages_written", FieldValue::U64(report.messages_written),),
@@ -121,16 +122,31 @@ fn connect_to_compositor_socket(
         config.width.max(1),
         config.height.max(1),
     );
-    let message = if config.connect_lifecycle {
+    let management_messages = if config.connect_management {
         format!(
-            "{surface_message}BACKLIT_DEMO_CLIENT damage title={} app_id={}\nBACKLIT_DEMO_CLIENT close title={} app_id={}\n",
+            "BACKLIT_DEMO_CLIENT move title={} app_id={} x=120 y=140\nBACKLIT_DEMO_CLIENT resize title={} app_id={} width=960 height=620\nBACKLIT_DEMO_CLIENT maximize title={} app_id={}\nBACKLIT_DEMO_CLIENT fullscreen title={} app_id={}\n",
+            protocol_token(config.connect_title.as_str()),
+            protocol_token(config.connect_app_id.as_str()),
+            protocol_token(config.connect_title.as_str()),
+            protocol_token(config.connect_app_id.as_str()),
             protocol_token(config.connect_title.as_str()),
             protocol_token(config.connect_app_id.as_str()),
             protocol_token(config.connect_title.as_str()),
             protocol_token(config.connect_app_id.as_str()),
         )
     } else {
-        surface_message
+        String::new()
+    };
+    let message = if config.connect_lifecycle {
+        format!(
+            "{surface_message}{management_messages}BACKLIT_DEMO_CLIENT damage title={} app_id={}\nBACKLIT_DEMO_CLIENT close title={} app_id={}\n",
+            protocol_token(config.connect_title.as_str()),
+            protocol_token(config.connect_app_id.as_str()),
+            protocol_token(config.connect_title.as_str()),
+            protocol_token(config.connect_app_id.as_str()),
+        )
+    } else {
+        format!("{surface_message}{management_messages}")
     };
     stream.write_all(message.as_bytes()).map_err(|error| {
         format!(
@@ -186,6 +202,7 @@ struct Config {
     connect_title: String,
     connect_app_id: String,
     connect_lifecycle: bool,
+    connect_management: bool,
     connect_only: bool,
     help: bool,
 }
@@ -201,6 +218,7 @@ impl Default for Config {
             connect_title: String::from("demo-client"),
             connect_app_id: String::from("org.backlit.DemoClient"),
             connect_lifecycle: false,
+            connect_management: false,
             connect_only: false,
             help: false,
         }
@@ -264,6 +282,8 @@ impl Config {
                 config.connect_only = true;
             } else if arg == "--connect-lifecycle" {
                 config.connect_lifecycle = true;
+            } else if arg == "--connect-management" {
+                config.connect_management = true;
             } else {
                 return Err(format!("unknown flag: {arg}"));
             }
@@ -285,7 +305,7 @@ fn print_help() {
 backlit-demo-client
 
 Usage:
-  backlit-demo-client [--output=target/backlit-demo-client.ppm] [--width=800] [--height=520] [--verify] [--connect-socket=backlit-0] [--connect-app-id=org.backlit.DemoClient] [--connect-lifecycle] [--connect-only]
+  backlit-demo-client [--output=target/backlit-demo-client.ppm] [--width=800] [--height=520] [--verify] [--connect-socket=backlit-0] [--connect-app-id=org.backlit.DemoClient] [--connect-lifecycle] [--connect-management] [--connect-only]
 
 Flags:
   --output          PPM screenshot output path.
@@ -297,6 +317,8 @@ Flags:
   --connect-app-id  Application id to announce when connecting.
   --connect-lifecycle
                    Announce, damage, and close the demo surface.
+  --connect-management
+                   Move, resize, maximize, and fullscreen the connected surface.
   --connect-only    Skip screenshot rendering after the socket announcement.
 "
     );
@@ -314,6 +336,7 @@ mod tests {
             "--connect-title=hello world",
             "--connect-app-id=org.backlit.HelloWorld",
             "--connect-lifecycle",
+            "--connect-management",
             "--connect-only",
             "--width=640",
             "--height=480",
@@ -324,6 +347,7 @@ mod tests {
         assert_eq!(config.connect_title, "hello world");
         assert_eq!(config.connect_app_id, "org.backlit.HelloWorld");
         assert!(config.connect_lifecycle);
+        assert!(config.connect_management);
         assert!(config.connect_only);
         assert_eq!(config.width, 640);
         assert_eq!(config.height, 480);

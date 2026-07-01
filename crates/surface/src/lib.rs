@@ -311,6 +311,28 @@ impl SurfaceManager {
         Some(configure)
     }
 
+    pub fn move_toplevel(&mut self, id: SurfaceId, x: i32, y: i32) -> bool {
+        let Some(index) = self.surface_index(id) else {
+            return false;
+        };
+        let Some(window_id) = self.surfaces[index].window_id else {
+            return false;
+        };
+
+        self.policy.move_window(window_id, x, y)
+    }
+
+    pub fn resize_toplevel(&mut self, id: SurfaceId, width: i32, height: i32) -> bool {
+        let Some(index) = self.surface_index(id) else {
+            return false;
+        };
+        let Some(window_id) = self.surfaces[index].window_id else {
+            return false;
+        };
+
+        self.policy.resize_window(window_id, width, height)
+    }
+
     pub fn request_close(&mut self, id: SurfaceId) -> Option<Configure> {
         let index = self.surface_index(id)?;
         if self.surfaces[index].phase == SurfacePhase::Closed {

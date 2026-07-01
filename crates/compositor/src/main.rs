@@ -458,6 +458,10 @@ impl SocketClientRuntime {
         match command.action {
             DemoSocketAction::Surface => self.map_surface(command),
             DemoSocketAction::Damage => self.damage_surface(command),
+            DemoSocketAction::Move => self.manage_surface(command),
+            DemoSocketAction::Resize => self.manage_surface(command),
+            DemoSocketAction::Maximize => self.manage_surface(command),
+            DemoSocketAction::Fullscreen => self.manage_surface(command),
             DemoSocketAction::Close => self.close_surface(command),
             DemoSocketAction::Invalid => SocketClientReport::invalid(),
         }
@@ -506,6 +510,7 @@ impl SocketClientRuntime {
         }
         let frame = self.backend.present();
         let focused = self.focused_window_state();
+        let geometry = self.window_geometry_for_surface(policy_window);
 
         SocketClientReport {
             message_valid: true,
@@ -519,6 +524,10 @@ impl SocketClientRuntime {
             backend_surface_closed: false,
             policy_window_mapped,
             policy_app_id_preserved,
+            policy_window_moved: false,
+            policy_window_resized: false,
+            policy_window_maximized: false,
+            policy_window_fullscreen: false,
             policy_window_closed: false,
             client_disconnected: false,
             frame: frame.frame,
@@ -527,6 +536,106 @@ impl SocketClientRuntime {
             backend_surfaces: frame.surface_count,
             policy_windows: self.manager.policy().windows().len() as u64,
             visible_windows: self.manager.policy().visible_windows().count() as u64,
+            policy_state: geometry.state,
+            policy_x: geometry.x,
+            policy_y: geometry.y,
+            policy_width: geometry.width,
+            policy_height: geometry.height,
+            focused_window: focused.is_some(),
+            focused_title: focused
+                .as_ref()
+                .map(|window| window.title.clone())
+                .unwrap_or_default(),
+            focused_app_id: focused
+                .and_then(|window| window.app_id.clone())
+                .unwrap_or_default(),
+        }
+    }
+
+    fn manage_surface(&mut self, command: DemoSocketCommand) -> SocketClientReport {
+        let record = self
+            .find_client(command.app_id.as_str(), command.title.as_str())
+            .cloned();
+        let mut policy_window_moved = false;
+        let mut policy_window_resized = false;
+        let mut policy_window_maximized = false;
+        let mut policy_window_fullscreen = false;
+        let mut backend_surface_damaged = false;
+        let policy_window = record
+            .as_ref()
+            .and_then(|record| self.window_id_for_surface(record.policy_surface));
+
+        if let Some(record) = record.as_ref() {
+            match command.action {
+                DemoSocketAction::Move => {
+                    policy_window_moved =
+                        self.manager
+                            .move_toplevel(record.policy_surface, command.x, command.y);
+                    backend_surface_damaged = policy_window_moved
+                        && self.backend.mark_damaged(record.backend_surface).is_ok();
+                }
+                DemoSocketAction::Resize => {
+                    policy_window_resized = self.manager.resize_toplevel(
+                        record.policy_surface,
+                        command.width as i32,
+                        command.height as i32,
+                    );
+                    backend_surface_damaged = policy_window_resized
+                        && self.backend.mark_damaged(record.backend_surface).is_ok();
+                }
+                DemoSocketAction::Maximize => {
+                    policy_window_maximized = self
+                        .manager
+                        .request_maximize(record.policy_surface)
+                        .is_some();
+                    backend_surface_damaged = policy_window_maximized
+                        && self.backend.mark_damaged(record.backend_surface).is_ok();
+                }
+                DemoSocketAction::Fullscreen => {
+                    policy_window_fullscreen = self
+                        .manager
+                        .request_fullscreen(record.policy_surface)
+                        .is_some();
+                    backend_surface_damaged = policy_window_fullscreen
+                        && self.backend.mark_damaged(record.backend_surface).is_ok();
+                }
+                _ => {}
+            }
+        }
+
+        let frame = self.backend.present();
+        let focused = self.focused_window_state();
+        let geometry = self.window_geometry_for_surface(policy_window);
+
+        SocketClientReport {
+            message_valid: true,
+            action: command.action,
+            title: command.title,
+            app_id: command.app_id,
+            width: command.width,
+            height: command.height,
+            backend_surface_presented: false,
+            backend_surface_damaged: backend_surface_damaged && frame.damaged_surfaces == 1,
+            backend_surface_closed: false,
+            policy_window_mapped: false,
+            policy_app_id_preserved: false,
+            policy_window_moved,
+            policy_window_resized,
+            policy_window_maximized,
+            policy_window_fullscreen,
+            policy_window_closed: false,
+            client_disconnected: false,
+            frame: frame.frame,
+            damaged_surfaces: frame.damaged_surfaces,
+            backend_clients: frame.client_count,
+            backend_surfaces: frame.surface_count,
+            policy_windows: self.manager.policy().windows().len() as u64,
+            visible_windows: self.manager.policy().visible_windows().count() as u64,
+            policy_state: geometry.state,
+            policy_x: geometry.x,
+            policy_y: geometry.y,
+            policy_width: geometry.width,
+            policy_height: geometry.height,
             focused_window: focused.is_some(),
             focused_title: focused
                 .as_ref()
@@ -542,11 +651,15 @@ impl SocketClientRuntime {
         let backend_surface = self
             .find_client(command.app_id.as_str(), command.title.as_str())
             .map(|record| record.backend_surface);
+        let policy_window = self
+            .find_client(command.app_id.as_str(), command.title.as_str())
+            .and_then(|record| self.window_id_for_surface(record.policy_surface));
         let backend_surface_damaged = backend_surface
             .map(|surface| self.backend.mark_damaged(surface).is_ok())
             .unwrap_or(false);
         let frame = self.backend.present();
         let focused = self.focused_window_state();
+        let geometry = self.window_geometry_for_surface(policy_window);
 
         SocketClientReport {
             message_valid: true,
@@ -560,6 +673,10 @@ impl SocketClientRuntime {
             backend_surface_closed: false,
             policy_window_mapped: false,
             policy_app_id_preserved: false,
+            policy_window_moved: false,
+            policy_window_resized: false,
+            policy_window_maximized: false,
+            policy_window_fullscreen: false,
             policy_window_closed: false,
             client_disconnected: false,
             frame: frame.frame,
@@ -568,6 +685,11 @@ impl SocketClientRuntime {
             backend_surfaces: frame.surface_count,
             policy_windows: self.manager.policy().windows().len() as u64,
             visible_windows: self.manager.policy().visible_windows().count() as u64,
+            policy_state: geometry.state,
+            policy_x: geometry.x,
+            policy_y: geometry.y,
+            policy_width: geometry.width,
+            policy_height: geometry.height,
             focused_window: focused.is_some(),
             focused_title: focused
                 .as_ref()
@@ -582,6 +704,9 @@ impl SocketClientRuntime {
     fn close_surface(&mut self, command: DemoSocketCommand) -> SocketClientReport {
         let record_index = self.find_client_index(command.app_id.as_str(), command.title.as_str());
         let record = record_index.map(|index| self.clients.remove(index));
+        let policy_window = record
+            .as_ref()
+            .and_then(|record| self.window_id_for_surface(record.policy_surface));
         let backend_surface_closed = record
             .as_ref()
             .map(|record| self.backend.close_surface(record.backend_surface).is_ok())
@@ -603,6 +728,7 @@ impl SocketClientRuntime {
             .unwrap_or(false);
         let frame = self.backend.present();
         let focused = self.focused_window_state();
+        let geometry = self.window_geometry_for_surface(policy_window);
 
         SocketClientReport {
             message_valid: true,
@@ -616,6 +742,10 @@ impl SocketClientRuntime {
             backend_surface_closed,
             policy_window_mapped: false,
             policy_app_id_preserved: false,
+            policy_window_moved: false,
+            policy_window_resized: false,
+            policy_window_maximized: false,
+            policy_window_fullscreen: false,
             policy_window_closed,
             client_disconnected,
             frame: frame.frame,
@@ -624,6 +754,11 @@ impl SocketClientRuntime {
             backend_surfaces: frame.surface_count,
             policy_windows: self.manager.policy().windows().len() as u64,
             visible_windows: self.manager.policy().visible_windows().count() as u64,
+            policy_state: geometry.state,
+            policy_x: geometry.x,
+            policy_y: geometry.y,
+            policy_width: geometry.width,
+            policy_height: geometry.height,
             focused_window: focused.is_some(),
             focused_title: focused
                 .as_ref()
@@ -640,6 +775,25 @@ impl SocketClientRuntime {
             .policy()
             .focused()
             .and_then(|window| self.manager.policy().window(window))
+    }
+
+    fn window_id_for_surface(
+        &self,
+        policy_surface: backlit_surface::SurfaceId,
+    ) -> Option<backlit_window_policy::WindowId> {
+        self.manager
+            .surface(policy_surface)
+            .and_then(|surface| surface.window_id)
+    }
+
+    fn window_geometry_for_surface(
+        &self,
+        policy_window: Option<backlit_window_policy::WindowId>,
+    ) -> SocketWindowGeometry {
+        policy_window
+            .and_then(|window| self.manager.policy().window(window))
+            .map(SocketWindowGeometry::from_window)
+            .unwrap_or_default()
     }
 
     fn find_client(&self, app_id: &str, title: &str) -> Option<&SocketClientRecord> {
@@ -682,6 +836,10 @@ struct SocketClientReport {
     backend_surface_closed: bool,
     policy_window_mapped: bool,
     policy_app_id_preserved: bool,
+    policy_window_moved: bool,
+    policy_window_resized: bool,
+    policy_window_maximized: bool,
+    policy_window_fullscreen: bool,
     policy_window_closed: bool,
     client_disconnected: bool,
     frame: u64,
@@ -690,6 +848,11 @@ struct SocketClientReport {
     backend_surfaces: u64,
     policy_windows: u64,
     visible_windows: u64,
+    policy_state: &'static str,
+    policy_x: i32,
+    policy_y: i32,
+    policy_width: i32,
+    policy_height: i32,
     focused_window: bool,
     focused_title: String,
     focused_app_id: String,
@@ -709,6 +872,10 @@ impl SocketClientReport {
             backend_surface_closed: false,
             policy_window_mapped: false,
             policy_app_id_preserved: false,
+            policy_window_moved: false,
+            policy_window_resized: false,
+            policy_window_maximized: false,
+            policy_window_fullscreen: false,
             policy_window_closed: false,
             client_disconnected: false,
             frame: 0,
@@ -717,6 +884,11 @@ impl SocketClientReport {
             backend_surfaces: 0,
             policy_windows: 0,
             visible_windows: 0,
+            policy_state: "none",
+            policy_x: 0,
+            policy_y: 0,
+            policy_width: 0,
+            policy_height: 0,
             focused_window: false,
             focused_title: String::new(),
             focused_app_id: String::new(),
@@ -725,9 +897,56 @@ impl SocketClientReport {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+struct SocketWindowGeometry {
+    state: &'static str,
+    x: i32,
+    y: i32,
+    width: i32,
+    height: i32,
+}
+
+impl SocketWindowGeometry {
+    fn from_window(window: &backlit_window_policy::Window) -> Self {
+        Self {
+            state: window_state_name(window.state),
+            x: window.geometry.x,
+            y: window.geometry.y,
+            width: window.geometry.width,
+            height: window.geometry.height,
+        }
+    }
+}
+
+impl Default for SocketWindowGeometry {
+    fn default() -> Self {
+        Self {
+            state: "none",
+            x: 0,
+            y: 0,
+            width: 0,
+            height: 0,
+        }
+    }
+}
+
+fn window_state_name(state: WindowState) -> &'static str {
+    match state {
+        WindowState::Normal => "normal",
+        WindowState::Maximized => "maximized",
+        WindowState::Fullscreen => "fullscreen",
+        WindowState::Minimized => "minimized",
+        WindowState::Snapped => "snapped",
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum DemoSocketAction {
     Surface,
     Damage,
+    Move,
+    Resize,
+    Maximize,
+    Fullscreen,
     Close,
     Invalid,
 }
@@ -737,6 +956,10 @@ impl DemoSocketAction {
         match self {
             Self::Surface => "surface",
             Self::Damage => "damage",
+            Self::Move => "move",
+            Self::Resize => "resize",
+            Self::Maximize => "maximize",
+            Self::Fullscreen => "fullscreen",
             Self::Close => "close",
             Self::Invalid => "invalid",
         }
@@ -757,6 +980,8 @@ struct DemoSocketCommand {
     action: DemoSocketAction,
     title: String,
     app_id: String,
+    x: i32,
+    y: i32,
     width: u32,
     height: u32,
 }
@@ -770,12 +995,18 @@ impl DemoSocketCommand {
         let action = match tokens.next()? {
             "surface" => DemoSocketAction::Surface,
             "damage" => DemoSocketAction::Damage,
+            "move" => DemoSocketAction::Move,
+            "resize" => DemoSocketAction::Resize,
+            "maximize" => DemoSocketAction::Maximize,
+            "fullscreen" => DemoSocketAction::Fullscreen,
             "close" => DemoSocketAction::Close,
             _ => return None,
         };
 
         let mut title = None;
         let mut app_id = None;
+        let mut x = None;
+        let mut y = None;
         let mut width = None;
         let mut height = None;
 
@@ -784,6 +1015,10 @@ impl DemoSocketCommand {
                 title = Some(value.to_string());
             } else if let Some(value) = token.strip_prefix("app_id=") {
                 app_id = Some(value.to_string());
+            } else if let Some(value) = token.strip_prefix("x=") {
+                x = value.parse::<i32>().ok();
+            } else if let Some(value) = token.strip_prefix("y=") {
+                y = value.parse::<i32>().ok();
             } else if let Some(value) = token.strip_prefix("width=") {
                 width = value.parse::<u32>().ok();
             } else if let Some(value) = token.strip_prefix("height=") {
@@ -802,6 +1037,8 @@ impl DemoSocketCommand {
             action,
             title,
             app_id,
+            x: x.unwrap_or(0),
+            y: y.unwrap_or(0),
             width: width.unwrap_or(1).max(1),
             height: height.unwrap_or(1).max(1),
         })
@@ -1703,6 +1940,22 @@ fn emit_socket_client(config: &RunConfig, report: &SocketClientReport) {
                 FieldValue::Bool(report.policy_app_id_preserved),
             ),
             (
+                "policy_window_moved",
+                FieldValue::Bool(report.policy_window_moved),
+            ),
+            (
+                "policy_window_resized",
+                FieldValue::Bool(report.policy_window_resized),
+            ),
+            (
+                "policy_window_maximized",
+                FieldValue::Bool(report.policy_window_maximized),
+            ),
+            (
+                "policy_window_fullscreen",
+                FieldValue::Bool(report.policy_window_fullscreen),
+            ),
+            (
                 "policy_window_closed",
                 FieldValue::Bool(report.policy_window_closed),
             ),
@@ -1716,6 +1969,17 @@ fn emit_socket_client(config: &RunConfig, report: &SocketClientReport) {
             ("backend_surfaces", FieldValue::U64(report.backend_surfaces)),
             ("policy_windows", FieldValue::U64(report.policy_windows)),
             ("visible_windows", FieldValue::U64(report.visible_windows)),
+            ("policy_state", FieldValue::Str(report.policy_state)),
+            ("policy_x", FieldValue::U64(report.policy_x.max(0) as u64)),
+            ("policy_y", FieldValue::U64(report.policy_y.max(0) as u64)),
+            (
+                "policy_width",
+                FieldValue::U64(report.policy_width.max(0) as u64),
+            ),
+            (
+                "policy_height",
+                FieldValue::U64(report.policy_height.max(0) as u64),
+            ),
             ("focused_window", FieldValue::Bool(report.focused_window)),
             (
                 "focused_title",
@@ -1859,6 +2123,22 @@ mod tests {
         assert_eq!(damage.width, 1);
         assert_eq!(damage.height, 1);
 
+        let moved = DemoSocketCommand::parse(
+            "BACKLIT_DEMO_CLIENT move title=socket-demo app_id=org.backlit.SocketDemo x=120 y=140\n",
+        )
+        .unwrap();
+        assert_eq!(moved.action, DemoSocketAction::Move);
+        assert_eq!(moved.x, 120);
+        assert_eq!(moved.y, 140);
+
+        let resized = DemoSocketCommand::parse(
+            "BACKLIT_DEMO_CLIENT resize title=socket-demo app_id=org.backlit.SocketDemo width=960 height=620\n",
+        )
+        .unwrap();
+        assert_eq!(resized.action, DemoSocketAction::Resize);
+        assert_eq!(resized.width, 960);
+        assert_eq!(resized.height, 620);
+
         let close =
             DemoSocketCommand::parse("BACKLIT_DEMO_CLIENT close title=socket-demo\n").unwrap();
         assert_eq!(close.action, DemoSocketAction::Close);
@@ -1934,6 +2214,10 @@ BACKLIT_DEMO_CLIENT close app_id=org.backlit.SocketDemo
         let browser = runtime.handle_stream(
             "\
 BACKLIT_DEMO_CLIENT surface title=socket-browser app_id=org.backlit.SocketBrowser width=900 height=600
+BACKLIT_DEMO_CLIENT move title=socket-browser app_id=org.backlit.SocketBrowser x=120 y=140
+BACKLIT_DEMO_CLIENT resize title=socket-browser app_id=org.backlit.SocketBrowser width=960 height=620
+BACKLIT_DEMO_CLIENT maximize title=socket-browser app_id=org.backlit.SocketBrowser
+BACKLIT_DEMO_CLIENT fullscreen title=socket-browser app_id=org.backlit.SocketBrowser
 BACKLIT_DEMO_CLIENT damage app_id=org.backlit.SocketBrowser
 BACKLIT_DEMO_CLIENT close app_id=org.backlit.SocketBrowser
 ",
@@ -1946,21 +2230,40 @@ BACKLIT_DEMO_CLIENT close app_id=org.backlit.SocketBrowser
         assert_eq!(terminal[0].policy_windows, 1);
         assert_eq!(terminal[0].focused_app_id, "org.backlit.SocketTerminal");
 
-        assert_eq!(browser.len(), 3);
+        assert_eq!(browser.len(), 7);
         assert_eq!(browser[0].action, DemoSocketAction::Surface);
         assert_eq!(browser[0].backend_clients, 2);
         assert_eq!(browser[0].backend_surfaces, 2);
         assert_eq!(browser[0].policy_windows, 2);
         assert_eq!(browser[0].focused_app_id, "org.backlit.SocketBrowser");
-        assert_eq!(browser[1].action, DemoSocketAction::Damage);
-        assert!(browser[1].backend_surface_damaged);
-        assert_eq!(browser[2].action, DemoSocketAction::Close);
-        assert!(browser[2].policy_window_closed);
-        assert_eq!(browser[2].backend_clients, 1);
-        assert_eq!(browser[2].backend_surfaces, 1);
-        assert_eq!(browser[2].policy_windows, 1);
-        assert_eq!(browser[2].visible_windows, 1);
-        assert_eq!(browser[2].focused_title, "socket-terminal");
-        assert_eq!(browser[2].focused_app_id, "org.backlit.SocketTerminal");
+        assert_eq!(browser[1].action, DemoSocketAction::Move);
+        assert!(browser[1].policy_window_moved);
+        assert_eq!(browser[1].policy_state, "normal");
+        assert_eq!(browser[1].policy_x, 120);
+        assert_eq!(browser[1].policy_y, 140);
+        assert_eq!(browser[2].action, DemoSocketAction::Resize);
+        assert!(browser[2].policy_window_resized);
+        assert_eq!(browser[2].policy_width, 960);
+        assert_eq!(browser[2].policy_height, 620);
+        assert_eq!(browser[3].action, DemoSocketAction::Maximize);
+        assert!(browser[3].policy_window_maximized);
+        assert_eq!(browser[3].policy_state, "maximized");
+        assert_eq!(browser[3].policy_y, 42);
+        assert_eq!(browser[4].action, DemoSocketAction::Fullscreen);
+        assert!(browser[4].policy_window_fullscreen);
+        assert_eq!(browser[4].policy_state, "fullscreen");
+        assert_eq!(browser[4].policy_x, 0);
+        assert_eq!(browser[4].policy_y, 0);
+        assert_eq!(browser[5].action, DemoSocketAction::Damage);
+        assert!(browser[5].backend_surface_damaged);
+        assert_eq!(browser[5].policy_state, "fullscreen");
+        assert_eq!(browser[6].action, DemoSocketAction::Close);
+        assert!(browser[6].policy_window_closed);
+        assert_eq!(browser[6].backend_clients, 1);
+        assert_eq!(browser[6].backend_surfaces, 1);
+        assert_eq!(browser[6].policy_windows, 1);
+        assert_eq!(browser[6].visible_windows, 1);
+        assert_eq!(browser[6].focused_title, "socket-terminal");
+        assert_eq!(browser[6].focused_app_id, "org.backlit.SocketTerminal");
     }
 }
