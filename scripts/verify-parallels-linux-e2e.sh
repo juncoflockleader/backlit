@@ -357,6 +357,7 @@ host_compositor_runtime_manifest="$host_out_dir/compositor-runtime-manifest.json
 host_smithay_compositor_runtime_manifest="$host_out_dir/smithay-compositor-runtime-manifest.json"
 host_compositor_socket_manifest="$host_out_dir/compositor-socket-manifest.json"
 host_smithay_runtime_probe_manifest="$host_out_dir/smithay-runtime-probe-manifest.json"
+host_launch_performance_manifest="$host_out_dir/launch-performance-manifest.json"
 host_resource_budget_manifest="$host_out_dir/resource-budget-manifest.json"
 host_launch_readiness_manifest="$host_out_dir/launch-readiness-manifest.json"
 host_session_launch_manifest="$host_out_dir/session-launch-manifest.json"
@@ -387,6 +388,7 @@ rm -f \
   "$host_smithay_compositor_runtime_manifest" \
   "$host_compositor_socket_manifest" \
   "$host_smithay_runtime_probe_manifest" \
+  "$host_launch_performance_manifest" \
   "$host_resource_budget_manifest" \
   "$host_launch_readiness_manifest" \
   "$host_session_launch_manifest" \
@@ -416,6 +418,7 @@ download_file "$guest_e2e_dir/compositor-runtime/manifest.json" "$host_composito
 download_file "$guest_e2e_dir/smithay-compositor-runtime/manifest.json" "$host_smithay_compositor_runtime_manifest"
 download_file "$guest_e2e_dir/compositor-socket/manifest.json" "$host_compositor_socket_manifest"
 download_file "$guest_e2e_dir/smithay-runtime-probe/manifest.json" "$host_smithay_runtime_probe_manifest"
+download_file "$guest_e2e_dir/launch-performance/manifest.json" "$host_launch_performance_manifest"
 download_file "$guest_e2e_dir/resource-budget/manifest.json" "$host_resource_budget_manifest"
 download_file "$guest_e2e_dir/launch-readiness/manifest.json" "$host_launch_readiness_manifest"
 download_file "$guest_e2e_dir/session-launch/manifest.json" "$host_session_launch_manifest"
@@ -522,6 +525,7 @@ require_contains "$host_guest_manifest" '"drm_master_boundary": true'
 require_contains "$host_guest_manifest" '"drm_session_smoke": true'
 require_contains "$host_guest_manifest" '"dedicated_drm_session": true'
 require_contains "$host_guest_manifest" '"dedicated_drm_handoff": true'
+require_contains "$host_guest_manifest" '"launch_performance": true'
 require_contains "$host_guest_manifest" '"resource_budget": true'
 require_contains "$host_guest_manifest" '"nested_wayland": true'
 require_contains "$host_guest_manifest" '"mvp1_contract": true'
@@ -662,6 +666,9 @@ require_contains "$host_smithay_runtime_probe_manifest" '"smithay_wayland_displa
 require_contains "$host_smithay_runtime_probe_manifest" '"smithay_wayland_socket_bootstrap": true'
 require_contains "$host_smithay_runtime_probe_manifest" '"smithay_wayland_client_inserted": true'
 require_contains "$host_smithay_runtime_probe_manifest" '"smithay_calloop_dispatch_bootstrap": true'
+require_contains "$host_launch_performance_manifest" '"startup_budget": true'
+require_contains "$host_launch_performance_manifest" '"terminal_launch_budget": true'
+require_contains "$host_launch_performance_manifest" '"shell_ready_budget": true'
 require_contains "$host_resource_budget_manifest" '"name": "backlit-resource-budget"'
 require_contains "$host_resource_budget_manifest" '"resource_budget_checked": true'
 require_contains "$host_resource_budget_manifest" '"idle_cpu_budget": true'
@@ -799,6 +806,7 @@ cat > "$host_out_dir/manifest.json" <<EOF
     "smithay_compositor_runtime_manifest": "$host_smithay_compositor_runtime_manifest",
     "compositor_socket_manifest": "$host_compositor_socket_manifest",
     "smithay_runtime_probe_manifest": "$host_smithay_runtime_probe_manifest",
+    "launch_performance_manifest": "$host_launch_performance_manifest",
     "resource_budget_manifest": "$host_resource_budget_manifest",
     "launch_readiness_manifest": "$host_launch_readiness_manifest",
     "session_launch_manifest": "$host_session_launch_manifest",
@@ -833,6 +841,7 @@ cat > "$host_out_dir/manifest.json" <<EOF
     "smithay_compositor_runtime": true,
     "compositor_socket": true,
     "smithay_runtime_probe": true,
+    "launch_performance": true,
     "resource_budget": true,
     "launch_readiness": true,
     "drm_launch_plan": true,

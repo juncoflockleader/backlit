@@ -12,6 +12,8 @@ parallels_manifest="$parallels_e2e_dir/manifest.json"
 dedicated_manifest="$dedicated_e2e_dir/manifest.json"
 dedicated_session_manifest="$dedicated_e2e_dir/dedicated-drm-session-manifest.json"
 package_build_manifest="$dedicated_e2e_dir/package-build-manifest.json"
+launch_performance_manifest="$parallels_e2e_dir/launch-performance-manifest.json"
+resource_budget_manifest="$parallels_e2e_dir/resource-budget-manifest.json"
 parallels_preview="$parallels_e2e_dir/gui-preview-backlit-session.png"
 dedicated_preview="$dedicated_e2e_dir/dedicated-session.png"
 mkdir -p "$out_dir"
@@ -24,6 +26,7 @@ package_installed_dedicated_drm=false
 current_commit_evidence=false
 gui_launch_verified=false
 mvp1_acceptance=false
+launch_performance_evidence=false
 resource_budget_evidence=false
 
 write_manifest() {
@@ -37,6 +40,8 @@ write_manifest() {
   "expected_commit": "$commit",
   "artifacts": {
     "parallels_linux_e2e_manifest": "$parallels_manifest",
+    "parallels_launch_performance_manifest": "$launch_performance_manifest",
+    "parallels_resource_budget_manifest": "$resource_budget_manifest",
     "parallels_linux_gui_preview": "$parallels_preview",
     "parallels_dedicated_drm_manifest": "$dedicated_manifest",
     "parallels_dedicated_drm_session_manifest": "$dedicated_session_manifest",
@@ -50,6 +55,7 @@ write_manifest() {
     "current_commit_evidence": $current_commit_evidence,
     "gui_launch_verified": $gui_launch_verified,
     "mvp1_acceptance": $mvp1_acceptance,
+    "launch_performance_evidence": $launch_performance_evidence,
     "resource_budget_evidence": $resource_budget_evidence
   }
 }
@@ -103,6 +109,8 @@ require_contains docs/architecture/mvp-1.md 'scripts/verify-parallels-dedicated-
 design_scope=true
 
 require_file "$parallels_manifest" missing-parallels-linux-e2e-manifest
+require_file "$launch_performance_manifest" missing-parallels-launch-performance-manifest
+require_file "$resource_budget_manifest" missing-parallels-resource-budget-manifest
 require_file "$dedicated_manifest" missing-parallels-dedicated-drm-manifest
 require_file "$dedicated_session_manifest" missing-parallels-dedicated-session-manifest
 require_file "$package_build_manifest" missing-parallels-dedicated-package-build-manifest
@@ -117,8 +125,15 @@ require_contains "$parallels_manifest" '"drm_session_smoke": true' parallels-lin
 require_contains "$parallels_manifest" '"mvp1_contract": true' parallels-linux-e2e
 require_contains "$parallels_manifest" '"launch_performance": true' parallels-linux-e2e
 require_contains "$parallels_manifest" '"resource_budget": true' parallels-linux-e2e
+require_contains "$launch_performance_manifest" '"startup_budget": true' launch-performance-evidence
+require_contains "$launch_performance_manifest" '"terminal_launch_budget": true' launch-performance-evidence
+require_contains "$launch_performance_manifest" '"shell_ready_budget": true' launch-performance-evidence
+require_contains "$resource_budget_manifest" '"resource_budget_checked": true' resource-budget-evidence
+require_contains "$resource_budget_manifest" '"idle_cpu_budget": true' resource-budget-evidence
+require_contains "$resource_budget_manifest" '"idle_rss_budget": true' resource-budget-evidence
 require_nonempty_file "$parallels_preview" missing-parallels-linux-preview
 normal_parallels_e2e=true
+launch_performance_evidence=true
 resource_budget_evidence=true
 
 require_contains "$dedicated_manifest" '"passed": true' package-installed-dedicated-drm
