@@ -1425,9 +1425,37 @@ impl FromStr for BackendKind {
     }
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum RuntimeKind {
+    Headless,
+    Smithay,
+}
+
+impl RuntimeKind {
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Self::Headless => "headless",
+            Self::Smithay => "smithay",
+        }
+    }
+}
+
+impl FromStr for RuntimeKind {
+    type Err = String;
+
+    fn from_str(value: &str) -> Result<Self, Self::Err> {
+        match value {
+            "headless" => Ok(Self::Headless),
+            "smithay" => Ok(Self::Smithay),
+            other => Err(format!("unknown runtime '{other}'")),
+        }
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct RunConfig {
     pub backend: BackendKind,
+    pub runtime: RuntimeKind,
     pub socket: String,
     pub smoke_test: bool,
     pub scripted_client: bool,
@@ -1442,6 +1470,7 @@ impl Default for RunConfig {
     fn default() -> Self {
         Self {
             backend: BackendKind::Headless,
+            runtime: RuntimeKind::Headless,
             socket: String::from("backlit-0"),
             smoke_test: false,
             scripted_client: false,
@@ -1457,6 +1486,7 @@ impl Default for RunConfig {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum ArgError {
     InvalidBackend(String),
+    InvalidRuntime(String),
     InvalidValue(&'static str, String),
     MissingValue(&'static str),
     UnknownFlag(String),
@@ -1466,6 +1496,7 @@ impl fmt::Display for ArgError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Self::InvalidBackend(value) => write!(f, "invalid backend: {value}"),
+            Self::InvalidRuntime(value) => write!(f, "invalid runtime: {value}"),
             Self::InvalidValue(flag, value) => write!(f, "invalid value for {flag}: {value}"),
             Self::MissingValue(flag) => write!(f, "missing value for {flag}"),
             Self::UnknownFlag(flag) => write!(f, "unknown flag: {flag}"),
@@ -1504,6 +1535,11 @@ where
         } else if arg == "--backend" {
             let value = args.next().ok_or(ArgError::MissingValue("--backend"))?;
             config.backend = parse_backend(&value)?;
+        } else if let Some(value) = arg.strip_prefix("--runtime=") {
+            config.runtime = parse_runtime(value)?;
+        } else if arg == "--runtime" {
+            let value = args.next().ok_or(ArgError::MissingValue("--runtime"))?;
+            config.runtime = parse_runtime(&value)?;
         } else if let Some(value) = arg.strip_prefix("--socket=") {
             config.socket = value.to_string();
         } else if arg == "--socket" {
@@ -1536,6 +1572,12 @@ fn parse_backend(value: &str) -> Result<BackendKind, ArgError> {
     value
         .parse()
         .map_err(|_| ArgError::InvalidBackend(value.to_string()))
+}
+
+fn parse_runtime(value: &str) -> Result<RuntimeKind, ArgError> {
+    value
+        .parse()
+        .map_err(|_| ArgError::InvalidRuntime(value.to_string()))
 }
 
 fn parse_u64(flag: &'static str, value: &str) -> Result<u64, ArgError> {
@@ -1910,6 +1952,194 @@ impl CompositorRuntime for HeadlessCompositor {
     }
 }
 
+#[cfg(all(feature = "smithay-backend", target_os = "linux"))]
+pub struct SmithayCompositorRuntime {
+    inner: HeadlessCompositor,
+    display: smithay::reexports::wayland_server::Display<SmithayCompositorState>,
+    listening_socket: smithay::reexports::wayland_server::ListeningSocket,
+    socket_name: String,
+    inserted_wayland_clients: u64,
+    dispatch_count: u64,
+    last_error: Option<String>,
+}
+
+#[cfg(all(feature = "smithay-backend", target_os = "linux"))]
+#[derive(Debug, Default)]
+struct SmithayCompositorState;
+
+#[cfg(all(feature = "smithay-backend", target_os = "linux"))]
+impl SmithayCompositorRuntime {
+    pub fn try_new() -> Result<Self, SmithayRuntimeError> {
+        use smithay::reexports::wayland_server::{Display, ListeningSocket};
+
+        let display = Display::<SmithayCompositorState>::new()
+            .map_err(|error| SmithayRuntimeError(format!("display-new:{error}")))?;
+        let listening_socket = ListeningSocket::bind_auto("backlit-smithay-runtime", 0..64)
+            .map_err(|error| SmithayRuntimeError(format!("socket-bind:{error}")))?;
+        let socket_name = listening_socket
+            .socket_name()
+            .and_then(|name| name.to_str())
+            .map(String::from)
+            .ok_or_else(|| SmithayRuntimeError(String::from("socket-name:unavailable")))?;
+
+        Ok(Self {
+            inner: HeadlessCompositor::default(),
+            display,
+            listening_socket,
+            socket_name,
+            inserted_wayland_clients: 0,
+            dispatch_count: 0,
+            last_error: None,
+        })
+    }
+
+    pub fn socket_name(&self) -> &str {
+        self.socket_name.as_str()
+    }
+
+    pub fn inserted_wayland_clients(&self) -> u64 {
+        self.inserted_wayland_clients
+    }
+
+    pub fn dispatch_count(&self) -> u64 {
+        self.dispatch_count
+    }
+
+    pub fn last_error(&self) -> Option<&str> {
+        self.last_error.as_deref()
+    }
+
+    fn insert_wayland_client(&mut self, name: &str) -> Result<(), SmithayRuntimeError> {
+        use std::{env, os::unix::net::UnixStream, path::PathBuf, sync::Arc};
+
+        use smithay::reexports::wayland_server::backend::ClientData;
+
+        let runtime_dir = env::var_os("XDG_RUNTIME_DIR").ok_or_else(|| {
+            SmithayRuntimeError(String::from("socket-connect:missing-runtime-dir"))
+        })?;
+        let socket_path = PathBuf::from(runtime_dir).join(&self.socket_name);
+        let _client_stream = UnixStream::connect(&socket_path)
+            .map_err(|error| SmithayRuntimeError(format!("socket-connect:{name}:{error}")))?;
+        let accepted_stream = accept_bootstrap_client(&self.listening_socket)
+            .map_err(|error| SmithayRuntimeError(format!("{name}:{error}")))?;
+        let client_data: Arc<dyn ClientData> = Arc::new(());
+        let mut display_handle = self.display.handle();
+        display_handle
+            .insert_client(accepted_stream, client_data)
+            .map_err(|error| SmithayRuntimeError(format!("client-insert:{name}:{error}")))?;
+        self.inserted_wayland_clients += 1;
+        Ok(())
+    }
+
+    fn dispatch_wayland(&mut self) {
+        let mut state = SmithayCompositorState;
+        match self.display.dispatch_clients(&mut state) {
+            Ok(count) => {
+                self.dispatch_count += count as u64;
+                if let Err(error) = self.display.flush_clients() {
+                    self.last_error = Some(format!("display-flush:{error}"));
+                }
+            }
+            Err(error) => {
+                self.last_error = Some(format!("display-dispatch:{error}"));
+            }
+        }
+    }
+}
+
+#[cfg(all(feature = "smithay-backend", target_os = "linux"))]
+impl CompositorRuntime for SmithayCompositorRuntime {
+    type Error = SmithayRuntimeError;
+
+    fn runtime_name(&self) -> &'static str {
+        "smithay-compositor-runtime"
+    }
+
+    fn connect_client(&mut self, name: &str) -> ClientId {
+        match self.insert_wayland_client(name) {
+            Ok(()) => self.inner.connect_client(name),
+            Err(error) => {
+                self.last_error = Some(error.to_string());
+                ClientId(0)
+            }
+        }
+    }
+
+    fn submit_surface(
+        &mut self,
+        client: ClientId,
+        title: &str,
+        width: u32,
+        height: u32,
+    ) -> Result<SurfaceId, Self::Error> {
+        self.submit_surface_with_options(client, title, width, height, SurfaceOptions::default())
+    }
+
+    fn submit_surface_with_options(
+        &mut self,
+        client: ClientId,
+        title: &str,
+        width: u32,
+        height: u32,
+        options: SurfaceOptions,
+    ) -> Result<SurfaceId, Self::Error> {
+        self.inner
+            .submit_surface_with_options(client, title, width, height, options)
+            .map_err(|error| SmithayRuntimeError(error.to_string()))
+    }
+
+    fn mark_damaged(&mut self, surface: SurfaceId) -> Result<(), Self::Error> {
+        self.inner
+            .mark_damaged(surface)
+            .map_err(|error| SmithayRuntimeError(error.to_string()))
+    }
+
+    fn close_surface(&mut self, surface: SurfaceId) -> Result<(), Self::Error> {
+        self.inner
+            .close_surface(surface)
+            .map_err(|error| SmithayRuntimeError(error.to_string()))
+    }
+
+    fn disconnect_client(&mut self, client: ClientId) -> Result<u64, Self::Error> {
+        self.inner
+            .disconnect_client(client)
+            .map_err(|error| SmithayRuntimeError(error.to_string()))
+    }
+
+    fn present(&mut self) -> FrameReport {
+        self.dispatch_wayland();
+        self.inner.present()
+    }
+
+    fn direct_scanout_candidate(
+        &self,
+        surface: SurfaceId,
+        output_width: u32,
+        output_height: u32,
+    ) -> Result<DirectScanoutReport, Self::Error> {
+        self.inner
+            .direct_scanout_candidate(surface, output_width, output_height)
+            .map_err(|error| SmithayRuntimeError(error.to_string()))
+    }
+
+    fn client_count(&self) -> u64 {
+        self.inner.client_count()
+    }
+
+    fn surface_count(&self) -> u64 {
+        self.inner.surface_count()
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct SmithayRuntimeError(pub String);
+
+impl fmt::Display for SmithayRuntimeError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str(self.0.as_str())
+    }
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum HeadlessError {
     UnknownClient(ClientId),
@@ -1929,7 +2159,7 @@ impl fmt::Display for HeadlessError {
 mod tests {
     use super::{
         backend_launch_plan, parse_args, BackendKind, BackendPreflightEnvironment, BufferKind,
-        ClientId, CompositorRuntime, HeadlessCompositor, RunConfig, SurfaceOptions,
+        ClientId, CompositorRuntime, HeadlessCompositor, RunConfig, RuntimeKind, SurfaceOptions,
     };
 
     #[test]
@@ -1944,6 +2174,8 @@ mod tests {
     fn parses_backend_socket_and_smoke_test() {
         let config = parse_args([
             "--backend=wayland",
+            "--runtime",
+            "smithay",
             "--socket",
             "backlit-test",
             "--smoke-test",
@@ -1958,6 +2190,7 @@ mod tests {
         .unwrap();
 
         assert_eq!(config.backend, BackendKind::Wayland);
+        assert_eq!(config.runtime, RuntimeKind::Smithay);
         assert_eq!(config.socket, "backlit-test");
         assert!(config.smoke_test);
         assert!(config.scripted_client);

@@ -40,6 +40,7 @@ require_executable scripts/verify-debian-system-install.sh
 require_executable scripts/verify-launch-performance.sh
 require_executable scripts/verify-resource-budget.sh
 require_executable scripts/verify-smithay-runtime-probe.sh
+require_executable scripts/verify-smithay-compositor-runtime.sh
 require_executable scripts/verify-linux-e2e.sh
 
 require_contains docs/architecture/mvp-1.md 'MVP 1 is the bare graphical session'
@@ -98,6 +99,10 @@ require_contains scripts/verify-smithay-runtime-probe.sh '"smithay_runtime_boots
 require_contains scripts/verify-smithay-runtime-probe.sh '"smithay_wayland_socket_bootstrap": $smithay_wayland_socket_bootstrap'
 require_contains scripts/verify-smithay-runtime-probe.sh '"smithay_wayland_client_inserted": $smithay_wayland_client_inserted'
 require_contains scripts/verify-linux-e2e.sh './scripts/verify-smithay-runtime-probe.sh'
+require_contains scripts/verify-linux-e2e.sh './scripts/verify-smithay-compositor-runtime.sh'
+require_contains scripts/verify-smithay-compositor-runtime.sh '--features smithay-backend'
+require_contains scripts/verify-smithay-compositor-runtime.sh '--runtime=smithay'
+require_contains scripts/verify-smithay-compositor-runtime.sh '"smithay_compositor_runtime": true'
 require_contains scripts/verify-linux-e2e.sh './scripts/verify-drm-session-smoke.sh'
 require_contains scripts/verify-linux-e2e.sh './scripts/verify-mvp1-contract.sh'
 
@@ -109,6 +114,7 @@ debian_system_install_replay_artifact=false
 nested_wayland_artifact=false
 compositor_socket_artifact=false
 smithay_runtime_probe_artifact=false
+smithay_compositor_runtime_artifact=false
 
 if [ -n "$artifact_root" ] && [ -d "$artifact_root" ]; then
   artifact_manifests_checked=true
@@ -122,6 +128,7 @@ if [ -n "$artifact_root" ] && [ -d "$artifact_root" ]; then
   require_file "$artifact_root/compositor-runtime/manifest.json"
   require_file "$artifact_root/compositor-socket/manifest.json"
   require_file "$artifact_root/smithay-runtime-probe/manifest.json"
+  require_file "$artifact_root/smithay-compositor-runtime/manifest.json"
   require_file "$artifact_root/launcher-desktop-discovery/manifest.json"
   require_file "$artifact_root/debian-package-install/manifest.json"
   require_file "$artifact_root/debian-system-install/manifest.json"
@@ -222,6 +229,24 @@ if [ -n "$artifact_root" ] && [ -d "$artifact_root" ]; then
   require_contains "$artifact_root/compositor-runtime/manifest.json" '"surface_policy_preview": true'
   require_contains "$artifact_root/compositor-runtime/manifest.json" '"targeted_surface_damage": true'
   require_contains "$artifact_root/compositor-runtime/manifest.json" '"client_disconnect_cleanup": true'
+  require_contains "$artifact_root/smithay-compositor-runtime/manifest.json" '"name": "backlit-smithay-compositor-runtime"'
+  require_contains "$artifact_root/smithay-compositor-runtime/manifest.json" '"smithay_compositor_runtime":'
+  require_contains "$artifact_root/smithay-compositor-runtime/manifest.json" '"smithay_runtime_trait":'
+  require_contains "$artifact_root/smithay-compositor-runtime/manifest.json" '"smithay_scripted_client":'
+  require_contains "$artifact_root/smithay-compositor-runtime/manifest.json" '"smithay_service_ready":'
+  if grep '"checked": true' "$artifact_root/smithay-compositor-runtime/manifest.json" >/dev/null; then
+    if grep '"drm_launch_ready": true' "$artifact_root/smithay-compositor-runtime/manifest.json" >/dev/null; then
+      require_contains "$artifact_root/smithay-compositor-runtime/manifest.json" '"smithay_compositor_runtime": true'
+      require_contains "$artifact_root/smithay-compositor-runtime/manifest.json" '"smithay_runtime_trait": true'
+      require_contains "$artifact_root/smithay-compositor-runtime/manifest.json" '"smithay_scripted_client": true'
+      require_contains "$artifact_root/smithay-compositor-runtime/manifest.json" '"smithay_service_ready": true'
+      smithay_compositor_runtime_artifact=true
+    else
+      require_contains "$artifact_root/smithay-compositor-runtime/manifest.json" '"expected_blocked": true'
+    fi
+  else
+    require_contains "$artifact_root/smithay-compositor-runtime/manifest.json" '"expected_blocked": true'
+  fi
   require_contains "$artifact_root/smithay-runtime-probe/manifest.json" '"name": "backlit-smithay-runtime-probe"'
   require_contains "$artifact_root/smithay-runtime-probe/manifest.json" '"smithay_runtime_probe":'
   require_contains "$artifact_root/smithay-runtime-probe/manifest.json" '"smithay_runtime_bootstrap":'
@@ -321,6 +346,8 @@ cat > "$manifest" <<EOF
     "compositor_runtime_trait_contract": true,
     "smithay_runtime_probe_contract": true,
     "smithay_runtime_probe_artifact": $smithay_runtime_probe_artifact,
+    "smithay_compositor_runtime_contract": true,
+    "smithay_compositor_runtime_artifact": $smithay_compositor_runtime_artifact,
     "compositor_socket_contract": true,
     "compositor_socket_artifact": $compositor_socket_artifact,
     "drm_launch_ready_artifact": $drm_launch_ready_artifact,

@@ -9,6 +9,7 @@ smoke_dir="$out_dir/gui-smoke"
 preview_dir="$out_dir/gui-preview"
 compositor_runtime_dir="$out_dir/compositor-runtime"
 compositor_socket_dir="$out_dir/compositor-socket"
+smithay_compositor_runtime_dir="$out_dir/smithay-compositor-runtime"
 launch_performance_dir="$out_dir/launch-performance"
 launcher_desktop_dir="$out_dir/launcher-desktop-discovery"
 resource_budget_dir="$out_dir/resource-budget"
@@ -48,6 +49,7 @@ cargo clippy --workspace --all-targets -- -D warnings
 ./scripts/render-gui-preview.sh "$preview_dir"
 ./scripts/verify-compositor-runtime.sh "$compositor_runtime_dir"
 ./scripts/verify-compositor-socket.sh "$compositor_socket_dir"
+./scripts/verify-smithay-compositor-runtime.sh "$smithay_compositor_runtime_dir"
 ./scripts/verify-launch-performance.sh "$launch_performance_dir"
 ./scripts/verify-launcher-desktop-discovery.sh "$launcher_desktop_dir"
 ./scripts/verify-resource-budget.sh "$resource_budget_dir"
@@ -96,6 +98,7 @@ cat > "$out_dir/manifest.json" <<EOF
     "gui_preview_manifest": "$preview_dir/manifest.json",
     "compositor_runtime_manifest": "$compositor_runtime_dir/manifest.json",
     "compositor_socket_manifest": "$compositor_socket_dir/manifest.json",
+    "smithay_compositor_runtime_manifest": "$smithay_compositor_runtime_dir/manifest.json",
     "launch_performance_manifest": "$launch_performance_dir/manifest.json",
     "launcher_desktop_discovery_manifest": "$launcher_desktop_dir/manifest.json",
     "resource_budget_manifest": "$resource_budget_dir/manifest.json",
@@ -131,6 +134,7 @@ cat > "$out_dir/manifest.json" <<EOF
     "gui_preview": true,
     "compositor_runtime": true,
     "compositor_socket": true,
+    "smithay_compositor_runtime": true,
     "launch_performance": true,
     "launcher_desktop_discovery": true,
     "resource_budget": true,

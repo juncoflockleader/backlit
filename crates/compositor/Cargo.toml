@@ -7,6 +7,9 @@ license.workspace = true
 repository.workspace = true
 publish = false
 
+[features]
+smithay-backend = ["backlit-compositor-backend/smithay-backend"]
+
 [dependencies]
 backlit-common = { path = "../common" }
 backlit-compositor-backend = { path = "../compositor-backend" }

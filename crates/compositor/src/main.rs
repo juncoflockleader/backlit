@@ -12,10 +12,12 @@ use std::time::Duration;
 use std::time::Instant;
 
 use backlit_common::metrics::{event_json, FieldValue};
+#[cfg(all(feature = "smithay-backend", target_os = "linux"))]
+use backlit_compositor_backend::SmithayCompositorRuntime;
 use backlit_compositor_backend::{
     backend_launch_plan, parse_args, preflight_backend_with_environment, BackendLaunchPlan,
     BackendPreflightEnvironment, BackendPreflightReport, ClientId, CompositorRuntime,
-    HeadlessCompositor, RunConfig, SurfaceId as BackendSurfaceId, SurfaceOptions,
+    HeadlessCompositor, RunConfig, RuntimeKind, SurfaceId as BackendSurfaceId, SurfaceOptions,
 };
 use backlit_demo_client::{render_policy_gui, verify_policy_gui};
 use backlit_surface::{SurfaceManager, SurfacePhase, SurfaceRole};
@@ -41,6 +43,7 @@ fn run() -> Result<(), String> {
         "compositor.start",
         &config,
         &[
+            ("runtime", FieldValue::Str(config.runtime.as_str())),
             ("smoke_test", FieldValue::Bool(config.smoke_test)),
             ("scripted_client", FieldValue::Bool(config.scripted_client)),
         ],
@@ -63,7 +66,10 @@ fn run() -> Result<(), String> {
     }
 
     if config.scripted_client {
-        let runtime = run_scripted_client_runtime(config.scripted_client_preview.as_deref())?;
+        let runtime = run_scripted_client_runtime_for_config(
+            &config,
+            config.scripted_client_preview.as_deref(),
+        )?;
         emit(
             "compositor.scripted_client",
             &config,
@@ -181,7 +187,7 @@ fn run() -> Result<(), String> {
     if config.smoke_test {
         run_smoke_test(&config);
     } else {
-        let readiness = run_service_ready();
+        let readiness = run_service_ready_for_config(&config)?;
         emit(
             "compositor.ready",
             &config,
@@ -1169,6 +1175,33 @@ fn run_scripted_client_runtime(
     run_scripted_client_runtime_with_backend(HeadlessCompositor::default(), policy_preview_path)
 }
 
+fn run_scripted_client_runtime_for_config(
+    config: &RunConfig,
+    policy_preview_path: Option<&str>,
+) -> Result<ScriptedClientRuntime, String> {
+    match config.runtime {
+        RuntimeKind::Headless => run_scripted_client_runtime(policy_preview_path),
+        RuntimeKind::Smithay => run_scripted_client_runtime_with_smithay(policy_preview_path),
+    }
+}
+
+#[cfg(all(feature = "smithay-backend", target_os = "linux"))]
+fn run_scripted_client_runtime_with_smithay(
+    policy_preview_path: Option<&str>,
+) -> Result<ScriptedClientRuntime, String> {
+    let runtime = SmithayCompositorRuntime::try_new().map_err(|error| error.to_string())?;
+    run_scripted_client_runtime_with_backend(runtime, policy_preview_path)
+}
+
+#[cfg(not(all(feature = "smithay-backend", target_os = "linux")))]
+fn run_scripted_client_runtime_with_smithay(
+    _policy_preview_path: Option<&str>,
+) -> Result<ScriptedClientRuntime, String> {
+    Err(String::from(
+        "smithay runtime requires Linux and the smithay-backend feature",
+    ))
+}
+
 fn run_scripted_client_runtime_with_backend<B: CompositorRuntime>(
     mut backend: B,
     policy_preview_path: Option<&str>,
@@ -1511,6 +1544,26 @@ impl CompositorReadyReport {
 
 fn run_service_ready() -> CompositorReadyReport {
     run_service_ready_with_backend(HeadlessCompositor::default())
+}
+
+fn run_service_ready_for_config(config: &RunConfig) -> Result<CompositorReadyReport, String> {
+    match config.runtime {
+        RuntimeKind::Headless => Ok(run_service_ready()),
+        RuntimeKind::Smithay => run_service_ready_with_smithay(),
+    }
+}
+
+#[cfg(all(feature = "smithay-backend", target_os = "linux"))]
+fn run_service_ready_with_smithay() -> Result<CompositorReadyReport, String> {
+    let runtime = SmithayCompositorRuntime::try_new().map_err(|error| error.to_string())?;
+    Ok(run_service_ready_with_backend(runtime))
+}
+
+#[cfg(not(all(feature = "smithay-backend", target_os = "linux")))]
+fn run_service_ready_with_smithay() -> Result<CompositorReadyReport, String> {
+    Err(String::from(
+        "smithay runtime requires Linux and the smithay-backend feature",
+    ))
 }
 
 fn run_service_ready_with_backend<B: CompositorRuntime>(mut backend: B) -> CompositorReadyReport {
@@ -2114,10 +2167,11 @@ fn print_help() {
 backlit-compositor
 
 Usage:
-  backlit-compositor [--backend=headless|wayland|drm] [--socket=backlit-0] [--smoke-test] [--scripted-client] [--scripted-client-preview=path] [--serve] [--serve-for-ms=1000] [--idle-probe-ms=1000]
+  backlit-compositor [--backend=headless|wayland|drm] [--runtime=headless|smithay] [--socket=backlit-0] [--smoke-test] [--scripted-client] [--scripted-client-preview=path] [--serve] [--serve-for-ms=1000] [--idle-probe-ms=1000]
 
 Flags:
   --backend      Select compositor backend. Defaults to headless.
+  --runtime      Select runtime implementation. Defaults to headless.
   --socket       Wayland socket name to create or target. Defaults to backlit-0.
   --smoke-test   Run the current MVP 0 policy/metrics smoke test and exit.
   --scripted-client

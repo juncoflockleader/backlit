@@ -237,6 +237,7 @@ copy_file target/debug/backlit-portal-backend "$(package_root fastgui-portal)/us
 for verifier in \
   verify-gui-smoke.sh \
   verify-compositor-runtime.sh \
+  verify-smithay-compositor-runtime.sh \
   verify-compositor-socket.sh \
   verify-package-manifests.sh \
   verify-debian-package-build.sh \
@@ -287,6 +288,7 @@ require_deb_contains fastgui-settings usr/bin/backlit-settings-daemon
 require_deb_contains fastgui-settings usr/share/applications/org.backlit.Settings.desktop
 require_deb_contains fastgui-portal usr/bin/backlit-portal-backend
 require_deb_contains fastgui-dev-tools usr/lib/backlit/dev-tools/verify-linux-e2e.sh
+require_deb_contains fastgui-dev-tools usr/lib/backlit/dev-tools/verify-smithay-compositor-runtime.sh
 require_deb_contains fastgui-dev-tools usr/lib/backlit/dev-tools/verify-compositor-socket.sh
 require_deb_contains fastgui-dev-tools usr/lib/backlit/dev-tools/verify-debian-package-build.sh
 require_deb_contains fastgui-dev-tools usr/lib/backlit/dev-tools/verify-debian-package-install.sh
