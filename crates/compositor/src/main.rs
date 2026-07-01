@@ -90,6 +90,10 @@ fn run() -> Result<(), String> {
                     FieldValue::U64(runtime.calloop_dispatch_count),
                 ),
                 (
+                    "smithay_protocol_globals",
+                    FieldValue::U64(runtime.smithay_protocol_globals),
+                ),
+                (
                     "client_connected",
                     FieldValue::Bool(runtime.client_connected),
                 ),
@@ -221,6 +225,10 @@ fn run() -> Result<(), String> {
                 (
                     "calloop_dispatch_count",
                     FieldValue::U64(readiness.calloop_dispatch_count),
+                ),
+                (
+                    "smithay_protocol_globals",
+                    FieldValue::U64(readiness.smithay_protocol_globals),
                 ),
                 (
                     "accepting_clients",
@@ -580,6 +588,7 @@ impl<B: CompositorRuntime> SocketClientRuntime<B> {
             inserted_wayland_clients: self.backend.inserted_wayland_clients(),
             wayland_dispatch_count: self.backend.wayland_dispatch_count(),
             calloop_dispatch_count: self.backend.calloop_dispatch_count(),
+            smithay_protocol_globals: self.backend.smithay_protocol_global_count(),
             policy_windows: self.manager.policy().windows().len() as u64,
             visible_windows: self.manager.policy().visible_windows().count() as u64,
             policy_state: geometry.state,
@@ -678,6 +687,7 @@ impl<B: CompositorRuntime> SocketClientRuntime<B> {
             inserted_wayland_clients: self.backend.inserted_wayland_clients(),
             wayland_dispatch_count: self.backend.wayland_dispatch_count(),
             calloop_dispatch_count: self.backend.calloop_dispatch_count(),
+            smithay_protocol_globals: self.backend.smithay_protocol_global_count(),
             policy_windows: self.manager.policy().windows().len() as u64,
             visible_windows: self.manager.policy().visible_windows().count() as u64,
             policy_state: geometry.state,
@@ -735,6 +745,7 @@ impl<B: CompositorRuntime> SocketClientRuntime<B> {
             inserted_wayland_clients: self.backend.inserted_wayland_clients(),
             wayland_dispatch_count: self.backend.wayland_dispatch_count(),
             calloop_dispatch_count: self.backend.calloop_dispatch_count(),
+            smithay_protocol_globals: self.backend.smithay_protocol_global_count(),
             policy_windows: self.manager.policy().windows().len() as u64,
             visible_windows: self.manager.policy().visible_windows().count() as u64,
             policy_state: geometry.state,
@@ -807,6 +818,7 @@ impl<B: CompositorRuntime> SocketClientRuntime<B> {
             inserted_wayland_clients: self.backend.inserted_wayland_clients(),
             wayland_dispatch_count: self.backend.wayland_dispatch_count(),
             calloop_dispatch_count: self.backend.calloop_dispatch_count(),
+            smithay_protocol_globals: self.backend.smithay_protocol_global_count(),
             policy_windows: self.manager.policy().windows().len() as u64,
             visible_windows: self.manager.policy().visible_windows().count() as u64,
             policy_state: geometry.state,
@@ -904,6 +916,7 @@ struct SocketClientReport {
     inserted_wayland_clients: u64,
     wayland_dispatch_count: u64,
     calloop_dispatch_count: u64,
+    smithay_protocol_globals: u64,
     policy_windows: u64,
     visible_windows: u64,
     policy_state: &'static str,
@@ -943,6 +956,7 @@ impl SocketClientReport {
             inserted_wayland_clients: 0,
             wayland_dispatch_count: 0,
             calloop_dispatch_count: 0,
+            smithay_protocol_globals: 0,
             policy_windows: 0,
             visible_windows: 0,
             policy_state: "none",
@@ -1232,6 +1246,7 @@ struct ScriptedClientRuntime {
     inserted_wayland_clients: u64,
     wayland_dispatch_count: u64,
     calloop_dispatch_count: u64,
+    smithay_protocol_globals: u64,
     client_connected: bool,
     surfaces_after_map: u64,
     first_frame_damaged_surfaces: u64,
@@ -1266,6 +1281,7 @@ impl ScriptedClientRuntime {
         self.runtime_trait
             && !self.runtime_backend.is_empty()
             && self.smithay_event_loop_runtime_ok()
+            && self.smithay_protocol_globals_ok()
             && self.client_connected
             && self.surfaces_after_map == 2
             && self.first_frame_damaged_surfaces == 2
@@ -1298,6 +1314,10 @@ impl ScriptedClientRuntime {
             || (self.inserted_wayland_clients >= 1
                 && self.wayland_dispatch_count >= self.frames
                 && self.calloop_dispatch_count >= self.frames)
+    }
+
+    fn smithay_protocol_globals_ok(self) -> bool {
+        self.runtime_backend != "smithay-compositor-runtime" || self.smithay_protocol_globals >= 4
     }
 }
 
@@ -1410,6 +1430,7 @@ fn run_scripted_client_runtime_with_backend<B: CompositorRuntime>(
         inserted_wayland_clients: backend.inserted_wayland_clients(),
         wayland_dispatch_count: backend.wayland_dispatch_count(),
         calloop_dispatch_count: backend.calloop_dispatch_count(),
+        smithay_protocol_globals: backend.smithay_protocol_global_count(),
         client_connected: first_frame.client_count == 1,
         surfaces_after_map: first_frame.surface_count,
         first_frame_damaged_surfaces: first_frame.damaged_surfaces,
@@ -1655,6 +1676,7 @@ struct CompositorReadyReport {
     inserted_wayland_clients: u64,
     wayland_dispatch_count: u64,
     calloop_dispatch_count: u64,
+    smithay_protocol_globals: u64,
     accepting_clients: bool,
     bootstrap_client_connected: bool,
     bootstrap_surface_presented: bool,
@@ -1670,6 +1692,7 @@ impl CompositorReadyReport {
         self.runtime_trait
             && !self.runtime_backend.is_empty()
             && self.smithay_event_loop_runtime_ok()
+            && self.smithay_protocol_globals_ok()
             && self.accepting_clients
             && self.bootstrap_client_connected
             && self.bootstrap_surface_presented
@@ -1685,6 +1708,10 @@ impl CompositorReadyReport {
             || (self.inserted_wayland_clients >= 1
                 && self.wayland_dispatch_count >= self.frames
                 && self.calloop_dispatch_count >= self.frames)
+    }
+
+    fn smithay_protocol_globals_ok(self) -> bool {
+        self.runtime_backend != "smithay-compositor-runtime" || self.smithay_protocol_globals >= 4
     }
 }
 
@@ -1726,6 +1753,7 @@ fn run_service_ready_with_backend<B: CompositorRuntime>(mut backend: B) -> Compo
         inserted_wayland_clients: backend.inserted_wayland_clients(),
         wayland_dispatch_count: backend.wayland_dispatch_count(),
         calloop_dispatch_count: backend.calloop_dispatch_count(),
+        smithay_protocol_globals: backend.smithay_protocol_global_count(),
         accepting_clients: backend.client_count() > 0,
         bootstrap_client_connected: backend.client_count() == 1,
         bootstrap_surface_presented,
@@ -2296,6 +2324,10 @@ fn emit_socket_client(config: &RunConfig, runtime_backend: &str, report: &Socket
             (
                 "calloop_dispatch_count",
                 FieldValue::U64(report.calloop_dispatch_count),
+            ),
+            (
+                "smithay_protocol_globals",
+                FieldValue::U64(report.smithay_protocol_globals),
             ),
             ("policy_windows", FieldValue::U64(report.policy_windows)),
             ("visible_windows", FieldValue::U64(report.visible_windows)),

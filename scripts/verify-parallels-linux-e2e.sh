@@ -458,6 +458,7 @@ require_contains "$host_compositor_runtime_manifest" '"client_disconnect_cleanup
 require_contains "$host_smithay_compositor_runtime_manifest" '"smithay_compositor_runtime": true'
 require_contains "$host_smithay_compositor_runtime_manifest" '"smithay_runtime_trait": true'
 require_contains "$host_smithay_compositor_runtime_manifest" '"smithay_scripted_client": true'
+require_contains "$host_smithay_compositor_runtime_manifest" '"smithay_core_protocol_globals": true'
 require_contains "$host_smithay_compositor_runtime_manifest" '"smithay_event_loop_runtime": true'
 require_contains "$host_smithay_compositor_runtime_manifest" '"smithay_service_ready": true'
 require_contains "$host_smithay_compositor_runtime_manifest" '"smithay_service_socket": true'

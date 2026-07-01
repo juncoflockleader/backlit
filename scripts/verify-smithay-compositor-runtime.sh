@@ -84,6 +84,7 @@ write_blocked_manifest() {
     "smithay_compositor_runtime": false,
     "smithay_runtime_trait": false,
     "smithay_scripted_client": false,
+    "smithay_core_protocol_globals": false,
     "smithay_event_loop_runtime": false,
     "smithay_service_ready": false,
     "smithay_service_socket": false,
@@ -144,6 +145,7 @@ require_contains "$log" '"runtime_trait":true'
 require_line_contains_all "$log" \
   '"event":"compositor.scripted_client"' \
   '"inserted_wayland_clients":1' \
+  '"smithay_protocol_globals":4' \
   '"wayland_dispatch_count":7' \
   '"calloop_dispatch_count":7'
 require_contains "$log" '"client_connected":true'
@@ -155,6 +157,7 @@ require_contains "$log" '"ready":true'
 require_line_contains_all "$log" \
   '"event":"compositor.ready"' \
   '"inserted_wayland_clients":1' \
+  '"smithay_protocol_globals":4' \
   '"wayland_dispatch_count":1' \
   '"calloop_dispatch_count":1'
 require_contains "$log" '"bootstrap_client_connected":true'
@@ -234,6 +237,7 @@ require_contains "$service_log" '"ready":true'
 require_line_contains_all "$service_log" \
   '"event":"compositor.ready"' \
   '"inserted_wayland_clients":1' \
+  '"smithay_protocol_globals":4' \
   '"wayland_dispatch_count":1' \
   '"calloop_dispatch_count":1'
 require_contains "$service_log" '"event":"compositor.socket_bound"'
@@ -248,6 +252,7 @@ require_line_contains_all "$service_log" \
   '"runtime_backend":"smithay-compositor-runtime"' \
   '"backend_surface_presented":true' \
   '"inserted_wayland_clients":1' \
+  '"smithay_protocol_globals":4' \
   '"wayland_dispatch_count":1' \
   '"calloop_dispatch_count":1' \
   '"policy_window_mapped":true' \
@@ -263,6 +268,7 @@ require_line_contains_all "$service_log" \
   '"backend_clients":2' \
   '"backend_surfaces":2' \
   '"inserted_wayland_clients":2' \
+  '"smithay_protocol_globals":4' \
   '"wayland_dispatch_count":2' \
   '"calloop_dispatch_count":2'
 require_line_contains_all "$service_log" \
@@ -301,6 +307,7 @@ require_line_contains_all "$service_log" \
   '"backend_clients":1' \
   '"backend_surfaces":1' \
   '"inserted_wayland_clients":2' \
+  '"smithay_protocol_globals":4' \
   '"wayland_dispatch_count":8' \
   '"calloop_dispatch_count":8' \
   '"policy_windows":1'
@@ -334,6 +341,7 @@ cat > "$out_dir/manifest.json" <<EOF
     "smithay_compositor_runtime": true,
     "smithay_runtime_trait": true,
     "smithay_scripted_client": true,
+    "smithay_core_protocol_globals": true,
     "smithay_event_loop_runtime": true,
     "smithay_service_ready": true,
     "smithay_service_socket": true,

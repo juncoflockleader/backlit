@@ -1675,6 +1675,9 @@ pub trait CompositorRuntime {
     type Error: fmt::Display;
 
     fn runtime_name(&self) -> &'static str;
+    fn smithay_protocol_global_count(&self) -> u64 {
+        0
+    }
     fn inserted_wayland_clients(&self) -> u64 {
         0
     }
@@ -1966,6 +1969,7 @@ pub struct SmithayCompositorRuntime {
     inner: HeadlessCompositor,
     display: smithay::reexports::wayland_server::Display<SmithayCompositorState>,
     event_loop: smithay::reexports::calloop::EventLoop<'static, SmithayCompositorState>,
+    state: SmithayCompositorState,
     listening_socket: smithay::reexports::wayland_server::ListeningSocket,
     socket_name: String,
     inserted_wayland_clients: u64,
@@ -1975,8 +1979,134 @@ pub struct SmithayCompositorRuntime {
 }
 
 #[cfg(all(feature = "smithay-backend", target_os = "linux"))]
+#[derive(Debug)]
+struct SmithayCompositorState {
+    compositor_state: smithay::wayland::compositor::CompositorState,
+    shm_state: smithay::wayland::shm::ShmState,
+    xdg_shell_state: smithay::wayland::shell::xdg::XdgShellState,
+    protocol_global_count: u64,
+    surface_commit_count: u64,
+    xdg_toplevel_count: u64,
+    xdg_popup_count: u64,
+}
+
+#[cfg(all(feature = "smithay-backend", target_os = "linux"))]
 #[derive(Debug, Default)]
-struct SmithayCompositorState;
+struct SmithayClientData {
+    compositor_state: smithay::wayland::compositor::CompositorClientState,
+}
+
+#[cfg(all(feature = "smithay-backend", target_os = "linux"))]
+impl smithay::reexports::wayland_server::backend::ClientData for SmithayClientData {}
+
+#[cfg(all(feature = "smithay-backend", target_os = "linux"))]
+impl SmithayCompositorState {
+    fn new(display: &smithay::reexports::wayland_server::DisplayHandle) -> Self {
+        let compositor_state = smithay::wayland::compositor::CompositorState::new::<Self>(display);
+        let shm_state = smithay::wayland::shm::ShmState::new::<Self>(
+            display,
+            std::iter::empty::<smithay::reexports::wayland_server::protocol::wl_shm::Format>(),
+        );
+        let xdg_shell_state = smithay::wayland::shell::xdg::XdgShellState::new::<Self>(display);
+
+        Self {
+            compositor_state,
+            shm_state,
+            xdg_shell_state,
+            protocol_global_count: 4,
+            surface_commit_count: 0,
+            xdg_toplevel_count: 0,
+            xdg_popup_count: 0,
+        }
+    }
+}
+
+#[cfg(all(feature = "smithay-backend", target_os = "linux"))]
+impl smithay::wayland::compositor::CompositorHandler for SmithayCompositorState {
+    fn compositor_state(&mut self) -> &mut smithay::wayland::compositor::CompositorState {
+        &mut self.compositor_state
+    }
+
+    fn client_compositor_state<'a>(
+        &self,
+        client: &'a smithay::reexports::wayland_server::Client,
+    ) -> &'a smithay::wayland::compositor::CompositorClientState {
+        client
+            .get_data::<SmithayClientData>()
+            .map(|data| &data.compositor_state)
+            .expect("Smithay compositor clients must carry Backlit client data")
+    }
+
+    fn commit(
+        &mut self,
+        _surface: &smithay::reexports::wayland_server::protocol::wl_surface::WlSurface,
+    ) {
+        self.surface_commit_count += 1;
+    }
+}
+
+#[cfg(all(feature = "smithay-backend", target_os = "linux"))]
+impl smithay::wayland::buffer::BufferHandler for SmithayCompositorState {
+    fn buffer_destroyed(
+        &mut self,
+        _buffer: &smithay::reexports::wayland_server::protocol::wl_buffer::WlBuffer,
+    ) {
+    }
+}
+
+#[cfg(all(feature = "smithay-backend", target_os = "linux"))]
+impl smithay::wayland::shm::ShmHandler for SmithayCompositorState {
+    fn shm_state(&self) -> &smithay::wayland::shm::ShmState {
+        &self.shm_state
+    }
+}
+
+#[cfg(all(feature = "smithay-backend", target_os = "linux"))]
+impl smithay::wayland::shell::xdg::XdgShellHandler for SmithayCompositorState {
+    fn xdg_shell_state(&mut self) -> &mut smithay::wayland::shell::xdg::XdgShellState {
+        &mut self.xdg_shell_state
+    }
+
+    fn new_toplevel(&mut self, surface: smithay::wayland::shell::xdg::ToplevelSurface) {
+        self.xdg_toplevel_count += 1;
+        surface.send_configure();
+    }
+
+    fn new_popup(
+        &mut self,
+        surface: smithay::wayland::shell::xdg::PopupSurface,
+        _positioner: smithay::wayland::shell::xdg::PositionerState,
+    ) {
+        self.xdg_popup_count += 1;
+        let _ = surface.send_configure();
+    }
+
+    fn grab(
+        &mut self,
+        _surface: smithay::wayland::shell::xdg::PopupSurface,
+        _seat: smithay::reexports::wayland_server::protocol::wl_seat::WlSeat,
+        _serial: smithay::utils::Serial,
+    ) {
+    }
+
+    fn reposition_request(
+        &mut self,
+        surface: smithay::wayland::shell::xdg::PopupSurface,
+        _positioner: smithay::wayland::shell::xdg::PositionerState,
+        token: u32,
+    ) {
+        surface.send_repositioned(token);
+    }
+}
+
+#[cfg(all(feature = "smithay-backend", target_os = "linux"))]
+smithay::delegate_compositor!(SmithayCompositorState);
+
+#[cfg(all(feature = "smithay-backend", target_os = "linux"))]
+smithay::delegate_shm!(SmithayCompositorState);
+
+#[cfg(all(feature = "smithay-backend", target_os = "linux"))]
+smithay::delegate_xdg_shell!(SmithayCompositorState);
 
 #[cfg(all(feature = "smithay-backend", target_os = "linux"))]
 impl SmithayCompositorRuntime {
@@ -1986,6 +2116,8 @@ impl SmithayCompositorRuntime {
 
         let display = Display::<SmithayCompositorState>::new()
             .map_err(|error| SmithayRuntimeError(format!("display-new:{error}")))?;
+        let display_handle = display.handle();
+        let state = SmithayCompositorState::new(&display_handle);
         let event_loop = EventLoop::<SmithayCompositorState>::try_new()
             .map_err(|error| SmithayRuntimeError(format!("event-loop-new:{error}")))?;
         let listening_socket = ListeningSocket::bind_auto("backlit-smithay-runtime", 0..64)
@@ -2000,6 +2132,7 @@ impl SmithayCompositorRuntime {
             inner: HeadlessCompositor::default(),
             display,
             event_loop,
+            state,
             listening_socket,
             socket_name,
             inserted_wayland_clients: 0,
@@ -2015,6 +2148,10 @@ impl SmithayCompositorRuntime {
 
     pub fn inserted_wayland_clients(&self) -> u64 {
         self.inserted_wayland_clients
+    }
+
+    pub fn smithay_protocol_global_count(&self) -> u64 {
+        self.state.protocol_global_count
     }
 
     pub fn wayland_dispatch_count(&self) -> u64 {
@@ -2042,7 +2179,7 @@ impl SmithayCompositorRuntime {
             .map_err(|error| SmithayRuntimeError(format!("socket-connect:{name}:{error}")))?;
         let accepted_stream = accept_bootstrap_client(&self.listening_socket)
             .map_err(|error| SmithayRuntimeError(format!("{name}:{error}")))?;
-        let client_data: Arc<dyn ClientData> = Arc::new(());
+        let client_data: Arc<dyn ClientData> = Arc::new(SmithayClientData::default());
         let mut display_handle = self.display.handle();
         display_handle
             .insert_client(accepted_stream, client_data)
@@ -2054,8 +2191,7 @@ impl SmithayCompositorRuntime {
     fn dispatch_wayland(&mut self) {
         use std::time::Duration;
 
-        let mut state = SmithayCompositorState;
-        match self.display.dispatch_clients(&mut state) {
+        match self.display.dispatch_clients(&mut self.state) {
             Ok(_count) => {
                 self.wayland_dispatch_count += 1;
                 if let Err(error) = self.display.flush_clients() {
@@ -2069,7 +2205,7 @@ impl SmithayCompositorRuntime {
 
         match self
             .event_loop
-            .dispatch(Some(Duration::from_millis(0)), &mut state)
+            .dispatch(Some(Duration::from_millis(0)), &mut self.state)
         {
             Ok(()) => {
                 self.calloop_dispatch_count += 1;
@@ -2087,6 +2223,10 @@ impl CompositorRuntime for SmithayCompositorRuntime {
 
     fn runtime_name(&self) -> &'static str {
         "smithay-compositor-runtime"
+    }
+
+    fn smithay_protocol_global_count(&self) -> u64 {
+        SmithayCompositorRuntime::smithay_protocol_global_count(self)
     }
 
     fn inserted_wayland_clients(&self) -> u64 {
