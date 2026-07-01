@@ -906,6 +906,10 @@ struct CompositorServiceVerification {
 
 const COMPOSITOR_SERVICE_SOCKET_WAIT_MS: u64 = 2_000;
 const COMPOSITOR_SERVICE_SERVE_FOR_MS: u64 = 650;
+const _: () = {
+    assert!(COMPOSITOR_SERVICE_SOCKET_WAIT_MS > COMPOSITOR_SERVICE_SERVE_FOR_MS);
+    assert!(COMPOSITOR_SERVICE_SOCKET_WAIT_MS >= 2_000);
+};
 
 impl CompositorServiceVerification {
     fn missing() -> Self {
@@ -3486,8 +3490,7 @@ mod tests {
 
     use super::{
         binary_name, run_systemd_activation, systemd_launch_plan, verify_systemd_units,
-        CompositorServiceVerification, Config, ServiceProbe, COMPOSITOR_SERVICE_SERVE_FOR_MS,
-        COMPOSITOR_SERVICE_SOCKET_WAIT_MS,
+        CompositorServiceVerification, Config, ServiceProbe,
     };
 
     #[test]
@@ -3559,12 +3562,6 @@ mod tests {
     #[test]
     fn binary_name_uses_platform_suffix() {
         assert!(binary_name("backlit-compositor").starts_with("backlit-compositor"));
-    }
-
-    #[test]
-    fn compositor_service_socket_wait_covers_installed_startup() {
-        assert!(COMPOSITOR_SERVICE_SOCKET_WAIT_MS > COMPOSITOR_SERVICE_SERVE_FOR_MS);
-        assert!(COMPOSITOR_SERVICE_SOCKET_WAIT_MS >= 2_000);
     }
 
     #[test]
