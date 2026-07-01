@@ -32,6 +32,11 @@ if [ "$(uname -s)" != "Linux" ]; then
     "smithay_dependency_compiled": false,
     "smithay_backend_feature": false,
     "smithay_drm_component": false,
+    "smithay_gbm_allocator_component": false,
+    "smithay_egl_display_component": false,
+    "smithay_gles_renderer_component": false,
+    "smithay_drm_node_resolved": false,
+    "smithay_renderer_node_selected": false,
     "smithay_libinput_component": false,
     "smithay_libseat_session_component": false,
     "smithay_calloop_component": false,
@@ -65,7 +70,10 @@ require_contains "$log" '"display_driver":"smithay-drm-kms"'
 require_contains "$log" '"input_driver":"smithay-libinput"'
 require_contains "$log" '"session_driver":"smithay-libseat-logind"'
 require_contains "$log" '"event_loop":"calloop"'
-require_contains "$log" '"component_count":5'
+require_contains "$log" '"component_count":8'
+require_contains "$log" '"gbm_allocator_component":true'
+require_contains "$log" '"egl_display_component":true'
+require_contains "$log" '"gles_renderer_component":true'
 
 launch_ready=false
 expected_blocked=true
@@ -73,12 +81,20 @@ smithay_runtime_probe=false
 smithay_runtime_bootstrap=false
 smithay_wayland_socket_bootstrap=false
 smithay_wayland_client_inserted=false
+smithay_drm_node_resolved=false
+smithay_renderer_node_selected=false
 if grep -F '"event":"backend.preflight","backend":"drm","ready":true' "$log" >/dev/null; then
   launch_ready=true
   expected_blocked=false
   require_contains "$log" '"launch_ready":true'
   require_contains "$log" '"passed":true'
   require_contains "$log" '"drm_card_selected":true'
+  require_contains "$log" '"drm_node_resolved":true'
+  require_contains "$log" '"drm_node_type":"primary"'
+  require_contains "$log" '"drm_node_primary_path":"/dev/dri/card'
+  require_contains "$log" '"drm_node_render_path":"/dev/dri/renderD'
+  require_contains "$log" '"renderer_node_selected":true'
+  require_contains "$log" '"renderer_node_path":"/dev/dri/renderD'
   require_contains "$log" '"input_event_selected":true'
   require_contains "$log" '"uses_logind":true'
   require_contains "$log" '"uses_libseat":true'
@@ -99,6 +115,8 @@ if grep -F '"event":"backend.preflight","backend":"drm","ready":true' "$log" >/d
   smithay_runtime_bootstrap=true
   smithay_wayland_socket_bootstrap=true
   smithay_wayland_client_inserted=true
+  smithay_drm_node_resolved=true
+  smithay_renderer_node_selected=true
 else
   require_contains "$log" '"event":"backend.preflight","backend":"drm","ready":false'
   require_contains "$log" '"launch_ready":false'
@@ -117,6 +135,11 @@ cat > "$out_dir/manifest.json" <<EOF
     "smithay_dependency_compiled": true,
     "smithay_backend_feature": true,
     "smithay_drm_component": true,
+    "smithay_gbm_allocator_component": true,
+    "smithay_egl_display_component": true,
+    "smithay_gles_renderer_component": true,
+    "smithay_drm_node_resolved": $smithay_drm_node_resolved,
+    "smithay_renderer_node_selected": $smithay_renderer_node_selected,
     "smithay_libinput_component": true,
     "smithay_libseat_session_component": true,
     "smithay_calloop_component": true,

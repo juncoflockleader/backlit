@@ -230,6 +230,9 @@ fn emit_smithay_runtime_bootstrap(bootstrap: &SmithayRuntimeBootstrap) {
 fn emit_smithay_runtime_probe(probe: &SmithayRuntimeProbe) {
     let primary_drm_card = probe.primary_drm_card.as_deref().unwrap_or("");
     let primary_drm_render_node = probe.primary_drm_render_node.as_deref().unwrap_or("");
+    let drm_node_primary_path = probe.drm_node_primary_path.as_deref().unwrap_or("");
+    let drm_node_render_path = probe.drm_node_render_path.as_deref().unwrap_or("");
+    let renderer_node_path = probe.renderer_node_path.as_deref().unwrap_or("");
     let primary_input_event = probe.primary_input_event.as_deref().unwrap_or("");
     let components = probe.components.join(",");
 
@@ -258,12 +261,42 @@ fn emit_smithay_runtime_probe(probe: &SmithayRuntimeProbe) {
                     FieldValue::Bool(probe.drm_render_selected),
                 ),
                 (
+                    "drm_node_resolved",
+                    FieldValue::Bool(probe.drm_node_resolved),
+                ),
+                ("drm_node_type", FieldValue::Str(probe.drm_node_type)),
+                (
+                    "drm_node_primary_path",
+                    FieldValue::Str(drm_node_primary_path),
+                ),
+                (
+                    "drm_node_render_path",
+                    FieldValue::Str(drm_node_render_path),
+                ),
+                (
+                    "renderer_node_selected",
+                    FieldValue::Bool(probe.renderer_node_selected),
+                ),
+                ("renderer_node_path", FieldValue::Str(renderer_node_path),),
+                (
                     "input_event_selected",
                     FieldValue::Bool(probe.input_event_selected),
                 ),
                 ("uses_logind", FieldValue::Bool(probe.uses_logind)),
                 ("uses_libseat", FieldValue::Bool(probe.uses_libseat)),
                 ("uses_libinput", FieldValue::Bool(probe.uses_libinput)),
+                (
+                    "gbm_allocator_component",
+                    FieldValue::Bool(probe.gbm_allocator_component),
+                ),
+                (
+                    "egl_display_component",
+                    FieldValue::Bool(probe.egl_display_component),
+                ),
+                (
+                    "gles_renderer_component",
+                    FieldValue::Bool(probe.gles_renderer_component),
+                ),
                 ("primary_drm_card", FieldValue::Str(primary_drm_card)),
                 (
                     "primary_drm_render_node",

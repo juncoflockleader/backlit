@@ -337,10 +337,19 @@ pub struct SmithayRuntimeProbe {
     pub event_loop: &'static str,
     pub drm_card_selected: bool,
     pub drm_render_selected: bool,
+    pub drm_node_resolved: bool,
+    pub drm_node_type: &'static str,
+    pub drm_node_primary_path: Option<String>,
+    pub drm_node_render_path: Option<String>,
+    pub renderer_node_selected: bool,
+    pub renderer_node_path: Option<String>,
     pub input_event_selected: bool,
     pub uses_logind: bool,
     pub uses_libseat: bool,
     pub uses_libinput: bool,
+    pub gbm_allocator_component: bool,
+    pub egl_display_component: bool,
+    pub gles_renderer_component: bool,
     pub primary_drm_card: Option<String>,
     pub primary_drm_render_node: Option<String>,
     pub primary_input_event: Option<String>,
@@ -399,10 +408,15 @@ impl SmithayRuntimeProbe {
             && self.session_driver == "smithay-libseat-logind"
             && self.event_loop == "calloop"
             && self.drm_card_selected
+            && self.drm_node_resolved
+            && self.renderer_node_selected
             && self.input_event_selected
             && self.uses_logind
             && self.uses_libseat
             && self.uses_libinput
+            && self.gbm_allocator_component
+            && self.egl_display_component
+            && self.gles_renderer_component
     }
 }
 
@@ -744,12 +758,24 @@ fn smithay_runtime_bootstrap_impl() -> SmithayRuntimeBootstrap {
 pub fn smithay_runtime_probe(environment: &BackendPreflightEnvironment) -> SmithayRuntimeProbe {
     let feature_enabled = cfg!(feature = "smithay-backend");
     let compiled = cfg!(all(feature = "smithay-backend", target_os = "linux"));
+    let drm_node_probe = smithay_drm_node_probe(environment.primary_drm_card.as_deref());
+    let renderer_node_path = if compiled {
+        environment
+            .primary_drm_render_node
+            .clone()
+            .or_else(|| drm_node_probe.renderer_path.clone())
+    } else {
+        None
+    };
+    let renderer_node_selected = renderer_node_path.is_some();
     let launch_ready = compiled
         && environment.target_os == "linux"
         && environment.drm_card_access_ready()
         && environment.input_broker_ready()
         && environment.primary_drm_card.is_some()
-        && environment.primary_input_event.is_some();
+        && environment.primary_input_event.is_some()
+        && drm_node_probe.resolved
+        && renderer_node_selected;
 
     SmithayRuntimeProbe {
         feature_enabled,
@@ -780,10 +806,19 @@ pub fn smithay_runtime_probe(environment: &BackendPreflightEnvironment) -> Smith
         event_loop: if compiled { "calloop" } else { "unavailable" },
         drm_card_selected: environment.primary_drm_card.is_some(),
         drm_render_selected: environment.primary_drm_render_node.is_some(),
+        drm_node_resolved: drm_node_probe.resolved,
+        drm_node_type: drm_node_probe.node_type,
+        drm_node_primary_path: drm_node_probe.primary_path,
+        drm_node_render_path: drm_node_probe.render_path.clone(),
+        renderer_node_selected,
+        renderer_node_path,
         input_event_selected: environment.primary_input_event.is_some(),
         uses_logind: environment.logind_session_verified || environment.logind_available,
         uses_libseat: environment.input_broker_mode() == "logind-libseat",
         uses_libinput: environment.input_broker_ready(),
+        gbm_allocator_component: compiled,
+        egl_display_component: compiled,
+        gles_renderer_component: compiled,
         primary_drm_card: environment.primary_drm_card.clone(),
         primary_drm_render_node: environment.primary_drm_render_node.clone(),
         primary_input_event: environment.primary_input_event.clone(),
@@ -791,9 +826,77 @@ pub fn smithay_runtime_probe(environment: &BackendPreflightEnvironment) -> Smith
     }
 }
 
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct SmithayDrmNodeProbe {
+    resolved: bool,
+    node_type: &'static str,
+    primary_path: Option<String>,
+    render_path: Option<String>,
+    renderer_path: Option<String>,
+}
+
+#[cfg(all(feature = "smithay-backend", target_os = "linux"))]
+fn smithay_drm_node_probe(path: Option<&str>) -> SmithayDrmNodeProbe {
+    use smithay::backend::drm::{DrmNode, NodeType};
+
+    let Some(path) = path else {
+        return unavailable_smithay_drm_node_probe();
+    };
+
+    let Ok(node) = DrmNode::from_path(path) else {
+        return unavailable_smithay_drm_node_probe();
+    };
+
+    let primary_path = node
+        .dev_path_with_type(NodeType::Primary)
+        .map(|path| path.to_string_lossy().into_owned());
+    let render_path = node
+        .dev_path_with_type(NodeType::Render)
+        .map(|path| path.to_string_lossy().into_owned());
+    let renderer_path = render_path.clone().or_else(|| {
+        node.dev_path()
+            .map(|path| path.to_string_lossy().into_owned())
+    });
+
+    SmithayDrmNodeProbe {
+        resolved: true,
+        node_type: smithay_drm_node_type_name(node.ty()),
+        primary_path,
+        render_path,
+        renderer_path,
+    }
+}
+
+#[cfg(not(all(feature = "smithay-backend", target_os = "linux")))]
+fn smithay_drm_node_probe(_path: Option<&str>) -> SmithayDrmNodeProbe {
+    unavailable_smithay_drm_node_probe()
+}
+
+fn unavailable_smithay_drm_node_probe() -> SmithayDrmNodeProbe {
+    SmithayDrmNodeProbe {
+        resolved: false,
+        node_type: "unavailable",
+        primary_path: None,
+        render_path: None,
+        renderer_path: None,
+    }
+}
+
+#[cfg(all(feature = "smithay-backend", target_os = "linux"))]
+fn smithay_drm_node_type_name(node_type: smithay::backend::drm::NodeType) -> &'static str {
+    match node_type {
+        smithay::backend::drm::NodeType::Primary => "primary",
+        smithay::backend::drm::NodeType::Control => "control",
+        smithay::backend::drm::NodeType::Render => "render",
+    }
+}
+
 #[cfg(all(feature = "smithay-backend", target_os = "linux"))]
 fn smithay_runtime_components() -> Vec<&'static str> {
     let _ = std::any::type_name::<smithay::backend::drm::DrmNode>();
+    let _ = std::any::type_name::<smithay::backend::allocator::gbm::GbmAllocator<std::fs::File>>();
+    let _ = std::any::type_name::<smithay::backend::egl::EGLDisplay>();
+    let _ = std::any::type_name::<smithay::backend::renderer::gles::GlesRenderer>();
     let _ = std::any::type_name::<smithay::backend::libinput::LibinputInputBackend>();
     let _ = std::any::type_name::<smithay::backend::session::Event>();
     let _ = std::any::type_name::<smithay::reexports::calloop::LoopSignal>();
@@ -801,6 +904,9 @@ fn smithay_runtime_components() -> Vec<&'static str> {
 
     vec![
         "smithay::backend::drm",
+        "smithay::backend::allocator::gbm",
+        "smithay::backend::egl",
+        "smithay::backend::renderer::gles",
         "smithay::backend::libinput",
         "smithay::backend::session",
         "smithay::reexports::calloop",
@@ -2903,18 +3009,26 @@ mod tests {
         assert_eq!(probe.feature_enabled, cfg!(feature = "smithay-backend"));
         if cfg!(all(feature = "smithay-backend", target_os = "linux")) {
             assert!(probe.compiled, "{probe:?}");
-            assert!(probe.launch_ready, "{probe:?}");
-            assert!(probe.passed(), "{probe:?}");
             assert_eq!(probe.runtime_backend, "smithay-drm-probe");
             assert_eq!(probe.display_driver, "smithay-drm-kms");
             assert_eq!(probe.input_driver, "smithay-libinput");
             assert_eq!(probe.session_driver, "smithay-libseat-logind");
             assert_eq!(probe.event_loop, "calloop");
-            assert_eq!(probe.components.len(), 5);
+            assert_eq!(probe.components.len(), 8);
+            assert!(probe.gbm_allocator_component);
+            assert!(probe.egl_display_component);
+            assert!(probe.gles_renderer_component);
+            assert_eq!(probe.launch_ready, probe.drm_node_resolved);
+            assert_eq!(probe.passed(), probe.launch_ready);
         } else {
             assert!(!probe.compiled, "{probe:?}");
             assert!(!probe.passed(), "{probe:?}");
             assert!(probe.components.is_empty());
+            assert!(!probe.drm_node_resolved);
+            assert!(!probe.renderer_node_selected);
+            assert!(!probe.gbm_allocator_component);
+            assert!(!probe.egl_display_component);
+            assert!(!probe.gles_renderer_component);
         }
     }
 
