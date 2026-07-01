@@ -128,6 +128,25 @@ fn run() -> Result<(), String> {
                     "registry_announced",
                     FieldValue::Bool(smoke.registry_announced),
                 ),
+                (
+                    "seat_global_announced",
+                    FieldValue::Bool(smoke.seat_global_announced),
+                ),
+                ("seat_bound", FieldValue::Bool(smoke.seat_bound)),
+                (
+                    "seat_name_observed",
+                    FieldValue::Bool(smoke.seat_name_observed),
+                ),
+                (
+                    "seat_keyboard_capability",
+                    FieldValue::Bool(smoke.seat_keyboard_capability),
+                ),
+                (
+                    "seat_pointer_capability",
+                    FieldValue::Bool(smoke.seat_pointer_capability),
+                ),
+                ("keyboard_bound", FieldValue::Bool(smoke.keyboard_bound)),
+                ("pointer_bound", FieldValue::Bool(smoke.pointer_bound)),
                 ("compositor_bound", FieldValue::Bool(smoke.compositor_bound)),
                 ("shm_bound", FieldValue::Bool(smoke.shm_bound)),
                 (
@@ -1437,6 +1456,13 @@ struct SmithayClientSmoke {
     smithay_protocol_globals: u64,
     registry_global_count: u64,
     registry_announced: bool,
+    seat_global_announced: bool,
+    seat_bound: bool,
+    seat_name_observed: bool,
+    seat_keyboard_capability: bool,
+    seat_pointer_capability: bool,
+    keyboard_bound: bool,
+    pointer_bound: bool,
     compositor_bound: bool,
     shm_bound: bool,
     shm_buffer_created: bool,
@@ -1475,9 +1501,16 @@ struct SmithayClientSmoke {
 impl SmithayClientSmoke {
     fn passed(&self) -> bool {
         self.runtime_backend == "smithay-compositor-runtime"
-            && self.smithay_protocol_globals >= 4
-            && self.registry_global_count >= 4
+            && self.smithay_protocol_globals >= 5
+            && self.registry_global_count >= 5
             && self.registry_announced
+            && self.seat_global_announced
+            && self.seat_bound
+            && self.seat_name_observed
+            && self.seat_keyboard_capability
+            && self.seat_pointer_capability
+            && self.keyboard_bound
+            && self.pointer_bound
             && self.compositor_bound
             && self.shm_bound
             && self.shm_buffer_created
@@ -1545,6 +1578,13 @@ fn run_smithay_client_smoke_for_config(config: &RunConfig) -> Result<SmithayClie
         smithay_protocol_globals: report.protocol_globals,
         registry_global_count: report.registry_global_count,
         registry_announced: report.registry_announced,
+        seat_global_announced: report.seat_global_announced,
+        seat_bound: report.seat_bound,
+        seat_name_observed: report.seat_name_observed,
+        seat_keyboard_capability: report.seat_keyboard_capability,
+        seat_pointer_capability: report.seat_pointer_capability,
+        keyboard_bound: report.keyboard_bound,
+        pointer_bound: report.pointer_bound,
         compositor_bound: report.compositor_bound,
         shm_bound: report.shm_bound,
         shm_buffer_created: report.shm_buffer_created,
@@ -1719,7 +1759,7 @@ impl ScriptedClientRuntime {
     }
 
     fn smithay_protocol_globals_ok(self) -> bool {
-        self.runtime_backend != "smithay-compositor-runtime" || self.smithay_protocol_globals >= 4
+        self.runtime_backend != "smithay-compositor-runtime" || self.smithay_protocol_globals >= 5
     }
 }
 
@@ -2113,7 +2153,7 @@ impl CompositorReadyReport {
     }
 
     fn smithay_protocol_globals_ok(self) -> bool {
-        self.runtime_backend != "smithay-compositor-runtime" || self.smithay_protocol_globals >= 4
+        self.runtime_backend != "smithay-compositor-runtime" || self.smithay_protocol_globals >= 5
     }
 }
 

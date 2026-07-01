@@ -482,6 +482,8 @@ require_contains "$host_smithay_compositor_runtime_manifest" '"smithay_composito
 require_contains "$host_smithay_compositor_runtime_manifest" '"smithay_runtime_trait": true'
 require_contains "$host_smithay_compositor_runtime_manifest" '"smithay_scripted_client": true'
 require_contains "$host_smithay_compositor_runtime_manifest" '"smithay_core_protocol_globals": true'
+require_contains "$host_smithay_compositor_runtime_manifest" '"smithay_seat_global": true'
+require_contains "$host_smithay_compositor_runtime_manifest" '"smithay_keyboard_pointer_capabilities": true'
 require_contains "$host_smithay_compositor_runtime_manifest" '"smithay_real_wayland_client": true'
 require_contains "$host_smithay_compositor_runtime_manifest" '"smithay_real_wayland_metadata": true'
 require_contains "$host_smithay_compositor_runtime_manifest" '"smithay_real_shm_buffer": true'
