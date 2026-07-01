@@ -12,6 +12,8 @@ parallels_manifest="$parallels_e2e_dir/manifest.json"
 dedicated_manifest="$dedicated_e2e_dir/manifest.json"
 dedicated_session_manifest="$dedicated_e2e_dir/dedicated-drm-session-manifest.json"
 package_build_manifest="$dedicated_e2e_dir/package-build-manifest.json"
+dedicated_dpkg_install_log="$dedicated_e2e_dir/system-dpkg-install.log"
+dedicated_dpkg_purge_log="$dedicated_e2e_dir/system-dpkg-purge.log"
 launch_performance_manifest="$parallels_e2e_dir/launch-performance-manifest.json"
 resource_budget_manifest="$parallels_e2e_dir/resource-budget-manifest.json"
 parallels_preview="$parallels_e2e_dir/gui-preview-backlit-session.png"
@@ -61,6 +63,8 @@ write_manifest() {
     "parallels_dedicated_drm_manifest": "$dedicated_manifest",
     "parallels_dedicated_drm_session_manifest": "$dedicated_session_manifest",
     "parallels_dedicated_package_build_manifest": "$package_build_manifest",
+    "parallels_dedicated_dpkg_install_log": "$dedicated_dpkg_install_log",
+    "parallels_dedicated_dpkg_purge_log": "$dedicated_dpkg_purge_log",
     "parallels_dedicated_gui_preview": "$dedicated_preview"
   },
   "checks": {
@@ -154,6 +158,8 @@ require_file "$resource_budget_manifest" missing-parallels-resource-budget-manif
 require_file "$dedicated_manifest" missing-parallels-dedicated-drm-manifest
 require_file "$dedicated_session_manifest" missing-parallels-dedicated-session-manifest
 require_file "$package_build_manifest" missing-parallels-dedicated-package-build-manifest
+require_file "$dedicated_dpkg_install_log" missing-parallels-dedicated-dpkg-install-log
+require_file "$dedicated_dpkg_purge_log" missing-parallels-dedicated-dpkg-purge-log
 
 require_contains "$parallels_manifest" '"passed": true' parallels-linux-e2e
 require_contains "$parallels_manifest" "\"guest_commit\": \"$commit\"" current-commit-evidence
@@ -202,6 +208,10 @@ require_contains "$dedicated_manifest" '"session_clean_exit": true' package-inst
 require_contains "$dedicated_manifest" '"png_written": true' preview-evidence
 require_contains "$dedicated_manifest" '"preview_format": "png"' preview-evidence
 require_contains "$package_build_manifest" '"debs_built": true' package-installed-dedicated-drm
+require_contains "$dedicated_dpkg_install_log" 'fastgui-core' package-installed-dedicated-drm
+require_contains "$dedicated_dpkg_install_log" 'fastgui-session' package-installed-dedicated-drm
+require_contains "$dedicated_dpkg_purge_log" 'fastgui-core' package-installed-dedicated-drm
+require_contains "$dedicated_dpkg_purge_log" 'fastgui-session' package-installed-dedicated-drm
 require_contains "$dedicated_session_manifest" '"expected_blocked": false' package-installed-dedicated-drm
 require_contains "$dedicated_session_manifest" '"reason": "dedicated-drm-session-presented"' package-installed-dedicated-drm
 require_contains "$dedicated_session_manifest" '"session_binary": "/usr/bin/backlit-session"' package-installed-dedicated-drm
