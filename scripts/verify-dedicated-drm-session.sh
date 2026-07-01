@@ -48,6 +48,13 @@ repo_root="$(git rev-parse --show-toplevel 2>/dev/null || pwd)"
 cd "$repo_root"
 
 out_dir="${1:-target/dedicated-drm-session-acceptance}"
+printf 'Backlit dedicated DRM acceptance handoff\n'
+printf '  output: %s\n' "$out_dir"
+printf '  requires: seat-owner TTY or display-manager Backlit session with DRM master\n'
+printf '  session: id=%s seat=%s type=%s runtime=%s wayland=%s\n' \
+  "${XDG_SESSION_ID:-}" "${XDG_SEAT:-}" "${XDG_SESSION_TYPE:-}" \
+  "${XDG_RUNTIME_DIR:-}" "${WAYLAND_DISPLAY:-}"
+
 BACKLIT_REQUIRE_DEDICATED_DRM_SESSION=1 \
 BACKLIT_REQUIRE_DRM_MASTER_PRESENT=1 \
   ./scripts/verify-dedicated-drm-session.sh "$out_dir"
@@ -94,10 +101,17 @@ write_manifest() {
   "handoff": {
     "command": "BACKLIT_REQUIRE_DEDICATED_DRM_SESSION=1 BACKLIT_REQUIRE_DRM_MASTER_PRESENT=1 ./scripts/verify-dedicated-drm-session.sh target/dedicated-drm-session-acceptance",
     "requires": "seat-owner-tty-or-display-manager-session",
+    "seat_owner_required": true,
+    "drm_master_present_required": true,
+    "acceptance_checks": "first-present-commit-vblank-gui-services-launch-clean-exit",
     "mutating_handoff_attempted": false
   },
   "checks": {
     "dedicated_handoff_plan": true,
+    "dedicated_handoff_script_checked": true,
+    "dedicated_handoff_seat_owner_required": true,
+    "dedicated_handoff_drm_master_present_required": true,
+    "dedicated_handoff_acceptance_checks": true,
     "dedicated_session_acceptance": $dedicated_session_acceptance,
     "drm_master_boundary": true,
     "drm_launch_ready": $drm_launch_ready,

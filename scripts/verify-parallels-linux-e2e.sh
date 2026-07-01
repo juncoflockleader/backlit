@@ -655,6 +655,13 @@ require_contains "$host_drm_master_boundary_manifest" '"mutating_handoff_attempt
 require_contains "$host_dedicated_drm_session_manifest" '"name": "backlit-dedicated-drm-session"'
 require_contains "$host_dedicated_drm_session_manifest" '"dedicated_handoff_plan": true'
 require_contains "$host_dedicated_drm_session_manifest" '"dedicated_handoff_script":'
+require_contains "$host_dedicated_drm_session_manifest" '"seat_owner_required": true'
+require_contains "$host_dedicated_drm_session_manifest" '"drm_master_present_required": true'
+require_contains "$host_dedicated_drm_session_manifest" '"acceptance_checks": "first-present-commit-vblank-gui-services-launch-clean-exit"'
+require_contains "$host_dedicated_drm_session_manifest" '"dedicated_handoff_script_checked": true'
+require_contains "$host_dedicated_drm_session_manifest" '"dedicated_handoff_seat_owner_required": true'
+require_contains "$host_dedicated_drm_session_manifest" '"dedicated_handoff_drm_master_present_required": true'
+require_contains "$host_dedicated_drm_session_manifest" '"dedicated_handoff_acceptance_checks": true'
 require_contains "$host_dedicated_drm_session_manifest" '"mutating_handoff_attempted": false'
 test -x "$host_dedicated_drm_handoff" || {
   echo "Parallels E2E export verification failed: missing executable $host_dedicated_drm_handoff" >&2
