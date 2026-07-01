@@ -1284,6 +1284,7 @@ fn smithay_kms_runtime_probe(
     let mut probe = SmithayKmsRuntimeProbe {
         failure: None,
         surface_failure: None,
+        framebuffer_failure: None,
         ..unavailable_smithay_kms_runtime_probe("unavailable")
     };
 
