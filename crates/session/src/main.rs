@@ -1837,7 +1837,7 @@ fn systemd_unit_contracts() -> [SystemdUnitContract; 4] {
         SystemdUnitContract {
             unit_name: "backlit-compositor.service",
             exec_start:
-                "ExecStart=/usr/bin/backlit-compositor --backend=drm --socket=backlit-0 --serve",
+                "ExecStart=/usr/bin/backlit-compositor --backend=drm --runtime=smithay --socket=backlit-0 --serve",
             after: "After=graphical-session-pre.target",
         },
         SystemdUnitContract {
@@ -3338,7 +3338,7 @@ mod tests {
             "backlit-compositor.service",
             "Backlit Wayland compositor",
             "After=graphical-session-pre.target",
-            "ExecStart=/usr/bin/backlit-compositor --backend=drm --socket=backlit-0 --serve",
+            "ExecStart=/usr/bin/backlit-compositor --backend=drm --runtime=smithay --socket=backlit-0 --serve",
         );
         write_unit(
             &unit_dir,
@@ -3433,7 +3433,7 @@ mod tests {
             "backlit-compositor.service",
             "Backlit Wayland compositor",
             "After=graphical-session-pre.target",
-            "ExecStart=/usr/bin/backlit-compositor --backend=drm --socket=backlit-0 --serve",
+            "ExecStart=/usr/bin/backlit-compositor --backend=drm --runtime=smithay --socket=backlit-0 --serve",
         );
 
         let report = verify_systemd_units(&unit_dir);

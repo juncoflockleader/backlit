@@ -5,7 +5,7 @@ PartOf=graphical-session.target
 
 [Service]
 Type=simple
-ExecStart=/usr/bin/backlit-compositor --backend=drm --socket=backlit-0 --serve
+ExecStart=/usr/bin/backlit-compositor --backend=drm --runtime=smithay --socket=backlit-0 --serve
 Environment=RUST_BACKTRACE=1
 SyslogIdentifier=backlit-compositor
 StandardOutput=journal

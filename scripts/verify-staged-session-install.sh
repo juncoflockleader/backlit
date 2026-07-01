@@ -105,7 +105,7 @@ require_line "$session_target" "After=graphical-session-pre.target"
 require_line "$session_target" "PartOf=graphical-session.target"
 require_line "$session_target" "WantedBy=graphical-session.target"
 
-require_line "$compositor_service" "ExecStart=/usr/bin/backlit-compositor --backend=drm --socket=backlit-0 --serve"
+require_line "$compositor_service" "ExecStart=/usr/bin/backlit-compositor --backend=drm --runtime=smithay --socket=backlit-0 --serve"
 require_line "$compositor_service" "Environment=RUST_BACKTRACE=1"
 require_line "$compositor_service" "SyslogIdentifier=backlit-compositor"
 require_line "$compositor_service" "StandardOutput=journal"

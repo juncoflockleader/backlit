@@ -383,7 +383,7 @@ These write `target/smithay-runtime-probe/manifest.json`, `target/smithay-compos
 
 ## Packaging Contract Verification
 
-The packaging contract verifier checks that the session desktop entry, Backlit systemd target, systemd units, Debian package split, and workspace binary names agree:
+The packaging contract verifier checks that the session desktop entry, Backlit systemd target, systemd units, Debian package split, and workspace binary names agree. The packaged DRM compositor service must use `--runtime=smithay`, and the Linux Debian package-build verifier compiles `backlit-compositor` with `--features smithay-backend` before assembling `fastgui-compositor`:
 
 ```bash
 ./scripts/verify-packaging-contract.sh

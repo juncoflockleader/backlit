@@ -83,8 +83,9 @@ mkdir -p "$build_root" "$debs_dir"
 
 ./scripts/verify-package-manifests.sh "$out_dir/package-manifests" >/dev/null
 
+cargo build -p backlit-compositor --features smithay-backend
+
 cargo build \
-  -p backlit-compositor \
   -p backlit-shell \
   -p backlit-notification-daemon \
   -p backlit-session \
@@ -328,6 +329,7 @@ cat > "$manifest" <<EOF
     "package_build_checked": true,
     "build_blocked_expected": false,
     "fastgui_core_deb": true,
+    "compositor_smithay_feature_build": true,
     "runtime_package_debs": true,
     "package_contents": true,
     "package_dependencies": true

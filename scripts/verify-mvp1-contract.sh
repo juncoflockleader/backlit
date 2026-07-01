@@ -80,6 +80,7 @@ require_contains scripts/verify-drm-session-smoke.sh '"session_compositor_demo_a
 require_contains scripts/verify-drm-master-boundary.sh '"name": "backlit-drm-master-boundary"'
 require_contains scripts/verify-drm-master-boundary.sh '"session_entry_drm": true'
 require_contains scripts/verify-drm-master-boundary.sh '"compositor_service_drm": true'
+require_contains scripts/verify-drm-master-boundary.sh '"compositor_service_smithay_runtime": true'
 require_contains scripts/verify-drm-master-boundary.sh '"dedicated_session_required": $dedicated_session_required'
 require_contains scripts/verify-drm-master-boundary.sh '"current_session_can_present": $current_session_can_present'
 require_contains scripts/verify-session-replay.sh '"launcher_overlay_frame": true'
@@ -214,6 +215,7 @@ if [ -n "$artifact_root" ] && [ -d "$artifact_root" ]; then
   require_contains "$artifact_root/drm-master-boundary/manifest.json" '"name": "backlit-drm-master-boundary"'
   require_contains "$artifact_root/drm-master-boundary/manifest.json" '"session_entry_drm": true'
   require_contains "$artifact_root/drm-master-boundary/manifest.json" '"compositor_service_drm": true'
+  require_contains "$artifact_root/drm-master-boundary/manifest.json" '"compositor_service_smithay_runtime": true'
   require_contains "$artifact_root/drm-master-boundary/manifest.json" '"mutating_handoff_attempted": false'
   require_contains "$artifact_root/drm-master-boundary/manifest.json" '"dedicated_session_model": "seat-owner-tty-or-display-manager-session"'
   if grep '"drm_launch_ready": true' "$artifact_root/drm-master-boundary/manifest.json" >/dev/null; then

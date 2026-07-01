@@ -42,6 +42,7 @@ MVP 0 is the development harness:
 - Policy-driven session preview renderer that draws visible workspace windows from `WindowPolicy`, including focused-window styling and workspace indicator verification.
 - Headless session launch verification.
 - Backlit user systemd target and dry-run session launch plan for starting/stopping runtime services.
+- Packaged DRM compositor user service selects `--runtime=smithay`, with Linux package-build evidence that `backlit-compositor` is built with the `smithay-backend` feature before entering the `.deb`.
 - Long-lived `--serve` mode for compositor, shell, notification daemon, and settings daemon, with bounded lifecycle probes for automation.
 - Viewable GUI preview renderer with verified session services.
 - Parallels GUI preview export from Ubuntu guest artifacts to the host workspace.

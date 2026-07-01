@@ -35,7 +35,7 @@ compositor_exec="$(sed -n 's/^ExecStart=//p' "$compositor_service")"
 
 test "$session_exec" = "backlit-session --backend=drm --activate-systemd" \
   || fail "unexpected session Exec=$session_exec"
-test "$compositor_exec" = "/usr/bin/backlit-compositor --backend=drm --socket=backlit-0 --serve" \
+test "$compositor_exec" = "/usr/bin/backlit-compositor --backend=drm --runtime=smithay --socket=backlit-0 --serve" \
   || fail "unexpected compositor ExecStart=$compositor_exec"
 
 session_id="${XDG_SESSION_ID:-}"
@@ -67,6 +67,7 @@ if [ "$(uname -s)" != "Linux" ]; then
   "checks": {
     "session_entry_drm": true,
     "compositor_service_drm": true,
+    "compositor_service_smithay_runtime": true,
     "drm_master_boundary_checked": false,
     "drm_launch_ready": false,
     "first_present_framebuffer_filled": false,
@@ -163,6 +164,7 @@ cat > "$manifest" <<EOF
   "checks": {
     "session_entry_drm": true,
     "compositor_service_drm": true,
+    "compositor_service_smithay_runtime": true,
     "drm_master_boundary_checked": $checked,
     "drm_launch_ready": $drm_launch_ready,
     "first_present_framebuffer_filled": $first_present_framebuffer_filled,

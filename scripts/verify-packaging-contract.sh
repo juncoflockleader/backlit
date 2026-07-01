@@ -64,7 +64,7 @@ require_line packaging/systemd/backlit-session.target "WantedBy=graphical-sessio
 
 require_line packaging/systemd/backlit-compositor.service "PartOf=graphical-session.target"
 require_line packaging/systemd/backlit-compositor.service "Type=simple"
-require_line packaging/systemd/backlit-compositor.service "ExecStart=/usr/bin/backlit-compositor --backend=drm --socket=backlit-0 --serve"
+require_line packaging/systemd/backlit-compositor.service "ExecStart=/usr/bin/backlit-compositor --backend=drm --runtime=smithay --socket=backlit-0 --serve"
 require_line packaging/systemd/backlit-compositor.service "Environment=RUST_BACKTRACE=1"
 require_line packaging/systemd/backlit-compositor.service "SyslogIdentifier=backlit-compositor"
 require_line packaging/systemd/backlit-compositor.service "StandardOutput=journal"
