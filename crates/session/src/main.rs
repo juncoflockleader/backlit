@@ -888,6 +888,10 @@ impl ServiceProbe {
 struct CompositorServiceVerification {
     service: ServiceProbe,
     demo_client: ServiceProbe,
+    compositor_runtime: String,
+    runtime_backend: String,
+    runtime_backend_ok: bool,
+    smithay_protocol_globals: bool,
     socket_bound: bool,
     demo_client_connected: bool,
     demo_surface_mapped: bool,
@@ -901,6 +905,10 @@ impl CompositorServiceVerification {
         Self {
             service: ServiceProbe::missing(),
             demo_client: ServiceProbe::missing(),
+            compositor_runtime: String::new(),
+            runtime_backend: String::new(),
+            runtime_backend_ok: false,
+            smithay_protocol_globals: false,
             socket_bound: false,
             demo_client_connected: false,
             demo_surface_mapped: false,
@@ -911,9 +919,13 @@ impl CompositorServiceVerification {
     }
 
     fn passed(&self) -> bool {
+        let runtime_ready = self.socket_blocked_expected
+            || (self.runtime_backend_ok && self.smithay_protocol_globals);
+
         self.service.resolved
             && self.service.exit_ok
             && self.service.ready
+            && runtime_ready
             && ((self.socket_bound
                 && self.demo_client.resolved
                 && self.demo_client.exit_ok
@@ -1038,12 +1050,15 @@ fn run_compositor_probe(
 
 fn run_compositor_smoke_probe(path: &Path, config: &Config) -> Result<ServiceProbe, String> {
     let backend_event = format!("\"backend\":\"{}\"", config.backend.as_str());
+    let runtime = compositor_runtime_for_backend(config.backend);
 
     run_service_probe(
         path,
         &[
             "--backend",
             config.backend.as_str(),
+            "--runtime",
+            runtime,
             "--socket",
             config.socket.as_str(),
             "--smoke-test",
@@ -1068,10 +1083,14 @@ fn run_compositor_service_client_probe(
     socket_path: &Path,
 ) -> Result<CompositorServiceVerification, String> {
     let started = Instant::now();
+    let compositor_runtime = compositor_runtime_for_backend(config.backend);
+    let expected_runtime_backend = expected_compositor_runtime_backend(config.backend);
     let mut child = Command::new(path)
         .env("XDG_RUNTIME_DIR", runtime_dir)
         .arg("--backend")
         .arg(config.backend.as_str())
+        .arg("--runtime")
+        .arg(compositor_runtime)
         .arg("--socket")
         .arg(socket_name)
         .arg("--serve")
@@ -1092,6 +1111,7 @@ fn run_compositor_service_client_probe(
             let fallback = run_compositor_smoke_probe(path, config)?;
             let mut report = CompositorServiceVerification::missing();
             report.service = fallback;
+            report.compositor_runtime = compositor_runtime.to_string();
             report.socket_blocked_expected = true;
             return Ok(report);
         }
@@ -1140,6 +1160,13 @@ fn run_compositor_service_client_probe(
         .map_err(|error| format!("failed to wait for {}: {error}", path.display()))?;
     let elapsed_ms = started.elapsed().as_millis() as u64;
     let stdout = String::from_utf8_lossy(&output.stdout);
+    let runtime_backend = detect_compositor_runtime_backend(stdout.as_ref());
+    let runtime_backend_ok = runtime_backend == expected_runtime_backend;
+    let smithay_protocol_globals = if compositor_runtime == "smithay" {
+        stdout.contains("\"smithay_protocol_globals\":5")
+    } else {
+        true
+    };
     let socket_bound = stdout.contains("\"event\":\"compositor.socket_bound\"");
     let demo_client_connected =
         demo_client.ready && stdout.contains("\"event\":\"compositor.socket_client\"");
@@ -1152,26 +1179,31 @@ fn run_compositor_service_client_probe(
     let socket_cleanup = stdout.contains("\"event\":\"compositor.socket_unbound\"")
         && stdout.contains("\"removed\":true")
         && !socket_path.exists();
-    let service = service_probe_from_output(
-        output,
-        elapsed_ms,
-        &[
-            String::from("\"event\":\"compositor.ready\""),
-            String::from("\"ready\":true"),
-            String::from("\"event\":\"compositor.socket_bound\""),
-            String::from("\"event\":\"compositor.socket_client\""),
-            String::from("\"title\":\"session-demo\""),
-            String::from("\"app_id\":\"org.backlit.SessionDemo\""),
-            String::from("\"backend_surface_presented\":true"),
-            String::from("\"policy_window_mapped\":true"),
-            String::from("\"policy_app_id_preserved\":true"),
-            String::from("\"event\":\"compositor.service_exit\""),
-        ],
-    );
+    let mut required_stdout = vec![
+        String::from("\"event\":\"compositor.ready\""),
+        String::from("\"ready\":true"),
+        String::from("\"event\":\"compositor.socket_bound\""),
+        String::from("\"event\":\"compositor.socket_client\""),
+        format!("\"runtime_backend\":\"{expected_runtime_backend}\""),
+        String::from("\"title\":\"session-demo\""),
+        String::from("\"app_id\":\"org.backlit.SessionDemo\""),
+        String::from("\"backend_surface_presented\":true"),
+        String::from("\"policy_window_mapped\":true"),
+        String::from("\"policy_app_id_preserved\":true"),
+        String::from("\"event\":\"compositor.service_exit\""),
+    ];
+    if compositor_runtime == "smithay" {
+        required_stdout.push(String::from("\"smithay_protocol_globals\":5"));
+    }
+    let service = service_probe_from_output(output, elapsed_ms, &required_stdout);
 
     Ok(CompositorServiceVerification {
         service,
         demo_client,
+        compositor_runtime: compositor_runtime.to_string(),
+        runtime_backend,
+        runtime_backend_ok,
+        smithay_protocol_globals,
         socket_bound,
         demo_client_connected,
         demo_surface_mapped,
@@ -1179,6 +1211,30 @@ fn run_compositor_service_client_probe(
         socket_cleanup,
         socket_blocked_expected: false,
     })
+}
+
+fn compositor_runtime_for_backend(backend: BackendKind) -> &'static str {
+    match backend {
+        BackendKind::Drm => "smithay",
+        BackendKind::Headless | BackendKind::Wayland => "headless",
+    }
+}
+
+fn expected_compositor_runtime_backend(backend: BackendKind) -> &'static str {
+    match backend {
+        BackendKind::Drm => "smithay-compositor-runtime",
+        BackendKind::Headless | BackendKind::Wayland => "headless-compositor",
+    }
+}
+
+fn detect_compositor_runtime_backend(stdout: &str) -> String {
+    if stdout.contains("\"runtime_backend\":\"smithay-compositor-runtime\"") {
+        String::from("smithay-compositor-runtime")
+    } else if stdout.contains("\"runtime_backend\":\"headless-compositor\"") {
+        String::from("headless-compositor")
+    } else {
+        String::new()
+    }
 }
 
 fn run_shell_probe(path: &Path, config: &Config) -> Result<ServiceProbe, String> {
@@ -1408,6 +1464,29 @@ fn emit_service_verification(config: &Config, report: &ServiceVerification, elap
             (
                 "compositor_ready",
                 FieldValue::Bool(report.compositor.service.ready),
+            ),
+            (
+                "compositor_runtime",
+                FieldValue::Str(report.compositor.compositor_runtime.as_str()),
+            ),
+            (
+                "compositor_runtime_backend",
+                FieldValue::Str(report.compositor.runtime_backend.as_str()),
+            ),
+            (
+                "compositor_runtime_backend_ok",
+                FieldValue::Bool(report.compositor.runtime_backend_ok),
+            ),
+            (
+                "compositor_smithay_runtime",
+                FieldValue::Bool(report.compositor.runtime_backend == "smithay-compositor-runtime"),
+            ),
+            (
+                "compositor_smithay_protocol_globals",
+                FieldValue::Bool(
+                    report.compositor.runtime_backend == "smithay-compositor-runtime"
+                        && report.compositor.smithay_protocol_globals,
+                ),
             ),
             (
                 "compositor_service_socket_bound",
@@ -3428,6 +3507,10 @@ mod tests {
         let mapped = CompositorServiceVerification {
             service: ready_service.clone(),
             demo_client: ready_client,
+            compositor_runtime: String::from("headless"),
+            runtime_backend: String::from("headless-compositor"),
+            runtime_backend_ok: true,
+            smithay_protocol_globals: true,
             socket_bound: true,
             demo_client_connected: true,
             demo_surface_mapped: true,
@@ -3440,6 +3523,10 @@ mod tests {
         let blocked = CompositorServiceVerification {
             service: ready_service,
             demo_client: ServiceProbe::missing(),
+            compositor_runtime: String::from("smithay"),
+            runtime_backend: String::new(),
+            runtime_backend_ok: false,
+            smithay_protocol_globals: false,
             socket_bound: false,
             demo_client_connected: false,
             demo_surface_mapped: false,

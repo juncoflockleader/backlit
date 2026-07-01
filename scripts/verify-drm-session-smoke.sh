@@ -187,8 +187,8 @@ session_first_present_blocked_by_drm_master=false
 
 if [ "$drm_expected_ready" = true ]; then
   cargo build -p backlit-session --features smithay-backend
+  cargo build -p backlit-compositor --features smithay-backend
   cargo build \
-    -p backlit-compositor \
     -p backlit-demo-client \
     -p backlit-shell \
     -p backlit-notification-daemon \
@@ -279,13 +279,18 @@ if [ "$drm_expected_ready" = true ]; then
   grep '"managed_windows_after_launch":4' "$session_log" >/dev/null
   grep '"focused_launched_window":true' "$session_log" >/dev/null
   grep '"compositor_ready":true' "$session_log" >/dev/null
+  grep '"compositor_runtime":"smithay"' "$session_log" >/dev/null
+  grep '"compositor_runtime_backend":"smithay-compositor-runtime"' "$session_log" >/dev/null
+  grep '"compositor_runtime_backend_ok":true' "$session_log" >/dev/null
+  grep '"compositor_smithay_runtime":true' "$session_log" >/dev/null
+  grep '"compositor_smithay_protocol_globals":true' "$session_log" >/dev/null
   grep '"compositor_service_socket_bound":true' "$session_log" >/dev/null
   grep '"compositor_demo_client_resolved":true' "$session_log" >/dev/null
   grep '"compositor_demo_client_exit_ok":true' "$session_log" >/dev/null
-	  grep '"compositor_demo_client_connected":true' "$session_log" >/dev/null
-	  grep '"compositor_demo_surface_mapped":true' "$session_log" >/dev/null
-	  grep '"compositor_demo_app_id_preserved":true' "$session_log" >/dev/null
-	  grep '"compositor_service_socket_cleanup":true' "$session_log" >/dev/null
+  grep '"compositor_demo_client_connected":true' "$session_log" >/dev/null
+  grep '"compositor_demo_surface_mapped":true' "$session_log" >/dev/null
+  grep '"compositor_demo_app_id_preserved":true' "$session_log" >/dev/null
+  grep '"compositor_service_socket_cleanup":true' "$session_log" >/dev/null
   grep '"shell_ready":true' "$session_log" >/dev/null
   grep '"notification_ready":true' "$session_log" >/dev/null
   grep '"settings_ready":true' "$session_log" >/dev/null
@@ -349,10 +354,12 @@ cat > "$out_dir/manifest.json" <<EOF
     "session_first_present_commit_succeeded": $session_first_present_commit_succeeded,
     "session_first_present_vblank_event_received": $session_first_present_vblank_event_received,
     "session_first_present_blocked_by_drm_master": $session_first_present_blocked_by_drm_master,
-	    "settings_service": $drm_session_smoke_ready,
-	    "session_compositor_demo_client": $drm_session_smoke_ready,
-	    "session_compositor_demo_app_id_preserved": $drm_session_smoke_ready,
-	    "session_desktop_launch": $drm_session_smoke_ready,
+    "settings_service": $drm_session_smoke_ready,
+    "session_compositor_smithay_runtime": $drm_session_smoke_ready,
+    "session_compositor_smithay_protocol_globals": $drm_session_smoke_ready,
+    "session_compositor_demo_client": $drm_session_smoke_ready,
+    "session_compositor_demo_app_id_preserved": $drm_session_smoke_ready,
+    "session_desktop_launch": $drm_session_smoke_ready,
     "session_desktop_managed_window": $drm_session_smoke_ready,
     "notification_service": $drm_session_smoke_ready,
     "workspace_switch": $drm_session_smoke_ready,

@@ -389,6 +389,8 @@ These write `target/smithay-runtime-probe/manifest.json`, `target/smithay-compos
 
 The packaging contract verifier checks that the session desktop entry, Backlit systemd target, systemd units, Debian package split, and workspace binary names agree. The packaged DRM compositor service must use `--runtime=smithay`, and the Linux Debian package-build verifier compiles `backlit-compositor` and `backlit-session` with `--features smithay-backend` before assembling the compositor and session packages:
 
+The DRM session smoke also launches its sibling compositor service with `--runtime=smithay` for `--backend=drm` and requires the session log plus manifest to report `session_compositor_smithay_runtime: true` and `session_compositor_smithay_protocol_globals: true`.
+
 ```bash
 ./scripts/verify-packaging-contract.sh
 ```

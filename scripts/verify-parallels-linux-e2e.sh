@@ -633,6 +633,8 @@ require_contains "$host_drm_session_smoke_manifest" '"drm_device_selected": true
 require_contains "$host_drm_session_smoke_manifest" '"drm_input_selected": true'
 require_contains "$host_drm_session_smoke_manifest" '"session_drm_first_present_probe": true'
 require_matches "$host_drm_session_smoke_manifest" '"session_first_present_(commit_succeeded|blocked_by_drm_master)": true'
+require_contains "$host_drm_session_smoke_manifest" '"session_compositor_smithay_runtime": true'
+require_contains "$host_drm_session_smoke_manifest" '"session_compositor_smithay_protocol_globals": true'
 require_contains "$host_drm_session_smoke_manifest" '"session_compositor_demo_client": true'
 require_contains "$host_drm_session_smoke_manifest" '"session_compositor_demo_app_id_preserved": true'
 require_contains "$host_drm_session_smoke_manifest" '"session_desktop_launch": true'
