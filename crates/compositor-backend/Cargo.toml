@@ -16,6 +16,8 @@ smithay-backend = [
   "dep:smithay",
   "dep:wayland-client",
   "wayland-protocols/client",
+  "wayland-protocols/staging",
+  "wayland-protocols/unstable",
 ]
 
 [dependencies]

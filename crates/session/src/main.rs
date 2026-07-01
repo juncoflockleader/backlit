@@ -1188,7 +1188,7 @@ fn run_compositor_service_client_probe(
     let runtime_backend = detect_compositor_runtime_backend(stdout.as_ref());
     let runtime_backend_ok = runtime_backend == expected_runtime_backend;
     let smithay_protocol_globals = if compositor_runtime == "smithay" {
-        stdout.contains("\"smithay_protocol_globals\":5")
+        stdout.contains("\"smithay_protocol_globals\":10")
     } else {
         true
     };
@@ -1243,7 +1243,7 @@ fn run_compositor_service_client_probe(
         String::from("\"event\":\"compositor.service_exit\""),
     ];
     if compositor_runtime == "smithay" {
-        required_stdout.push(String::from("\"smithay_protocol_globals\":5"));
+        required_stdout.push(String::from("\"smithay_protocol_globals\":10"));
         required_stdout.push(String::from("\"input_sources_ready\":true"));
         required_stdout.push(String::from("\"input_source_count\":2"));
         required_stdout.push(String::from("\"input_event_loop_dispatch_count\":"));

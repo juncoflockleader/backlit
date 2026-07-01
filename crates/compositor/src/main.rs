@@ -129,6 +129,36 @@ fn run() -> Result<(), String> {
                     FieldValue::Bool(smoke.registry_announced),
                 ),
                 (
+                    "mvp_protocol_globals",
+                    FieldValue::U64(smoke.mvp_protocol_globals),
+                ),
+                (
+                    "mvp_protocol_globals_announced",
+                    FieldValue::Bool(smoke.mvp_protocol_globals_announced),
+                ),
+                ("wl_output_bound", FieldValue::Bool(smoke.wl_output_bound)),
+                (
+                    "xdg_output_manager_bound",
+                    FieldValue::Bool(smoke.xdg_output_manager_bound),
+                ),
+                ("viewporter_bound", FieldValue::Bool(smoke.viewporter_bound)),
+                (
+                    "presentation_bound",
+                    FieldValue::Bool(smoke.presentation_bound),
+                ),
+                (
+                    "linux_dmabuf_bound",
+                    FieldValue::Bool(smoke.linux_dmabuf_bound),
+                ),
+                (
+                    "linux_dmabuf_version",
+                    FieldValue::U64(smoke.linux_dmabuf_version),
+                ),
+                (
+                    "linux_dmabuf_version_at_least_4",
+                    FieldValue::Bool(smoke.linux_dmabuf_version_at_least_4),
+                ),
+                (
                     "seat_global_announced",
                     FieldValue::Bool(smoke.seat_global_announced),
                 ),
@@ -1729,6 +1759,15 @@ struct SmithayClientSmoke {
     smithay_protocol_globals: u64,
     registry_global_count: u64,
     registry_announced: bool,
+    mvp_protocol_globals: u64,
+    mvp_protocol_globals_announced: bool,
+    wl_output_bound: bool,
+    xdg_output_manager_bound: bool,
+    viewporter_bound: bool,
+    presentation_bound: bool,
+    linux_dmabuf_bound: bool,
+    linux_dmabuf_version: u64,
+    linux_dmabuf_version_at_least_4: bool,
     seat_global_announced: bool,
     seat_bound: bool,
     seat_name_observed: bool,
@@ -1784,9 +1823,17 @@ struct SmithayClientSmoke {
 impl SmithayClientSmoke {
     fn passed(&self) -> bool {
         self.runtime_backend == "smithay-compositor-runtime"
-            && self.smithay_protocol_globals >= 5
-            && self.registry_global_count >= 5
+            && self.smithay_protocol_globals >= 10
+            && self.registry_global_count >= 10
             && self.registry_announced
+            && self.mvp_protocol_globals >= 7
+            && self.mvp_protocol_globals_announced
+            && self.wl_output_bound
+            && self.xdg_output_manager_bound
+            && self.viewporter_bound
+            && self.presentation_bound
+            && self.linux_dmabuf_bound
+            && self.linux_dmabuf_version_at_least_4
             && self.seat_global_announced
             && self.seat_bound
             && self.seat_name_observed
@@ -1870,6 +1917,15 @@ fn run_smithay_client_smoke_for_config(config: &RunConfig) -> Result<SmithayClie
         smithay_protocol_globals: report.protocol_globals,
         registry_global_count: report.registry_global_count,
         registry_announced: report.registry_announced,
+        mvp_protocol_globals: report.mvp_protocol_globals,
+        mvp_protocol_globals_announced: report.mvp_protocol_globals_announced,
+        wl_output_bound: report.wl_output_bound,
+        xdg_output_manager_bound: report.xdg_output_manager_bound,
+        viewporter_bound: report.viewporter_bound,
+        presentation_bound: report.presentation_bound,
+        linux_dmabuf_bound: report.linux_dmabuf_bound,
+        linux_dmabuf_version: report.linux_dmabuf_version,
+        linux_dmabuf_version_at_least_4: report.linux_dmabuf_version_at_least_4,
         seat_global_announced: report.seat_global_announced,
         seat_bound: report.seat_bound,
         seat_name_observed: report.seat_name_observed,
@@ -2080,7 +2136,7 @@ impl ScriptedClientRuntime {
     }
 
     fn smithay_protocol_globals_ok(self) -> bool {
-        self.runtime_backend != "smithay-compositor-runtime" || self.smithay_protocol_globals >= 5
+        self.runtime_backend != "smithay-compositor-runtime" || self.smithay_protocol_globals >= 10
     }
 }
 
@@ -2503,7 +2559,7 @@ impl CompositorReadyReport {
     }
 
     fn smithay_protocol_globals_ok(self) -> bool {
-        self.runtime_backend != "smithay-compositor-runtime" || self.smithay_protocol_globals >= 5
+        self.runtime_backend != "smithay-compositor-runtime" || self.smithay_protocol_globals >= 10
     }
 }
 

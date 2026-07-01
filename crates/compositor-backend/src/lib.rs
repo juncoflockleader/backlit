@@ -3667,6 +3667,12 @@ struct SmithayCompositorState {
     compositor_state: smithay::wayland::compositor::CompositorState,
     shm_state: smithay::wayland::shm::ShmState,
     xdg_shell_state: smithay::wayland::shell::xdg::XdgShellState,
+    output_manager_state: smithay::wayland::output::OutputManagerState,
+    output: smithay::output::Output,
+    viewporter_state: smithay::wayland::viewporter::ViewporterState,
+    presentation_state: smithay::wayland::presentation::PresentationState,
+    dmabuf_state: smithay::wayland::dmabuf::DmabufState,
+    dmabuf_global: smithay::wayland::dmabuf::DmabufGlobal,
     seat_state: smithay::input::SeatState<SmithayCompositorState>,
     seat: smithay::input::Seat<SmithayCompositorState>,
     keyboard_handle: smithay::input::keyboard::KeyboardHandle<SmithayCompositorState>,
@@ -3728,11 +3734,26 @@ const SMITHAY_SMOKE_WIDTH: i32 = 320;
 const SMITHAY_SMOKE_HEIGHT: i32 = 240;
 
 #[cfg(all(feature = "smithay-backend", target_os = "linux"))]
+const SMITHAY_RUNTIME_PROTOCOL_GLOBALS: u64 = 10;
+
+#[cfg(all(feature = "smithay-backend", target_os = "linux"))]
+const SMITHAY_MVP_PROTOCOL_GLOBALS: u64 = 7;
+
+#[cfg(all(feature = "smithay-backend", target_os = "linux"))]
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct SmithayWaylandClientSmokeReport {
     pub protocol_globals: u64,
     pub registry_global_count: u64,
     pub registry_announced: bool,
+    pub mvp_protocol_globals: u64,
+    pub mvp_protocol_globals_announced: bool,
+    pub wl_output_bound: bool,
+    pub xdg_output_manager_bound: bool,
+    pub viewporter_bound: bool,
+    pub presentation_bound: bool,
+    pub linux_dmabuf_bound: bool,
+    pub linux_dmabuf_version: u64,
+    pub linux_dmabuf_version_at_least_4: bool,
     pub seat_global_announced: bool,
     pub seat_bound: bool,
     pub seat_name_observed: bool,
@@ -3781,9 +3802,17 @@ pub struct SmithayWaylandClientSmokeReport {
 #[cfg(all(feature = "smithay-backend", target_os = "linux"))]
 impl SmithayWaylandClientSmokeReport {
     pub fn passed(&self) -> bool {
-        self.protocol_globals >= 5
-            && self.registry_global_count >= 5
+        self.protocol_globals >= SMITHAY_RUNTIME_PROTOCOL_GLOBALS
+            && self.registry_global_count >= SMITHAY_RUNTIME_PROTOCOL_GLOBALS
             && self.registry_announced
+            && self.mvp_protocol_globals >= SMITHAY_MVP_PROTOCOL_GLOBALS
+            && self.mvp_protocol_globals_announced
+            && self.wl_output_bound
+            && self.xdg_output_manager_bound
+            && self.viewporter_bound
+            && self.presentation_bound
+            && self.linux_dmabuf_bound
+            && self.linux_dmabuf_version_at_least_4
             && self.seat_global_announced
             && self.seat_bound
             && self.seat_name_observed
@@ -3844,6 +3873,11 @@ struct WaylandClientEventState {
     failure: Option<String>,
     compositor_bound: bool,
     shm_bound: bool,
+    wl_output_bound: bool,
+    xdg_output_manager_bound: bool,
+    viewporter_bound: bool,
+    presentation_bound: bool,
+    linux_dmabuf_bound: bool,
     seat_bound: bool,
     seat_name_observed: bool,
     seat_keyboard_capability: bool,
@@ -3862,6 +3896,7 @@ struct WaylandClientEventState {
     surface_committed: bool,
     compositor: Option<wayland_client::protocol::wl_compositor::WlCompositor>,
     shm: Option<wayland_client::protocol::wl_shm::WlShm>,
+    wl_output: Option<wayland_client::protocol::wl_output::WlOutput>,
     seat: Option<wayland_client::protocol::wl_seat::WlSeat>,
     keyboard: Option<wayland_client::protocol::wl_keyboard::WlKeyboard>,
     pointer: Option<wayland_client::protocol::wl_pointer::WlPointer>,
@@ -3872,6 +3907,13 @@ struct WaylandClientEventState {
     wm_base: Option<wayland_protocols::xdg::shell::client::xdg_wm_base::XdgWmBase>,
     xdg_surface: Option<wayland_protocols::xdg::shell::client::xdg_surface::XdgSurface>,
     xdg_toplevel: Option<wayland_protocols::xdg::shell::client::xdg_toplevel::XdgToplevel>,
+    xdg_output_manager:
+        Option<wayland_protocols::xdg::xdg_output::zv1::client::zxdg_output_manager_v1::ZxdgOutputManagerV1>,
+    viewporter: Option<wayland_protocols::wp::viewporter::client::wp_viewporter::WpViewporter>,
+    presentation:
+        Option<wayland_protocols::wp::presentation_time::client::wp_presentation::WpPresentation>,
+    linux_dmabuf:
+        Option<wayland_protocols::wp::linux_dmabuf::zv1::client::zwp_linux_dmabuf_v1::ZwpLinuxDmabufV1>,
 }
 
 #[cfg(all(feature = "smithay-backend", target_os = "linux"))]
@@ -3888,6 +3930,35 @@ impl WaylandClientEventState {
             && self.global("wl_shm").is_some()
             && self.global("wl_seat").is_some()
             && self.global("xdg_wm_base").is_some()
+    }
+
+    fn global_version(&self, interface: &str) -> Option<u32> {
+        self.global(interface).map(|global| global.version)
+    }
+
+    fn global_version_at_least(&self, interface: &str, minimum_version: u32) -> bool {
+        self.global_version(interface)
+            .map(|version| version >= minimum_version)
+            .unwrap_or(false)
+    }
+
+    fn mvp_protocol_globals(&self) -> u64 {
+        [
+            self.global_version_at_least("wl_compositor", 4),
+            self.global_version_at_least("wl_shm", 1),
+            self.global_version_at_least("xdg_wm_base", 1),
+            self.global_version_at_least("zxdg_output_manager_v1", 3),
+            self.global_version_at_least("wp_viewporter", 1),
+            self.global_version_at_least("wp_presentation", 1),
+            self.global_version_at_least("zwp_linux_dmabuf_v1", 4),
+        ]
+        .into_iter()
+        .filter(|announced| *announced)
+        .count() as u64
+    }
+
+    fn mvp_protocol_globals_announced(&self) -> bool {
+        self.mvp_protocol_globals() >= SMITHAY_MVP_PROTOCOL_GLOBALS
     }
 
     fn init_xdg_toplevel(&mut self, qh: &wayland_client::QueueHandle<Self>) {
@@ -4034,8 +4105,13 @@ impl wayland_client::Dispatch<wayland_client::protocol::wl_registry::WlRegistry,
         _: &wayland_client::Connection,
         qh: &wayland_client::QueueHandle<Self>,
     ) {
-        use wayland_client::protocol::{wl_compositor, wl_registry, wl_seat, wl_shm};
+        use wayland_client::protocol::{wl_compositor, wl_output, wl_registry, wl_seat, wl_shm};
+        use wayland_protocols::wp::{
+            linux_dmabuf::zv1::client::zwp_linux_dmabuf_v1,
+            presentation_time::client::wp_presentation, viewporter::client::wp_viewporter,
+        };
         use wayland_protocols::xdg::shell::client::xdg_wm_base;
+        use wayland_protocols::xdg::xdg_output::zv1::client::zxdg_output_manager_v1;
 
         let wl_registry::Event::Global {
             name,
@@ -4073,6 +4149,12 @@ impl wayland_client::Dispatch<wayland_client::protocol::wl_registry::WlRegistry,
                 state.init_shm_buffer(qh);
                 state.attach_shm_buffer_if_configured();
             }
+            "wl_output" if !state.wl_output_bound => {
+                let wl_output =
+                    registry.bind::<wl_output::WlOutput, _, _>(name, version.min(4), qh, ());
+                state.wl_output = Some(wl_output);
+                state.wl_output_bound = true;
+            }
             "wl_seat" if !state.seat_bound => {
                 let seat = registry.bind::<wl_seat::WlSeat, _, _>(name, version.min(9), qh, ());
                 state.seat = Some(seat);
@@ -4083,6 +4165,43 @@ impl wayland_client::Dispatch<wayland_client::protocol::wl_registry::WlRegistry,
                 state.wm_base = Some(wm_base);
                 state.xdg_wm_base_bound = true;
                 state.init_xdg_toplevel(qh);
+            }
+            "zxdg_output_manager_v1" if !state.xdg_output_manager_bound => {
+                let xdg_output_manager = registry
+                    .bind::<zxdg_output_manager_v1::ZxdgOutputManagerV1, _, _>(
+                        name,
+                        version.min(3),
+                        qh,
+                        (),
+                    );
+                state.xdg_output_manager = Some(xdg_output_manager);
+                state.xdg_output_manager_bound = true;
+            }
+            "wp_viewporter" if !state.viewporter_bound => {
+                let viewporter =
+                    registry.bind::<wp_viewporter::WpViewporter, _, _>(name, 1, qh, ());
+                state.viewporter = Some(viewporter);
+                state.viewporter_bound = true;
+            }
+            "wp_presentation" if !state.presentation_bound => {
+                let presentation = registry.bind::<wp_presentation::WpPresentation, _, _>(
+                    name,
+                    version.min(2),
+                    qh,
+                    (),
+                );
+                state.presentation = Some(presentation);
+                state.presentation_bound = true;
+            }
+            "zwp_linux_dmabuf_v1" if !state.linux_dmabuf_bound => {
+                let linux_dmabuf = registry.bind::<zwp_linux_dmabuf_v1::ZwpLinuxDmabufV1, _, _>(
+                    name,
+                    version.min(4),
+                    qh,
+                    (),
+                );
+                state.linux_dmabuf = Some(linux_dmabuf);
+                state.linux_dmabuf_bound = true;
             }
             _ => {}
         }
@@ -4198,6 +4317,9 @@ wayland_client::delegate_noop!(WaylandClientEventState: ignore wayland_client::p
 wayland_client::delegate_noop!(WaylandClientEventState: ignore wayland_client::protocol::wl_surface::WlSurface);
 
 #[cfg(all(feature = "smithay-backend", target_os = "linux"))]
+wayland_client::delegate_noop!(WaylandClientEventState: ignore wayland_client::protocol::wl_output::WlOutput);
+
+#[cfg(all(feature = "smithay-backend", target_os = "linux"))]
 wayland_client::delegate_noop!(WaylandClientEventState: ignore wayland_client::protocol::wl_shm::WlShm);
 
 #[cfg(all(feature = "smithay-backend", target_os = "linux"))]
@@ -4213,6 +4335,18 @@ wayland_client::delegate_noop!(WaylandClientEventState: ignore wayland_client::p
 wayland_client::delegate_noop!(WaylandClientEventState: ignore wayland_client::protocol::wl_pointer::WlPointer);
 
 #[cfg(all(feature = "smithay-backend", target_os = "linux"))]
+wayland_client::delegate_noop!(WaylandClientEventState: ignore wayland_protocols::xdg::xdg_output::zv1::client::zxdg_output_manager_v1::ZxdgOutputManagerV1);
+
+#[cfg(all(feature = "smithay-backend", target_os = "linux"))]
+wayland_client::delegate_noop!(WaylandClientEventState: ignore wayland_protocols::wp::viewporter::client::wp_viewporter::WpViewporter);
+
+#[cfg(all(feature = "smithay-backend", target_os = "linux"))]
+wayland_client::delegate_noop!(WaylandClientEventState: ignore wayland_protocols::wp::presentation_time::client::wp_presentation::WpPresentation);
+
+#[cfg(all(feature = "smithay-backend", target_os = "linux"))]
+wayland_client::delegate_noop!(WaylandClientEventState: ignore wayland_protocols::wp::linux_dmabuf::zv1::client::zwp_linux_dmabuf_v1::ZwpLinuxDmabufV1);
+
+#[cfg(all(feature = "smithay-backend", target_os = "linux"))]
 impl SmithayCompositorState {
     fn new(
         display: &smithay::reexports::wayland_server::DisplayHandle,
@@ -4223,6 +4357,49 @@ impl SmithayCompositorState {
             std::iter::empty::<smithay::reexports::wayland_server::protocol::wl_shm::Format>(),
         );
         let xdg_shell_state = smithay::wayland::shell::xdg::XdgShellState::new::<Self>(display);
+        let output_manager_state =
+            smithay::wayland::output::OutputManagerState::new_with_xdg_output::<Self>(display);
+        let output = smithay::output::Output::new(
+            String::from("backlit-virtual-output-0"),
+            smithay::output::PhysicalProperties {
+                size: (340, 190).into(),
+                subpixel: smithay::output::Subpixel::Unknown,
+                make: String::from("Backlit"),
+                model: String::from("Virtual Output"),
+            },
+        );
+        let output_mode = smithay::output::Mode {
+            size: (1920, 1080).into(),
+            refresh: 60_000,
+        };
+        output.change_current_state(
+            Some(output_mode),
+            Some(smithay::utils::Transform::Normal),
+            Some(smithay::output::Scale::Integer(1)),
+            Some((0, 0).into()),
+        );
+        output.set_preferred(output_mode);
+        output.create_global::<Self>(display);
+        let viewporter_state = smithay::wayland::viewporter::ViewporterState::new::<Self>(display);
+        let presentation_state =
+            smithay::wayland::presentation::PresentationState::new::<Self>(display, 1);
+        let mut dmabuf_state = smithay::wayland::dmabuf::DmabufState::new();
+        let dmabuf_formats = [
+            smithay::backend::allocator::Format {
+                code: smithay::backend::allocator::Fourcc::Argb8888,
+                modifier: smithay::backend::allocator::Modifier::Linear,
+            },
+            smithay::backend::allocator::Format {
+                code: smithay::backend::allocator::Fourcc::Xrgb8888,
+                modifier: smithay::backend::allocator::Modifier::Linear,
+            },
+        ];
+        let dmabuf_feedback =
+            smithay::wayland::dmabuf::DmabufFeedbackBuilder::new(0, dmabuf_formats)
+                .build()
+                .map_err(|error| SmithayRuntimeError(format!("dmabuf-feedback:{error}")))?;
+        let dmabuf_global =
+            dmabuf_state.create_global_with_default_feedback::<Self>(display, &dmabuf_feedback);
         let mut seat_state = smithay::input::SeatState::new();
         let mut seat = seat_state.new_wl_seat(display, "backlit-seat0");
         let pointer_handle = seat.add_pointer();
@@ -4234,11 +4411,17 @@ impl SmithayCompositorState {
             compositor_state,
             shm_state,
             xdg_shell_state,
+            output_manager_state,
+            output,
+            viewporter_state,
+            presentation_state,
+            dmabuf_state,
+            dmabuf_global,
             seat_state,
             seat,
             keyboard_handle,
             pointer_handle,
-            protocol_global_count: 5,
+            protocol_global_count: SMITHAY_RUNTIME_PROTOCOL_GLOBALS,
             seat_global_count: 1,
             seat_keyboard_capability: true,
             seat_pointer_capability: true,
@@ -4425,6 +4608,32 @@ impl smithay::wayland::shm::ShmHandler for SmithayCompositorState {
 }
 
 #[cfg(all(feature = "smithay-backend", target_os = "linux"))]
+impl smithay::wayland::output::OutputHandler for SmithayCompositorState {
+    fn output_bound(
+        &mut self,
+        _output: smithay::output::Output,
+        _wl_output: smithay::reexports::wayland_server::protocol::wl_output::WlOutput,
+    ) {
+    }
+}
+
+#[cfg(all(feature = "smithay-backend", target_os = "linux"))]
+impl smithay::wayland::dmabuf::DmabufHandler for SmithayCompositorState {
+    fn dmabuf_state(&mut self) -> &mut smithay::wayland::dmabuf::DmabufState {
+        &mut self.dmabuf_state
+    }
+
+    fn dmabuf_imported(
+        &mut self,
+        _global: &smithay::wayland::dmabuf::DmabufGlobal,
+        _dmabuf: smithay::backend::allocator::dmabuf::Dmabuf,
+        notifier: smithay::wayland::dmabuf::ImportNotifier,
+    ) {
+        notifier.failed();
+    }
+}
+
+#[cfg(all(feature = "smithay-backend", target_os = "linux"))]
 impl smithay::input::SeatHandler for SmithayCompositorState {
     type KeyboardFocus = smithay::reexports::wayland_server::protocol::wl_surface::WlSurface;
     type PointerFocus = smithay::reexports::wayland_server::protocol::wl_surface::WlSurface;
@@ -4519,6 +4728,18 @@ smithay::delegate_shm!(SmithayCompositorState);
 
 #[cfg(all(feature = "smithay-backend", target_os = "linux"))]
 smithay::delegate_xdg_shell!(SmithayCompositorState);
+
+#[cfg(all(feature = "smithay-backend", target_os = "linux"))]
+smithay::delegate_output!(SmithayCompositorState);
+
+#[cfg(all(feature = "smithay-backend", target_os = "linux"))]
+smithay::delegate_viewporter!(SmithayCompositorState);
+
+#[cfg(all(feature = "smithay-backend", target_os = "linux"))]
+smithay::delegate_presentation!(SmithayCompositorState);
+
+#[cfg(all(feature = "smithay-backend", target_os = "linux"))]
+smithay::delegate_dmabuf!(SmithayCompositorState);
 
 #[cfg(all(feature = "smithay-backend", target_os = "linux"))]
 smithay::delegate_seat!(SmithayCompositorState);
@@ -4748,6 +4969,12 @@ impl SmithayCompositorRuntime {
                 return Err(SmithayRuntimeError(error.clone()));
             }
             if client_state.registry_announced()
+                && client_state.mvp_protocol_globals_announced()
+                && client_state.wl_output_bound
+                && client_state.xdg_output_manager_bound
+                && client_state.viewporter_bound
+                && client_state.presentation_bound
+                && client_state.linux_dmabuf_bound
                 && client_state.configure_acked
                 && client_state.surface_committed
                 && self.state.surface_commit_count >= 2
@@ -4763,6 +4990,18 @@ impl SmithayCompositorRuntime {
             protocol_globals: self.state.protocol_global_count,
             registry_global_count: client_state.globals.len() as u64,
             registry_announced: client_state.registry_announced(),
+            mvp_protocol_globals: client_state.mvp_protocol_globals(),
+            mvp_protocol_globals_announced: client_state.mvp_protocol_globals_announced(),
+            wl_output_bound: client_state.wl_output_bound,
+            xdg_output_manager_bound: client_state.xdg_output_manager_bound,
+            viewporter_bound: client_state.viewporter_bound,
+            presentation_bound: client_state.presentation_bound,
+            linux_dmabuf_bound: client_state.linux_dmabuf_bound,
+            linux_dmabuf_version: client_state
+                .global_version("zwp_linux_dmabuf_v1")
+                .unwrap_or_default() as u64,
+            linux_dmabuf_version_at_least_4: client_state
+                .global_version_at_least("zwp_linux_dmabuf_v1", 4),
             seat_global_announced: self.state.seat_global_count >= 1
                 && client_state.global("wl_seat").is_some(),
             seat_bound: client_state.seat_bound,

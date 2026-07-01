@@ -100,6 +100,7 @@ write_blocked_manifest() {
     "smithay_runtime_launch_plan": false,
     "smithay_scripted_client": false,
     "smithay_core_protocol_globals": false,
+    "smithay_mvp_protocol_globals": false,
     "smithay_seat_global": false,
     "smithay_keyboard_pointer_capabilities": false,
     "smithay_input_sources": false,
@@ -174,7 +175,7 @@ require_contains "$log" '"runtime_trait":true'
 require_line_contains_all "$log" \
   '"event":"compositor.scripted_client"' \
   '"inserted_wayland_clients":1' \
-  '"smithay_protocol_globals":5' \
+  '"smithay_protocol_globals":10' \
   '"wayland_dispatch_count":7' \
   '"calloop_dispatch_count":7' \
   '"input_sources_ready":true' \
@@ -199,7 +200,7 @@ require_contains "$log" '"ready":true'
 require_line_contains_all "$log" \
   '"event":"compositor.ready"' \
   '"inserted_wayland_clients":1' \
-  '"smithay_protocol_globals":5' \
+  '"smithay_protocol_globals":10' \
   '"wayland_dispatch_count":1' \
   '"calloop_dispatch_count":1' \
   '"input_sources_ready":true' \
@@ -286,9 +287,18 @@ require_contains "$client_smoke_log" '"passed":true'
 require_contains "$client_smoke_log" '"runtime_backend":"smithay-compositor-runtime"'
 require_line_contains_all "$client_smoke_log" \
   '"event":"compositor.smithay_client_smoke"' \
-  '"smithay_protocol_globals":5' \
-  '"registry_global_count":5' \
+  '"smithay_protocol_globals":10' \
+  '"registry_global_count":10' \
   '"registry_announced":true' \
+  '"mvp_protocol_globals":7' \
+  '"mvp_protocol_globals_announced":true' \
+  '"wl_output_bound":true' \
+  '"xdg_output_manager_bound":true' \
+  '"viewporter_bound":true' \
+  '"presentation_bound":true' \
+  '"linux_dmabuf_bound":true' \
+  '"linux_dmabuf_version":5' \
+  '"linux_dmabuf_version_at_least_4":true' \
   '"seat_global_announced":true' \
   '"seat_bound":true' \
   '"seat_name_observed":true' \
@@ -415,7 +425,7 @@ require_contains "$service_log" '"ready":true'
 require_line_contains_all "$service_log" \
   '"event":"compositor.ready"' \
   '"inserted_wayland_clients":1' \
-  '"smithay_protocol_globals":5' \
+  '"smithay_protocol_globals":10' \
   '"wayland_dispatch_count":1' \
   '"calloop_dispatch_count":1' \
   '"input_sources_ready":true' \
@@ -443,7 +453,7 @@ require_line_contains_all "$service_log" \
   '"runtime_backend":"smithay-compositor-runtime"' \
   '"backend_surface_presented":true' \
   '"inserted_wayland_clients":1' \
-  '"smithay_protocol_globals":5' \
+  '"smithay_protocol_globals":10' \
   '"wayland_dispatch_count":1' \
   '"calloop_dispatch_count":1' \
   '"input_sources_ready":true' \
@@ -472,7 +482,7 @@ require_line_contains_all "$service_log" \
   '"backend_clients":2' \
   '"backend_surfaces":2' \
   '"inserted_wayland_clients":2' \
-  '"smithay_protocol_globals":5' \
+  '"smithay_protocol_globals":10' \
   '"wayland_dispatch_count":2' \
   '"calloop_dispatch_count":2' \
   '"input_sources_ready":true' \
@@ -514,7 +524,7 @@ require_line_contains_all "$service_log" \
   '"backend_clients":1' \
   '"backend_surfaces":1' \
   '"inserted_wayland_clients":2' \
-  '"smithay_protocol_globals":5' \
+  '"smithay_protocol_globals":10' \
   '"wayland_dispatch_count":8' \
   '"calloop_dispatch_count":8' \
   '"input_sources_ready":true' \
@@ -557,6 +567,7 @@ cat > "$out_dir/manifest.json" <<EOF
     "smithay_runtime_launch_plan": true,
     "smithay_scripted_client": true,
     "smithay_core_protocol_globals": true,
+    "smithay_mvp_protocol_globals": true,
     "smithay_seat_global": true,
     "smithay_keyboard_pointer_capabilities": true,
     "smithay_input_sources": true,

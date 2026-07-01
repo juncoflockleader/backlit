@@ -506,6 +506,7 @@ require_contains "$host_smithay_compositor_runtime_manifest" '"smithay_runtime_t
 require_contains "$host_smithay_compositor_runtime_manifest" '"smithay_runtime_launch_plan": true'
 require_contains "$host_smithay_compositor_runtime_manifest" '"smithay_scripted_client": true'
 require_contains "$host_smithay_compositor_runtime_manifest" '"smithay_core_protocol_globals": true'
+require_contains "$host_smithay_compositor_runtime_manifest" '"smithay_mvp_protocol_globals": true'
 require_contains "$host_smithay_compositor_runtime_manifest" '"smithay_seat_global": true'
 require_contains "$host_smithay_compositor_runtime_manifest" '"smithay_keyboard_pointer_capabilities": true'
 require_contains "$host_smithay_compositor_runtime_manifest" '"smithay_input_sources": true'
