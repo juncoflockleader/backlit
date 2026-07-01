@@ -19,8 +19,14 @@ dedicated_preview="$dedicated_e2e_dir/dedicated-session.png"
 mkdir -p "$out_dir"
 
 commit="$(git rev-parse --short HEAD 2>/dev/null || printf unknown)"
+branch="$(git branch --show-current 2>/dev/null || printf unknown)"
+upstream="$(git rev-parse --abbrev-ref --symbolic-full-name '@{u}' 2>/dev/null || printf '')"
+upstream_commit="$(git rev-parse --short '@{u}' 2>/dev/null || printf unknown)"
 
 design_scope=false
+source_tree_ready=false
+worktree_clean=false
+pushed_commit=false
 normal_parallels_e2e=false
 package_installed_dedicated_drm=false
 current_commit_evidence=false
@@ -38,6 +44,13 @@ write_manifest() {
   "passed": $passed,
   "reason": "$reason",
   "expected_commit": "$commit",
+  "source": {
+    "branch": "$branch",
+    "upstream": "$upstream",
+    "upstream_commit": "$upstream_commit",
+    "worktree_clean": $worktree_clean,
+    "pushed_commit": $pushed_commit
+  },
   "artifacts": {
     "parallels_linux_e2e_manifest": "$parallels_manifest",
     "parallels_launch_performance_manifest": "$launch_performance_manifest",
@@ -50,6 +63,7 @@ write_manifest() {
   },
   "checks": {
     "design_scope": $design_scope,
+    "source_tree_ready": $source_tree_ready,
     "normal_parallels_e2e": $normal_parallels_e2e,
     "package_installed_dedicated_drm": $package_installed_dedicated_drm,
     "current_commit_evidence": $current_commit_evidence,
@@ -107,6 +121,20 @@ require_contains backlit-design.md 'Idle CPU and memory hit MVP budget.' design-
 require_contains docs/architecture/mvp-1.md 'MVP 1 is the bare graphical session' design-scope
 require_contains docs/architecture/mvp-1.md 'scripts/verify-parallels-dedicated-drm-e2e.sh' design-scope
 design_scope=true
+
+if [ -n "$(git status --porcelain)" ]; then
+  fail dirty-worktree "worktree has uncommitted changes"
+fi
+worktree_clean=true
+
+if [ -z "$upstream" ]; then
+  fail missing-upstream "current branch has no upstream"
+fi
+if [ "$commit" != "$upstream_commit" ]; then
+  fail unpushed-commit "HEAD $commit does not match upstream $upstream at $upstream_commit"
+fi
+pushed_commit=true
+source_tree_ready=true
 
 require_file "$parallels_manifest" missing-parallels-linux-e2e-manifest
 require_file "$launch_performance_manifest" missing-parallels-launch-performance-manifest
