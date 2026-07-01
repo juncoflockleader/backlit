@@ -14,6 +14,13 @@ manifest="$out_dir/manifest.json"
 
 mkdir -p "$out_dir"
 
+branch="$(git branch --show-current 2>/dev/null || printf unknown)"
+head_commit="$(git rev-parse --short HEAD 2>/dev/null || printf unknown)"
+upstream="$(git rev-parse --abbrev-ref --symbolic-full-name '@{u}' 2>/dev/null || printf '')"
+upstream_commit="$(git rev-parse --short '@{u}' 2>/dev/null || printf unknown)"
+worktree_clean=false
+pushed_commit=false
+source_tree_ready=false
 normal_health_status=-1
 dedicated_health_status=-1
 normal_e2e_status=-1
@@ -61,6 +68,14 @@ write_manifest() {
   "name": "backlit-parallels-mvp-e2e",
   "passed": $(json_bool "$passed"),
   "reason": $(json_string "$reason"),
+  "source": {
+    "branch": $(json_string "$branch"),
+    "upstream": $(json_string "$upstream"),
+    "head_commit": $(json_string "$head_commit"),
+    "upstream_commit": $(json_string "$upstream_commit"),
+    "worktree_clean": $(json_bool "$worktree_clean"),
+    "pushed_commit": $(json_bool "$pushed_commit")
+  },
   "artifacts": {
     "normal_health_manifest": $(json_string "$normal_health_dir/manifest.json"),
     "dedicated_health_manifest": $(json_string "$dedicated_health_dir/manifest.json"),
@@ -74,6 +89,7 @@ write_manifest() {
     "mvp_complete_log": $(json_string "$out_dir/mvp-complete.log")
   },
   "checks": {
+    "source_tree_ready": $(json_bool "$source_tree_ready"),
     "normal_health_status": $(status_json "$normal_health_status"),
     "dedicated_health_status": $(status_json "$dedicated_health_status"),
     "normal_e2e_status": $(status_json "$normal_e2e_status"),
@@ -92,6 +108,53 @@ health_preflight=false
 normal_e2e_passed=false
 dedicated_e2e_passed=false
 mvp_complete_passed=false
+
+if [ -n "$upstream" ] && [ "$head_commit" = "$upstream_commit" ]; then
+  pushed_commit=true
+fi
+
+if [ -n "$(git status --porcelain)" ]; then
+  reason="dirty-worktree"
+  write_manifest
+  cat >&2 <<EOF
+Parallels MVP E2E stopped before VM work because the source tree has uncommitted changes.
+
+Commit and push the milestone first, then rerun:
+  ./scripts/verify-parallels-mvp-e2e.sh
+
+Manifest: $manifest
+EOF
+  exit 2
+fi
+worktree_clean=true
+
+if [ -z "$upstream" ]; then
+  reason="missing-upstream"
+  write_manifest
+  cat >&2 <<EOF
+Parallels MVP E2E stopped before VM work because the current branch has no upstream.
+
+Set an upstream and push the branch before running true E2E.
+Manifest: $manifest
+EOF
+  exit 2
+fi
+
+if [ "$head_commit" != "$upstream_commit" ]; then
+  reason="unpushed-commit"
+  write_manifest
+  cat >&2 <<EOF
+Parallels MVP E2E stopped before VM work because HEAD does not match its upstream.
+
+HEAD: $head_commit
+Upstream $upstream: $upstream_commit
+
+Push the current commit before running true E2E.
+Manifest: $manifest
+EOF
+  exit 2
+fi
+source_tree_ready=true
 
 if run_step normal-health ./scripts/verify-parallels-ubuntu-health.sh "$normal_health_dir"; then
   normal_health_status=0
