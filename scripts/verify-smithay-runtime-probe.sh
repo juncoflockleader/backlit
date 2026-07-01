@@ -35,6 +35,12 @@ if [ "$(uname -s)" != "Linux" ]; then
     "smithay_gbm_allocator_component": false,
     "smithay_egl_display_component": false,
     "smithay_gles_renderer_component": false,
+    "smithay_renderer_node_opened": false,
+    "smithay_gbm_device_created": false,
+    "smithay_gbm_allocator_created": false,
+    "smithay_egl_display_created": false,
+    "smithay_egl_context_created": false,
+    "smithay_gles_renderer_created": false,
     "smithay_drm_node_resolved": false,
     "smithay_renderer_node_selected": false,
     "smithay_libseat_session_created": false,
@@ -91,6 +97,12 @@ smithay_wayland_socket_bootstrap=false
 smithay_wayland_client_inserted=false
 smithay_drm_node_resolved=false
 smithay_renderer_node_selected=false
+smithay_renderer_node_opened=false
+smithay_gbm_device_created=false
+smithay_gbm_allocator_created=false
+smithay_egl_display_created=false
+smithay_egl_context_created=false
+smithay_gles_renderer_created=false
 smithay_libseat_session_created=false
 smithay_libseat_event_source_inserted=false
 smithay_libseat_event_loop_dispatched=false
@@ -111,6 +123,13 @@ if grep -F '"event":"backend.preflight","backend":"drm","ready":true' "$log" >/d
   require_contains "$log" '"drm_node_render_path":"/dev/dri/renderD'
   require_contains "$log" '"renderer_node_selected":true'
   require_contains "$log" '"renderer_node_path":"/dev/dri/renderD'
+  require_contains "$log" '"renderer_node_opened":true'
+  require_contains "$log" '"gbm_device_created":true'
+  require_contains "$log" '"gbm_allocator_created":true'
+  require_contains "$log" '"egl_display_created":true'
+  require_contains "$log" '"egl_context_created":true'
+  require_contains "$log" '"gles_renderer_created":true'
+  require_contains "$log" '"renderer_runtime_failure":""'
   require_contains "$log" '"input_event_selected":true'
   require_contains "$log" '"uses_logind":true'
   require_contains "$log" '"uses_libseat":true'
@@ -143,6 +162,12 @@ if grep -F '"event":"backend.preflight","backend":"drm","ready":true' "$log" >/d
   smithay_wayland_client_inserted=true
   smithay_drm_node_resolved=true
   smithay_renderer_node_selected=true
+  smithay_renderer_node_opened=true
+  smithay_gbm_device_created=true
+  smithay_gbm_allocator_created=true
+  smithay_egl_display_created=true
+  smithay_egl_context_created=true
+  smithay_gles_renderer_created=true
   smithay_libseat_session_created=true
   smithay_libseat_event_source_inserted=true
   smithay_libseat_event_loop_dispatched=true
@@ -172,6 +197,12 @@ cat > "$out_dir/manifest.json" <<EOF
     "smithay_gbm_allocator_component": true,
     "smithay_egl_display_component": true,
     "smithay_gles_renderer_component": true,
+    "smithay_renderer_node_opened": $smithay_renderer_node_opened,
+    "smithay_gbm_device_created": $smithay_gbm_device_created,
+    "smithay_gbm_allocator_created": $smithay_gbm_allocator_created,
+    "smithay_egl_display_created": $smithay_egl_display_created,
+    "smithay_egl_context_created": $smithay_egl_context_created,
+    "smithay_gles_renderer_created": $smithay_gles_renderer_created,
     "smithay_drm_node_resolved": $smithay_drm_node_resolved,
     "smithay_renderer_node_selected": $smithay_renderer_node_selected,
     "smithay_libseat_session_created": $smithay_libseat_session_created,

@@ -235,6 +235,7 @@ fn emit_smithay_runtime_probe(probe: &SmithayRuntimeProbe) {
     let renderer_node_path = probe.renderer_node_path.as_deref().unwrap_or("");
     let libseat_session_seat = probe.libseat_session_seat.as_deref().unwrap_or("");
     let input_runtime_failure = probe.input_runtime_failure.as_deref().unwrap_or("");
+    let renderer_runtime_failure = probe.renderer_runtime_failure.as_deref().unwrap_or("");
     let primary_input_event = probe.primary_input_event.as_deref().unwrap_or("");
     let components = probe.components.join(",");
 
@@ -298,6 +299,34 @@ fn emit_smithay_runtime_probe(probe: &SmithayRuntimeProbe) {
                 (
                     "gles_renderer_component",
                     FieldValue::Bool(probe.gles_renderer_component),
+                ),
+                (
+                    "renderer_node_opened",
+                    FieldValue::Bool(probe.renderer_node_opened),
+                ),
+                (
+                    "gbm_device_created",
+                    FieldValue::Bool(probe.gbm_device_created),
+                ),
+                (
+                    "gbm_allocator_created",
+                    FieldValue::Bool(probe.gbm_allocator_created),
+                ),
+                (
+                    "egl_display_created",
+                    FieldValue::Bool(probe.egl_display_created),
+                ),
+                (
+                    "egl_context_created",
+                    FieldValue::Bool(probe.egl_context_created),
+                ),
+                (
+                    "gles_renderer_created",
+                    FieldValue::Bool(probe.gles_renderer_created),
+                ),
+                (
+                    "renderer_runtime_failure",
+                    FieldValue::Str(renderer_runtime_failure),
                 ),
                 (
                     "libseat_session_created",

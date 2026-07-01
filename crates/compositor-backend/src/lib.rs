@@ -350,6 +350,13 @@ pub struct SmithayRuntimeProbe {
     pub gbm_allocator_component: bool,
     pub egl_display_component: bool,
     pub gles_renderer_component: bool,
+    pub renderer_node_opened: bool,
+    pub gbm_device_created: bool,
+    pub gbm_allocator_created: bool,
+    pub egl_display_created: bool,
+    pub egl_context_created: bool,
+    pub gles_renderer_created: bool,
+    pub renderer_runtime_failure: Option<String>,
     pub libseat_session_created: bool,
     pub libseat_session_active: bool,
     pub libseat_session_seat: Option<String>,
@@ -430,6 +437,13 @@ impl SmithayRuntimeProbe {
             && self.gbm_allocator_component
             && self.egl_display_component
             && self.gles_renderer_component
+            && self.renderer_node_opened
+            && self.gbm_device_created
+            && self.gbm_allocator_created
+            && self.egl_display_created
+            && self.egl_context_created
+            && self.gles_renderer_created
+            && self.renderer_runtime_failure.is_none()
             && self.libseat_session_created
             && self.libseat_event_source_inserted
             && self.libseat_event_loop_dispatched
@@ -795,6 +809,10 @@ pub fn smithay_runtime_probe(environment: &BackendPreflightEnvironment) -> Smith
         environment.input_broker_ready(),
         environment.seat.as_deref(),
     );
+    let renderer_runtime_probe = smithay_renderer_runtime_probe(
+        environment.target_os.as_str(),
+        renderer_node_path.as_deref(),
+    );
     let launch_ready = compiled
         && environment.target_os == "linux"
         && environment.drm_card_access_ready()
@@ -803,6 +821,7 @@ pub fn smithay_runtime_probe(environment: &BackendPreflightEnvironment) -> Smith
         && environment.primary_input_event.is_some()
         && drm_node_probe.resolved
         && renderer_node_selected
+        && renderer_runtime_probe.passed()
         && input_runtime_probe.passed();
 
     SmithayRuntimeProbe {
@@ -847,6 +866,13 @@ pub fn smithay_runtime_probe(environment: &BackendPreflightEnvironment) -> Smith
         gbm_allocator_component: compiled,
         egl_display_component: compiled,
         gles_renderer_component: compiled,
+        renderer_node_opened: renderer_runtime_probe.renderer_node_opened,
+        gbm_device_created: renderer_runtime_probe.gbm_device_created,
+        gbm_allocator_created: renderer_runtime_probe.gbm_allocator_created,
+        egl_display_created: renderer_runtime_probe.egl_display_created,
+        egl_context_created: renderer_runtime_probe.egl_context_created,
+        gles_renderer_created: renderer_runtime_probe.gles_renderer_created,
+        renderer_runtime_failure: renderer_runtime_probe.failure,
         libseat_session_created: input_runtime_probe.libseat_session_created,
         libseat_session_active: input_runtime_probe.libseat_session_active,
         libseat_session_seat: input_runtime_probe.libseat_session_seat,
@@ -893,6 +919,17 @@ struct SmithayInputRuntimeProbe {
     failure: Option<String>,
 }
 
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct SmithayRendererRuntimeProbe {
+    renderer_node_opened: bool,
+    gbm_device_created: bool,
+    gbm_allocator_created: bool,
+    egl_display_created: bool,
+    egl_context_created: bool,
+    gles_renderer_created: bool,
+    failure: Option<String>,
+}
+
 impl SmithayInputRuntimeProbe {
     fn passed(&self) -> bool {
         self.libseat_session_created
@@ -903,6 +940,18 @@ impl SmithayInputRuntimeProbe {
             && self.libinput_backend_created
             && self.libinput_event_source_inserted
             && self.libinput_event_loop_dispatched
+            && self.failure.is_none()
+    }
+}
+
+impl SmithayRendererRuntimeProbe {
+    fn passed(&self) -> bool {
+        self.renderer_node_opened
+            && self.gbm_device_created
+            && self.gbm_allocator_created
+            && self.egl_display_created
+            && self.egl_context_created
+            && self.gles_renderer_created
             && self.failure.is_none()
     }
 }
@@ -951,6 +1000,119 @@ fn unavailable_smithay_drm_node_probe() -> SmithayDrmNodeProbe {
         primary_path: None,
         render_path: None,
         renderer_path: None,
+    }
+}
+
+#[cfg(all(feature = "smithay-backend", target_os = "linux"))]
+fn smithay_renderer_runtime_probe(
+    target_os: &str,
+    renderer_node_path: Option<&str>,
+) -> SmithayRendererRuntimeProbe {
+    use std::os::unix::io::OwnedFd;
+
+    use smithay::backend::allocator::gbm::{GbmAllocator, GbmBufferFlags, GbmDevice};
+    use smithay::backend::drm::DrmDeviceFd;
+    use smithay::backend::egl::{EGLContext, EGLDisplay};
+    use smithay::backend::renderer::gles::GlesRenderer;
+    use smithay::utils::DeviceFd;
+
+    if target_os != "linux" {
+        return unavailable_smithay_renderer_runtime_probe("non-linux-target");
+    }
+
+    let Some(path) = renderer_node_path.filter(|value| !value.trim().is_empty()) else {
+        return unavailable_smithay_renderer_runtime_probe("missing-render-node");
+    };
+
+    let file = match std::fs::File::options().read(true).write(true).open(path) {
+        Ok(file) => file,
+        Err(error) => {
+            return unavailable_smithay_renderer_runtime_probe(format!("render-node-open:{error}"));
+        }
+    };
+
+    let drm_fd = DrmDeviceFd::new(DeviceFd::from(Into::<OwnedFd>::into(file)));
+    let gbm = match GbmDevice::new(drm_fd) {
+        Ok(gbm) => gbm,
+        Err(error) => {
+            return SmithayRendererRuntimeProbe {
+                renderer_node_opened: true,
+                failure: Some(format!("gbm-device:{error:?}")),
+                ..unavailable_smithay_renderer_runtime_probe("gbm-device")
+            };
+        }
+    };
+
+    let _allocator = GbmAllocator::new(gbm.clone(), GbmBufferFlags::RENDERING);
+
+    let egl_display = match unsafe { EGLDisplay::new(gbm.clone()) } {
+        Ok(display) => display,
+        Err(error) => {
+            return SmithayRendererRuntimeProbe {
+                renderer_node_opened: true,
+                gbm_device_created: true,
+                gbm_allocator_created: true,
+                failure: Some(format!("egl-display:{error:?}")),
+                ..unavailable_smithay_renderer_runtime_probe("egl-display")
+            };
+        }
+    };
+
+    let egl_context = match EGLContext::new(&egl_display) {
+        Ok(context) => context,
+        Err(error) => {
+            return SmithayRendererRuntimeProbe {
+                renderer_node_opened: true,
+                gbm_device_created: true,
+                gbm_allocator_created: true,
+                egl_display_created: true,
+                failure: Some(format!("egl-context:{error:?}")),
+                ..unavailable_smithay_renderer_runtime_probe("egl-context")
+            };
+        }
+    };
+
+    match unsafe { GlesRenderer::new(egl_context) } {
+        Ok(_renderer) => SmithayRendererRuntimeProbe {
+            renderer_node_opened: true,
+            gbm_device_created: true,
+            gbm_allocator_created: true,
+            egl_display_created: true,
+            egl_context_created: true,
+            gles_renderer_created: true,
+            failure: None,
+        },
+        Err(error) => SmithayRendererRuntimeProbe {
+            renderer_node_opened: true,
+            gbm_device_created: true,
+            gbm_allocator_created: true,
+            egl_display_created: true,
+            egl_context_created: true,
+            failure: Some(format!("gles-renderer:{error:?}")),
+            ..unavailable_smithay_renderer_runtime_probe("gles-renderer")
+        },
+    }
+}
+
+#[cfg(not(all(feature = "smithay-backend", target_os = "linux")))]
+fn smithay_renderer_runtime_probe(
+    _target_os: &str,
+    _renderer_node_path: Option<&str>,
+) -> SmithayRendererRuntimeProbe {
+    unavailable_smithay_renderer_runtime_probe("unavailable")
+}
+
+fn unavailable_smithay_renderer_runtime_probe(
+    reason: impl Into<String>,
+) -> SmithayRendererRuntimeProbe {
+    SmithayRendererRuntimeProbe {
+        renderer_node_opened: false,
+        gbm_device_created: false,
+        gbm_allocator_created: false,
+        egl_display_created: false,
+        egl_context_created: false,
+        gles_renderer_created: false,
+        failure: Some(reason.into()),
     }
 }
 
@@ -3526,6 +3688,7 @@ mod tests {
                 probe.launch_ready,
                 probe.drm_node_resolved
                     && probe.renderer_node_selected
+                    && probe.renderer_runtime_failure.is_none()
                     && probe.input_runtime_failure.is_none()
             );
             assert_eq!(probe.passed(), probe.launch_ready);
@@ -3538,6 +3701,13 @@ mod tests {
             assert!(!probe.gbm_allocator_component);
             assert!(!probe.egl_display_component);
             assert!(!probe.gles_renderer_component);
+            assert!(!probe.renderer_node_opened);
+            assert!(!probe.gbm_device_created);
+            assert!(!probe.gbm_allocator_created);
+            assert!(!probe.egl_display_created);
+            assert!(!probe.egl_context_created);
+            assert!(!probe.gles_renderer_created);
+            assert!(probe.renderer_runtime_failure.is_some());
             assert!(!probe.libseat_session_created);
             assert!(!probe.libseat_event_source_inserted);
             assert!(!probe.libseat_event_loop_dispatched);
