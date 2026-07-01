@@ -200,8 +200,8 @@ fi
 BACKLIT_REQUIRE_DRM_MASTER_PRESENT=1 ./scripts/verify-drm-master-boundary.sh "$boundary_dir"
 
 cargo build -p backlit-session --features smithay-backend
+cargo build -p backlit-compositor --features smithay-backend
 cargo build \
-  -p backlit-compositor \
   -p backlit-demo-client \
   -p backlit-shell \
   -p backlit-notification-daemon \

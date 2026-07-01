@@ -51,6 +51,7 @@ require_executable scripts/verify-smithay-runtime-probe.sh
 require_executable scripts/verify-smithay-compositor-runtime.sh
 require_executable scripts/verify-nested-wayland-smoke.sh
 require_executable scripts/verify-linux-e2e.sh
+require_executable scripts/verify-parallels-dedicated-drm-e2e.sh
 
 require_contains docs/architecture/mvp-1.md 'MVP 1 is the bare graphical session'
 require_contains docs/architecture/mvp-1.md 'DRM/KMS backend'
@@ -105,6 +106,7 @@ require_contains scripts/verify-drm-master-boundary.sh '"current_session_can_pre
 require_contains scripts/verify-dedicated-drm-session.sh '"name": "backlit-dedicated-drm-session"'
 require_contains scripts/verify-dedicated-drm-session.sh '--require-drm-master-present'
 require_contains scripts/verify-dedicated-drm-session.sh '"implementation":"smithay-compositor-runtime"'
+require_contains scripts/verify-dedicated-drm-session.sh 'cargo build -p backlit-compositor --features smithay-backend'
 require_contains scripts/verify-dedicated-drm-session.sh '"dedicated_handoff_plan": true'
 require_contains scripts/verify-dedicated-drm-session.sh '"dedicated_handoff_script_checked": true'
 require_contains scripts/verify-dedicated-drm-session.sh '"dedicated_handoff_seat_owner_required": true'
@@ -113,6 +115,11 @@ require_contains scripts/verify-dedicated-drm-session.sh '"dedicated_handoff_acc
 require_contains scripts/verify-dedicated-drm-session.sh '"dedicated_session_acceptance": $dedicated_session_acceptance'
 require_contains scripts/verify-dedicated-drm-session.sh '"first_present_commit_succeeded": $first_present_commit_succeeded'
 require_contains scripts/verify-dedicated-drm-session.sh '"first_present_vblank_event_received": $first_present_vblank_event_received'
+require_contains scripts/verify-parallels-dedicated-drm-e2e.sh 'systemd-run'
+require_contains scripts/verify-parallels-dedicated-drm-e2e.sh 'PAMName=login'
+require_contains scripts/verify-parallels-dedicated-drm-e2e.sh 'TTYPath='
+require_contains scripts/verify-parallels-dedicated-drm-e2e.sh 'BACKLIT_REQUIRE_DEDICATED_DRM_SESSION=1'
+require_contains scripts/verify-parallels-dedicated-drm-e2e.sh '"dedicated_session_acceptance": true'
 require_contains scripts/verify-session-replay.sh '"launcher_overlay_frame": true'
 require_contains scripts/verify-session-replay.sh '"app_switcher_overlay_frame": true'
 require_contains scripts/verify-compositor-socket.sh '"session_socket_bound": true'

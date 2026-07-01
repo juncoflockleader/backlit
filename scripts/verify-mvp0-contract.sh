@@ -51,6 +51,7 @@ require_executable scripts/verify-portal-security.sh
 require_executable scripts/verify-crash-logs.sh
 require_executable scripts/verify-linux-e2e.sh
 require_executable scripts/verify-parallels-linux-e2e.sh
+require_executable scripts/verify-parallels-dedicated-drm-e2e.sh
 require_executable scripts/render-parallels-gui-preview.sh
 require_executable scripts/verify-ci-contract.sh
 require_executable scripts/verify-packaging-contract.sh
@@ -155,12 +156,18 @@ require_contains scripts/verify-drm-master-boundary.sh '"dedicated_session_model
 require_contains scripts/verify-dedicated-drm-session.sh '"name": "backlit-dedicated-drm-session"'
 require_contains scripts/verify-dedicated-drm-session.sh '--require-drm-master-present'
 require_contains scripts/verify-dedicated-drm-session.sh '"implementation":"smithay-compositor-runtime"'
+require_contains scripts/verify-dedicated-drm-session.sh 'cargo build -p backlit-compositor --features smithay-backend'
 require_contains scripts/verify-dedicated-drm-session.sh '"dedicated_handoff_plan": true'
 require_contains scripts/verify-dedicated-drm-session.sh '"dedicated_handoff_script_checked": true'
 require_contains scripts/verify-dedicated-drm-session.sh '"dedicated_handoff_seat_owner_required": true'
 require_contains scripts/verify-dedicated-drm-session.sh '"dedicated_handoff_drm_master_present_required": true'
 require_contains scripts/verify-dedicated-drm-session.sh '"dedicated_handoff_acceptance_checks": true'
 require_contains scripts/verify-dedicated-drm-session.sh '"dedicated_session_acceptance": $dedicated_session_acceptance'
+require_contains scripts/verify-parallels-dedicated-drm-e2e.sh 'systemd-run'
+require_contains scripts/verify-parallels-dedicated-drm-e2e.sh 'PAMName=login'
+require_contains scripts/verify-parallels-dedicated-drm-e2e.sh 'TTYPath='
+require_contains scripts/verify-parallels-dedicated-drm-e2e.sh 'BACKLIT_REQUIRE_DEDICATED_DRM_SESSION=1'
+require_contains scripts/verify-parallels-dedicated-drm-e2e.sh '"dedicated_session_acceptance": true'
 require_contains scripts/verify-smithay-compositor-runtime.sh '--features smithay-backend'
 require_contains scripts/verify-smithay-compositor-runtime.sh '--runtime=smithay'
 require_contains scripts/verify-smithay-compositor-runtime.sh '--drm-first-present-probe'
