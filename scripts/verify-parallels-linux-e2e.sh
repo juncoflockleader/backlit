@@ -158,6 +158,29 @@ fi
 apt-get update
 apt-get install -y git ca-certificates build-essential pkg-config curl python3
 
+retry_guest_command() {
+  local attempt=1
+  local max_attempts=5
+  local delay=2
+
+  while true; do
+    if "\$@"; then
+      return 0
+    fi
+
+    local status="\$?"
+    if [ "\$attempt" -ge "\$max_attempts" ]; then
+      return "\$status"
+    fi
+
+    printf 'Guest command failed (attempt %s/%s); retrying in %ss: %s\n' \
+      "\$attempt" "\$max_attempts" "\$delay" "\$*" >&2
+    sleep "\$delay"
+    attempt="\$((attempt + 1))"
+    delay="\$((delay * 2))"
+  done
+}
+
 if [ -d "\$guest_runtime_dir" ]; then
   export XDG_RUNTIME_DIR="\$guest_runtime_dir"
 else
@@ -192,11 +215,11 @@ mkdir -p "\$(dirname "\$repo_dir")"
 chown "\$guest_user:\$guest_user" "\$(dirname "\$repo_dir")"
 
 if [ -d "\$repo_dir/.git" ]; then
-  runuser -u "\$guest_user" -- git -C "\$repo_dir" fetch origin "\$branch"
+  retry_guest_command runuser -u "\$guest_user" -- git -C "\$repo_dir" fetch origin "\$branch"
   runuser -u "\$guest_user" -- git -C "\$repo_dir" checkout "\$branch"
   runuser -u "\$guest_user" -- git -C "\$repo_dir" reset --hard "origin/\$branch"
 else
-  runuser -u "\$guest_user" -- git clone --branch "\$branch" "\$repo_url" "\$repo_dir"
+  retry_guest_command runuser -u "\$guest_user" -- git clone --branch "\$branch" "\$repo_url" "\$repo_dir"
 fi
 
 DEBIAN_FRONTEND=noninteractive "\$repo_dir/scripts/bootstrap-ubuntu.sh"
@@ -212,14 +235,9 @@ rustup default stable
 rustup component add rustfmt clippy
 '
 
-runuser -u "\$guest_user" -- bash -lc "
-set -euo pipefail
-source \"\\\$HOME/.cargo/env\"
-cd \"\$repo_dir\"
-git fetch origin \"\$branch\"
-git checkout \"\$branch\"
-git reset --hard \"origin/\$branch\"
-"
+retry_guest_command runuser -u "\$guest_user" -- git -C "\$repo_dir" fetch origin "\$branch"
+runuser -u "\$guest_user" -- git -C "\$repo_dir" checkout "\$branch"
+runuser -u "\$guest_user" -- git -C "\$repo_dir" reset --hard "origin/\$branch"
 
 install -m 0755 -o "\$guest_user" -g "\$guest_user" "\$uploaded_verifier" "\$repo_dir/scripts/verify-linux-e2e.sh"
 install -m 0755 -o "\$guest_user" -g "\$guest_user" "\$uploaded_gui_smoke_verifier" "\$repo_dir/scripts/verify-gui-smoke.sh"
