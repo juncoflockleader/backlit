@@ -53,6 +53,7 @@ require_executable scripts/verify-smithay-compositor-runtime.sh
 require_executable scripts/verify-nested-wayland-smoke.sh
 require_executable scripts/verify-linux-e2e.sh
 require_executable scripts/verify-parallels-ubuntu-health.sh
+require_executable scripts/verify-parallels-mvp-e2e.sh
 require_executable scripts/verify-parallels-dedicated-drm-e2e.sh
 require_executable scripts/verify-mvp-complete.sh
 
@@ -163,6 +164,12 @@ require_contains scripts/verify-parallels-ubuntu-health.sh 'guest-root-read-only
 require_contains scripts/verify-parallels-ubuntu-health.sh 'verify-parallels-linux-e2e.sh'
 require_contains scripts/verify-parallels-ubuntu-health.sh 'verify-parallels-dedicated-drm-e2e.sh'
 require_contains scripts/verify-parallels-ubuntu-health.sh 'docs/runbooks/parallels-ubuntu-readonly.md'
+require_contains scripts/verify-parallels-mvp-e2e.sh '"name": "backlit-parallels-mvp-e2e"'
+require_contains scripts/verify-parallels-mvp-e2e.sh './scripts/verify-parallels-ubuntu-health.sh "$normal_health_dir"'
+require_contains scripts/verify-parallels-mvp-e2e.sh './scripts/verify-parallels-linux-e2e.sh "$normal_e2e_dir"'
+require_contains scripts/verify-parallels-mvp-e2e.sh './scripts/verify-parallels-dedicated-drm-e2e.sh "$dedicated_e2e_dir"'
+require_contains scripts/verify-parallels-mvp-e2e.sh './scripts/verify-mvp-complete.sh "$mvp_complete_dir" "$normal_e2e_dir" "$dedicated_e2e_dir"'
+require_contains scripts/verify-parallels-mvp-e2e.sh 'parallels-health-failed'
 require_contains scripts/verify-mvp-complete.sh '"name": "backlit-mvp-complete"'
 require_contains scripts/verify-mvp-complete.sh '"source_tree_ready": $source_tree_ready'
 require_contains scripts/verify-mvp-complete.sh '"worktree_clean": $worktree_clean'
