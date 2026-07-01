@@ -35,6 +35,7 @@ fn run() -> Result<(), String> {
                     ("socket_name", FieldValue::Str(socket_name)),
                     ("socket_path", FieldValue::Str(report.socket_path.as_str())),
                     ("title", FieldValue::Str(config.connect_title.as_str())),
+                    ("app_id", FieldValue::Str(config.connect_app_id.as_str())),
                     ("width", FieldValue::U64(config.width as u64)),
                     ("height", FieldValue::U64(config.height as u64)),
                     ("connected", FieldValue::Bool(report.connected)),
@@ -111,8 +112,9 @@ fn connect_to_compositor_socket(
     let mut stream = UnixStream::connect(&socket_path)
         .map_err(|error| format!("failed to connect to {}: {error}", socket_path.display()))?;
     let message = format!(
-        "BACKLIT_DEMO_CLIENT surface title={} width={} height={}\n",
+        "BACKLIT_DEMO_CLIENT surface title={} app_id={} width={} height={}\n",
         protocol_token(config.connect_title.as_str()),
+        protocol_token(config.connect_app_id.as_str()),
         config.width.max(1),
         config.height.max(1),
     );
@@ -167,6 +169,7 @@ struct Config {
     verify: bool,
     connect_socket: Option<String>,
     connect_title: String,
+    connect_app_id: String,
     connect_only: bool,
     help: bool,
 }
@@ -180,6 +183,7 @@ impl Default for Config {
             verify: false,
             connect_socket: None,
             connect_title: String::from("demo-client"),
+            connect_app_id: String::from("org.backlit.DemoClient"),
             connect_only: false,
             help: false,
         }
@@ -233,6 +237,12 @@ impl Config {
                 config.connect_title = args
                     .next()
                     .ok_or_else(|| String::from("missing value for --connect-title"))?;
+            } else if let Some(value) = arg.strip_prefix("--connect-app-id=") {
+                config.connect_app_id = value.to_string();
+            } else if arg == "--connect-app-id" {
+                config.connect_app_id = args
+                    .next()
+                    .ok_or_else(|| String::from("missing value for --connect-app-id"))?;
             } else if arg == "--connect-only" {
                 config.connect_only = true;
             } else {
@@ -256,7 +266,7 @@ fn print_help() {
 backlit-demo-client
 
 Usage:
-  backlit-demo-client [--output=target/backlit-demo-client.ppm] [--width=800] [--height=520] [--verify] [--connect-socket=backlit-0] [--connect-only]
+  backlit-demo-client [--output=target/backlit-demo-client.ppm] [--width=800] [--height=520] [--verify] [--connect-socket=backlit-0] [--connect-app-id=org.backlit.DemoClient] [--connect-only]
 
 Flags:
   --output          PPM screenshot output path.
@@ -265,6 +275,7 @@ Flags:
   --verify          Fail if expected GUI regions are missing.
   --connect-socket  Connect to a compositor Unix socket and announce a demo surface.
   --connect-title   Surface title to announce when connecting.
+  --connect-app-id  Application id to announce when connecting.
   --connect-only    Skip screenshot rendering after the socket announcement.
 "
     );
@@ -280,6 +291,7 @@ mod tests {
             "--connect-socket",
             "backlit-test",
             "--connect-title=hello world",
+            "--connect-app-id=org.backlit.HelloWorld",
             "--connect-only",
             "--width=640",
             "--height=480",
@@ -288,6 +300,7 @@ mod tests {
 
         assert_eq!(config.connect_socket.as_deref(), Some("backlit-test"));
         assert_eq!(config.connect_title, "hello world");
+        assert_eq!(config.connect_app_id, "org.backlit.HelloWorld");
         assert!(config.connect_only);
         assert_eq!(config.width, 640);
         assert_eq!(config.height, 480);

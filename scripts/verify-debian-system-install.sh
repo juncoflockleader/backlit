@@ -226,6 +226,7 @@ grep -F '"compositor_ready":true' "$session_log" >/dev/null || fail "session com
 grep -F '"compositor_demo_client_resolved":true' "$session_log" >/dev/null || fail "session demo client binary did not resolve from /usr/bin"
 grep -F '"compositor_demo_client_connected":true' "$session_log" >/dev/null || fail "session demo client did not connect to system compositor"
 grep -F '"compositor_demo_surface_mapped":true' "$session_log" >/dev/null || fail "session demo client surface did not map from system install"
+grep -F '"compositor_demo_app_id_preserved":true' "$session_log" >/dev/null || fail "session demo client app id was not preserved from system install"
 grep -F '"compositor_service_socket_cleanup":true' "$session_log" >/dev/null || fail "session compositor socket did not clean up from system install"
 grep -F '"shell_resolved":true' "$session_log" >/dev/null || fail "session shell binary did not resolve from /usr/bin"
 grep -F '"shell_ready":true' "$session_log" >/dev/null || fail "session shell service did not become ready"
@@ -285,9 +286,10 @@ cat > "$manifest" <<EOF
     "usr_bin_session_launch": true,
     "systemd_units_from_system_install": true,
     "session_gui_from_system_install": true,
-    "session_services_from_system_install": true,
-    "session_compositor_demo_client_from_system_install": true,
-    "session_desktop_launch_from_system_install": true,
+	    "session_services_from_system_install": true,
+	    "session_compositor_demo_client_from_system_install": true,
+	    "session_compositor_demo_app_id_from_system_install": true,
+	    "session_desktop_launch_from_system_install": true,
     "session_desktop_managed_window_from_system_install": true,
     "session_replay_from_system_install": true,
     "session_clean_exit_from_system_install": true,

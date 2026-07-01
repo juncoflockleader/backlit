@@ -321,11 +321,13 @@ impl BoundSessionSocket {
         loop {
             match self.listener.accept() {
                 Ok((mut stream, _addr)) => {
-                    stream
-                        .set_read_timeout(Some(Duration::from_millis(100)))
-                        .map_err(|error| {
-                            format!("failed to set socket client read timeout: {error}")
-                        })?;
+                    if let Err(error) = stream.set_read_timeout(Some(Duration::from_millis(100))) {
+                        if error.kind() != ErrorKind::InvalidInput {
+                            return Err(format!(
+                                "failed to set socket client read timeout: {error}"
+                            ));
+                        }
+                    }
                     let mut message = String::new();
                     stream.read_to_string(&mut message).map_err(|error| {
                         format!("failed to read compositor socket client message: {error}")
@@ -438,7 +440,7 @@ impl SocketClientRuntime {
 
         let client = self
             .backend
-            .connect_client(format!("socket-client-{}", request.title));
+            .connect_client(format!("socket-client-{}", request.app_id));
         let backend_surface_presented = self
             .backend
             .submit_surface(
@@ -448,9 +450,10 @@ impl SocketClientRuntime {
                 request.height,
             )
             .is_ok();
-        let policy_window_mapped = map_scripted_toplevel(
+        let policy_window = map_scripted_app_toplevel(
             &mut self.manager,
             request.title.as_str(),
+            request.app_id.as_str(),
             request.width as i32,
             request.height as i32,
         )
@@ -459,17 +462,23 @@ impl SocketClientRuntime {
             self.manager
                 .surface(surface)
                 .and_then(|surface| surface.window_id)
-        })
-        .is_some();
+        });
+        let policy_window_mapped = policy_window.is_some();
+        let policy_app_id_preserved = policy_window
+            .and_then(|window| self.manager.policy().window(window))
+            .map(|window| window.app_id.as_deref() == Some(request.app_id.as_str()))
+            .unwrap_or(false);
         let frame = self.backend.present();
 
         SocketClientReport {
             message_valid: true,
             title: request.title,
+            app_id: request.app_id,
             width: request.width,
             height: request.height,
             backend_surface_presented,
             policy_window_mapped,
+            policy_app_id_preserved,
             frame: frame.frame,
             backend_surfaces: frame.surface_count,
             policy_windows: self.manager.policy().windows().len() as u64,
@@ -483,10 +492,12 @@ impl SocketClientRuntime {
 struct SocketClientReport {
     message_valid: bool,
     title: String,
+    app_id: String,
     width: u32,
     height: u32,
     backend_surface_presented: bool,
     policy_window_mapped: bool,
+    policy_app_id_preserved: bool,
     frame: u64,
     backend_surfaces: u64,
     policy_windows: u64,
@@ -499,10 +510,12 @@ impl SocketClientReport {
         Self {
             message_valid: false,
             title: String::new(),
+            app_id: String::new(),
             width: 0,
             height: 0,
             backend_surface_presented: false,
             policy_window_mapped: false,
+            policy_app_id_preserved: false,
             frame: 0,
             backend_surfaces: 0,
             policy_windows: 0,
@@ -515,6 +528,7 @@ impl SocketClientReport {
 #[derive(Debug, Clone, PartialEq, Eq)]
 struct DemoSurfaceRequest {
     title: String,
+    app_id: String,
     width: u32,
     height: u32,
 }
@@ -527,12 +541,15 @@ impl DemoSurfaceRequest {
         }
 
         let mut title = None;
+        let mut app_id = None;
         let mut width = None;
         let mut height = None;
 
         for token in tokens {
             if let Some(value) = token.strip_prefix("title=") {
                 title = Some(value.to_string());
+            } else if let Some(value) = token.strip_prefix("app_id=") {
+                app_id = Some(value.to_string());
             } else if let Some(value) = token.strip_prefix("width=") {
                 width = value.parse::<u32>().ok();
             } else if let Some(value) = token.strip_prefix("height=") {
@@ -540,8 +557,14 @@ impl DemoSurfaceRequest {
             }
         }
 
+        let title = title.filter(|title| !title.is_empty())?;
+        let app_id = app_id
+            .filter(|app_id| !app_id.is_empty())
+            .unwrap_or_else(|| title.clone());
+
         Some(Self {
-            title: title.filter(|title| !title.is_empty())?,
+            title,
+            app_id,
             width: width?.max(1),
             height: height?.max(1),
         })
@@ -753,6 +776,27 @@ fn map_scripted_toplevel(
     height: i32,
 ) -> Result<backlit_surface::SurfaceId, String> {
     let surface = manager.create_toplevel(title, (width, height));
+    configure_and_commit_scripted_surface(manager, surface, title, width, height)
+}
+
+fn map_scripted_app_toplevel(
+    manager: &mut SurfaceManager,
+    title: &str,
+    app_id: &str,
+    width: i32,
+    height: i32,
+) -> Result<backlit_surface::SurfaceId, String> {
+    let surface = manager.create_app_toplevel(title, Some(app_id), (width, height));
+    configure_and_commit_scripted_surface(manager, surface, title, width, height)
+}
+
+fn configure_and_commit_scripted_surface(
+    manager: &mut SurfaceManager,
+    surface: backlit_surface::SurfaceId,
+    title: &str,
+    width: i32,
+    height: i32,
+) -> Result<backlit_surface::SurfaceId, String> {
     let configure = manager
         .send_initial_configure(surface)
         .ok_or_else(|| format!("failed to configure scripted surface {title}"))?;
@@ -1396,6 +1440,7 @@ fn emit_socket_client(config: &RunConfig, report: &SocketClientReport) {
         &[
             ("message_valid", FieldValue::Bool(report.message_valid)),
             ("title", FieldValue::Str(report.title.as_str())),
+            ("app_id", FieldValue::Str(report.app_id.as_str())),
             ("width", FieldValue::U64(report.width as u64)),
             ("height", FieldValue::U64(report.height as u64)),
             (
@@ -1405,6 +1450,10 @@ fn emit_socket_client(config: &RunConfig, report: &SocketClientReport) {
             (
                 "policy_window_mapped",
                 FieldValue::Bool(report.policy_window_mapped),
+            ),
+            (
+                "policy_app_id_preserved",
+                FieldValue::Bool(report.policy_app_id_preserved),
             ),
             ("frame", FieldValue::U64(report.frame)),
             ("backend_surfaces", FieldValue::U64(report.backend_surfaces)),
@@ -1444,7 +1493,10 @@ Backend launch preflight runs before smoke or service readiness events.
 
 #[cfg(test)]
 mod tests {
-    use super::{run_compositor_surface_smoke, run_scripted_client_runtime, DemoSurfaceRequest};
+    use super::{
+        run_compositor_surface_smoke, run_scripted_client_runtime, DemoSurfaceRequest,
+        SocketClientRuntime,
+    };
     use std::fs;
     use std::os::unix::fs::FileTypeExt;
     use std::os::unix::net::UnixStream;
@@ -1523,13 +1575,38 @@ mod tests {
     #[test]
     fn demo_surface_request_parses_socket_message() {
         let request = DemoSurfaceRequest::parse(
-            "BACKLIT_DEMO_CLIENT surface title=socket-demo width=640 height=480\n",
+            "BACKLIT_DEMO_CLIENT surface title=socket-demo app_id=org.backlit.SocketDemo width=640 height=480\n",
         )
         .unwrap();
 
         assert_eq!(request.title, "socket-demo");
+        assert_eq!(request.app_id, "org.backlit.SocketDemo");
         assert_eq!(request.width, 640);
         assert_eq!(request.height, 480);
+
+        let legacy = DemoSurfaceRequest::parse(
+            "BACKLIT_DEMO_CLIENT surface title=legacy-demo width=320 height=240\n",
+        )
+        .unwrap();
+        assert_eq!(legacy.app_id, "legacy-demo");
+
         assert!(DemoSurfaceRequest::parse("garbage").is_none());
+    }
+
+    #[test]
+    fn socket_client_runtime_preserves_app_id_in_policy_window() {
+        let mut runtime = SocketClientRuntime::new();
+        let report = runtime.handle_message(
+            "BACKLIT_DEMO_CLIENT surface title=socket-demo app_id=org.backlit.SocketDemo width=640 height=480\n",
+        );
+
+        assert!(report.message_valid);
+        assert!(report.backend_surface_presented);
+        assert!(report.policy_window_mapped);
+        assert!(report.policy_app_id_preserved);
+        assert_eq!(report.app_id, "org.backlit.SocketDemo");
+        assert_eq!(report.policy_windows, 1);
+        assert_eq!(report.visible_windows, 1);
+        assert!(report.focused_window);
     }
 }

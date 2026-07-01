@@ -855,6 +855,7 @@ struct CompositorServiceVerification {
     socket_bound: bool,
     demo_client_connected: bool,
     demo_surface_mapped: bool,
+    demo_app_id_preserved: bool,
     socket_cleanup: bool,
     socket_blocked_expected: bool,
 }
@@ -867,6 +868,7 @@ impl CompositorServiceVerification {
             socket_bound: false,
             demo_client_connected: false,
             demo_surface_mapped: false,
+            demo_app_id_preserved: false,
             socket_cleanup: false,
             socket_blocked_expected: false,
         }
@@ -882,6 +884,7 @@ impl CompositorServiceVerification {
                 && self.demo_client.ready
                 && self.demo_client_connected
                 && self.demo_surface_mapped
+                && self.demo_app_id_preserved
                 && self.socket_cleanup)
                 || self.socket_blocked_expected)
     }
@@ -1076,6 +1079,8 @@ fn run_compositor_service_client_probe(
         .arg(socket_name)
         .arg("--connect-title")
         .arg("session-demo")
+        .arg("--connect-app-id")
+        .arg("org.backlit.SessionDemo")
         .arg("--connect-only")
         .arg("--width")
         .arg("640")
@@ -1089,6 +1094,7 @@ fn run_compositor_service_client_probe(
         &[
             String::from("\"event\":\"demo_client.socket_connected\""),
             String::from("\"title\":\"session-demo\""),
+            String::from("\"app_id\":\"org.backlit.SessionDemo\""),
             String::from("\"connected\":true"),
         ],
     );
@@ -1102,8 +1108,11 @@ fn run_compositor_service_client_probe(
     let demo_client_connected =
         demo_client.ready && stdout.contains("\"event\":\"compositor.socket_client\"");
     let demo_surface_mapped = stdout.contains("\"title\":\"session-demo\"")
+        && stdout.contains("\"app_id\":\"org.backlit.SessionDemo\"")
         && stdout.contains("\"backend_surface_presented\":true")
         && stdout.contains("\"policy_window_mapped\":true");
+    let demo_app_id_preserved = stdout.contains("\"app_id\":\"org.backlit.SessionDemo\"")
+        && stdout.contains("\"policy_app_id_preserved\":true");
     let socket_cleanup = stdout.contains("\"event\":\"compositor.socket_unbound\"")
         && stdout.contains("\"removed\":true")
         && !socket_path.exists();
@@ -1116,8 +1125,10 @@ fn run_compositor_service_client_probe(
             String::from("\"event\":\"compositor.socket_bound\""),
             String::from("\"event\":\"compositor.socket_client\""),
             String::from("\"title\":\"session-demo\""),
+            String::from("\"app_id\":\"org.backlit.SessionDemo\""),
             String::from("\"backend_surface_presented\":true"),
             String::from("\"policy_window_mapped\":true"),
+            String::from("\"policy_app_id_preserved\":true"),
             String::from("\"event\":\"compositor.service_exit\""),
         ],
     );
@@ -1128,6 +1139,7 @@ fn run_compositor_service_client_probe(
         socket_bound,
         demo_client_connected,
         demo_surface_mapped,
+        demo_app_id_preserved,
         socket_cleanup,
         socket_blocked_expected: false,
     })
@@ -1380,6 +1392,10 @@ fn emit_service_verification(config: &Config, report: &ServiceVerification, elap
             (
                 "compositor_demo_surface_mapped",
                 FieldValue::Bool(report.compositor.demo_surface_mapped),
+            ),
+            (
+                "compositor_demo_app_id_preserved",
+                FieldValue::Bool(report.compositor.demo_app_id_preserved),
             ),
             (
                 "compositor_service_socket_cleanup",
@@ -3232,6 +3248,7 @@ mod tests {
             socket_bound: true,
             demo_client_connected: true,
             demo_surface_mapped: true,
+            demo_app_id_preserved: true,
             socket_cleanup: true,
             socket_blocked_expected: false,
         };
@@ -3243,6 +3260,7 @@ mod tests {
             socket_bound: false,
             demo_client_connected: false,
             demo_surface_mapped: false,
+            demo_app_id_preserved: false,
             socket_cleanup: false,
             socket_blocked_expected: true,
         };

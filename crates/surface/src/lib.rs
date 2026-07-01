@@ -122,6 +122,7 @@ pub struct ToplevelSurface {
     pub id: SurfaceId,
     pub role: SurfaceRole,
     pub title: String,
+    pub app_id: Option<String>,
     pub phase: SurfacePhase,
     pub window_id: Option<WindowId>,
     pub parent: Option<SurfaceId>,
@@ -156,6 +157,15 @@ impl SurfaceManager {
         title: impl Into<String>,
         preferred_size: (i32, i32),
     ) -> SurfaceId {
+        self.create_app_toplevel(title, None::<String>, preferred_size)
+    }
+
+    pub fn create_app_toplevel(
+        &mut self,
+        title: impl Into<String>,
+        app_id: Option<impl Into<String>>,
+        preferred_size: (i32, i32),
+    ) -> SurfaceId {
         let id = SurfaceId(self.next_surface_id);
         self.next_surface_id += 1;
 
@@ -163,6 +173,7 @@ impl SurfaceManager {
             id,
             role: SurfaceRole::XdgToplevel,
             title: title.into(),
+            app_id: app_id.map(Into::into),
             phase: SurfacePhase::Created,
             window_id: None,
             parent: None,
@@ -196,6 +207,7 @@ impl SurfaceManager {
             id,
             role: SurfaceRole::XdgPopup,
             title: title.into(),
+            app_id: None,
             phase: SurfacePhase::Created,
             window_id: None,
             parent: Some(parent),
@@ -258,8 +270,9 @@ impl SurfaceManager {
         if let Some(window_id) = self.surfaces[index].window_id {
             self.policy.focus(window_id)
         } else {
-            let window_id = self.policy.add_window(
+            let window_id = self.policy.add_app_window(
                 self.surfaces[index].title.clone(),
+                self.surfaces[index].app_id.clone(),
                 (configure.width, configure.height),
             );
             self.surfaces[index].window_id = Some(window_id);
@@ -630,7 +643,8 @@ mod tests {
     #[test]
     fn toplevel_maps_after_configure_ack_and_commit() {
         let mut manager = SurfaceManager::new(OutputLayout::new(800, 520, 42));
-        let surface = manager.create_toplevel("browser", (640, 480));
+        let surface =
+            manager.create_app_toplevel("browser", Some("org.mozilla.firefox.desktop"), (640, 480));
         let configure = manager.send_initial_configure(surface).unwrap();
 
         assert!(manager.ack_configure(surface, configure.serial));
@@ -641,6 +655,14 @@ mod tests {
         assert_eq!(toplevel.phase, SurfacePhase::Mapped);
         assert_eq!(manager.policy().windows().len(), 1);
         assert_eq!(manager.policy().focused(), toplevel.window_id);
+        let window = manager
+            .policy()
+            .window(toplevel.window_id.unwrap())
+            .unwrap();
+        assert_eq!(
+            window.app_id.as_deref(),
+            Some("org.mozilla.firefox.desktop")
+        );
     }
 
     #[test]

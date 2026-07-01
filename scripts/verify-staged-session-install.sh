@@ -206,6 +206,13 @@ grep -F '"managed_window_app_id":"org.backlit.Settings.desktop"' "$session_log" 
 grep -F '"managed_windows_after_launch":4' "$session_log" >/dev/null || fail "session desktop launch did not add a managed window"
 grep -F '"focused_launched_window":true' "$session_log" >/dev/null || fail "session desktop launch did not focus launched Settings window"
 grep -F '"compositor_ready":true' "$session_log" >/dev/null || fail "session compositor service did not become ready"
+staged_session_compositor_demo_app_id=false
+if grep -F '"compositor_demo_surface_mapped":true' "$session_log" >/dev/null; then
+  grep -F '"compositor_demo_app_id_preserved":true' "$session_log" >/dev/null || fail "session demo client app id was not preserved from staged install"
+  staged_session_compositor_demo_app_id=true
+else
+  grep -F '"compositor_client_blocked_expected":true' "$session_log" >/dev/null || fail "session compositor client was neither mapped nor expected-blocked"
+fi
 grep -F '"shell_ready":true' "$session_log" >/dev/null || fail "session shell service did not become ready"
 grep -F '"notification_ready":true' "$session_log" >/dev/null || fail "session notification service did not become ready"
 grep -F '"settings_ready":true' "$session_log" >/dev/null || fail "session settings service did not become ready"
@@ -280,9 +287,10 @@ cat > "$out_dir/manifest.json" <<EOF
     "staged_session_gui": true,
     "staged_session_launch_spawn": true,
     "staged_session_desktop_launch": true,
-    "staged_session_desktop_managed_window": true,
-    "staged_session_services": true,
-    "staged_compositor_smoke": true,
+	    "staged_session_desktop_managed_window": true,
+	    "staged_session_services": true,
+	    "staged_session_compositor_demo_app_id": $staged_session_compositor_demo_app_id,
+	    "staged_compositor_smoke": true,
     "staged_compositor_surface_lifecycle": true,
     "staged_compositor_popup_lifecycle": true,
     "staged_shell_verify": true,

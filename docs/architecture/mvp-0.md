@@ -17,11 +17,11 @@ MVP 0 is the development harness:
 - xdg-shell-style toplevel and popup lifecycle smoke for configure/ack/map, focus, maximize, fullscreen, and close.
 - Compositor-owned xdg-toplevel and popup smoke that maps configured surfaces into a headless backend frame.
 - Scripted compositor runtime smoke that maps app-like surfaces into managed policy windows, writes a compositor-runtime GUI preview frame, verifies targeted damage and idle no-redraw behavior, closes a surface, and disconnects the client in bounded service mode.
-- Compositor service socket smoke that binds the configured socket inside `XDG_RUNTIME_DIR`, accepts `backlit-demo-client`, maps its announced surface into window policy, and cleans the socket up on bounded exit.
+- Compositor service socket smoke that binds the configured socket inside `XDG_RUNTIME_DIR`, accepts `backlit-demo-client`, maps its announced surface and app id into window policy, and cleans the socket up on bounded exit.
 - Session interaction smoke for app switching and terminal launch resolution.
 - Session desktop-entry launch smoke that resolves a discovered app entry, spawns it with the session `WAYLAND_DISPLAY`, and maps it into managed focused window policy with app id preserved; package install checks use the installed Settings desktop entry.
 - Scripted session replay frames for focus, terminal launch, move, resize, snap, and workspace switching.
-- Session service orchestration smoke for launching the compositor service, connecting `backlit-demo-client` to its socket, and probing shell/settings daemons from `backlit-session`.
+- Session service orchestration smoke for launching the compositor service, connecting `backlit-demo-client` to its socket with app id preserved, and probing shell/settings daemons from `backlit-session`.
 - Session move/resize smoke through pure window policy.
 - Workspace switching smoke that hides non-active workspace windows from focus and pointer routing.
 - Window snap smoke for left/right work-area tiling.

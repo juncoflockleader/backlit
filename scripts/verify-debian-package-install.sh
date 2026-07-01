@@ -237,6 +237,7 @@ grep -F '"compositor_ready":true' "$session_log" >/dev/null || fail "session com
 grep -F '"compositor_demo_client_resolved":true' "$session_log" >/dev/null || fail "session demo client binary did not resolve from extracted debs"
 grep -F '"compositor_demo_client_connected":true' "$session_log" >/dev/null || fail "session demo client did not connect to extracted compositor"
 grep -F '"compositor_demo_surface_mapped":true' "$session_log" >/dev/null || fail "session demo client surface did not map from extracted debs"
+grep -F '"compositor_demo_app_id_preserved":true' "$session_log" >/dev/null || fail "session demo client app id was not preserved from extracted debs"
 grep -F '"compositor_service_socket_cleanup":true' "$session_log" >/dev/null || fail "session compositor socket did not clean up from extracted debs"
 grep -F '"shell_resolved":true' "$session_log" >/dev/null || fail "session shell binary did not resolve from extracted debs"
 grep -F '"shell_ready":true' "$session_log" >/dev/null || fail "session shell service did not become ready"
@@ -290,9 +291,10 @@ cat > "$manifest" <<EOF
     "session_exec_from_extracted_debs": true,
     "session_systemd_units_from_extracted_debs": true,
     "session_gui_from_extracted_debs": true,
-    "session_services_from_extracted_debs": true,
-    "session_compositor_demo_client_from_extracted_debs": true,
-    "session_desktop_launch_from_extracted_debs": true,
+	    "session_services_from_extracted_debs": true,
+	    "session_compositor_demo_client_from_extracted_debs": true,
+	    "session_compositor_demo_app_id_from_extracted_debs": true,
+	    "session_desktop_launch_from_extracted_debs": true,
     "session_desktop_managed_window_from_extracted_debs": true,
     "session_replay_from_extracted_debs": true,
     "session_clean_exit_from_extracted_debs": true,

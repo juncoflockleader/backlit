@@ -61,10 +61,11 @@ write_blocked_manifest() {
     "xdg_runtime_dir_private": true,
     "session_socket_bound": false,
     "socket_path_is_unix_socket": false,
-    "socket_accepts_client_connection": false,
-    "demo_client_socket_launch": false,
-    "demo_client_surface_mapped": false,
-    "bounded_service_exit": false,
+	    "socket_accepts_client_connection": false,
+	    "demo_client_socket_launch": false,
+	    "demo_client_surface_mapped": false,
+	    "demo_client_app_id_preserved": false,
+	    "bounded_service_exit": false,
     "session_socket_cleanup": false,
     "socket_permission_denied": true
   }
@@ -115,9 +116,10 @@ done
 test "$socket_seen" = true || fail "socket was not created at $socket_path"
 
 XDG_RUNTIME_DIR="$runtime_dir" target/debug/backlit-demo-client \
-  --connect-socket "$socket_name" \
-  --connect-title socket-demo \
-  --connect-only \
+	  --connect-socket "$socket_name" \
+	  --connect-title socket-demo \
+	  --connect-app-id org.backlit.SocketDemo \
+	  --connect-only \
   --width 640 \
   --height 480 > "$demo_client_log"
 
@@ -139,10 +141,12 @@ require_contains "$compositor_log" '"event":"compositor.service_running"'
 require_contains "$compositor_log" '"event":"compositor.socket_client"'
 require_contains "$compositor_log" '"message_valid":true'
 require_contains "$compositor_log" '"title":"socket-demo"'
+require_contains "$compositor_log" '"app_id":"org.backlit.SocketDemo"'
 require_contains "$compositor_log" '"width":640'
 require_contains "$compositor_log" '"height":480'
 require_contains "$compositor_log" '"backend_surface_presented":true'
 require_contains "$compositor_log" '"policy_window_mapped":true'
+require_contains "$compositor_log" '"policy_app_id_preserved":true'
 require_contains "$compositor_log" '"policy_windows":1'
 require_contains "$compositor_log" '"visible_windows":1'
 require_contains "$compositor_log" '"focused_window":true'
@@ -153,6 +157,7 @@ require_contains "$demo_client_log" '"event":"demo_client.socket_connected"'
 require_contains "$demo_client_log" "\"socket_name\":\"$socket_name\""
 require_contains "$demo_client_log" "\"socket_path\":\"$socket_path\""
 require_contains "$demo_client_log" '"title":"socket-demo"'
+require_contains "$demo_client_log" '"app_id":"org.backlit.SocketDemo"'
 require_contains "$demo_client_log" '"width":640'
 require_contains "$demo_client_log" '"height":480'
 require_contains "$demo_client_log" '"connected":true'
@@ -174,10 +179,11 @@ cat > "$out_dir/manifest.json" <<EOF
     "xdg_runtime_dir_private": true,
     "session_socket_bound": true,
     "socket_path_is_unix_socket": true,
-    "socket_accepts_client_connection": true,
-    "demo_client_socket_launch": true,
-    "demo_client_surface_mapped": true,
-    "bounded_service_exit": true,
+	    "socket_accepts_client_connection": true,
+	    "demo_client_socket_launch": true,
+	    "demo_client_surface_mapped": true,
+	    "demo_client_app_id_preserved": true,
+	    "bounded_service_exit": true,
     "session_socket_cleanup": true
   }
 }
