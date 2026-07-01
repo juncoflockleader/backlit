@@ -904,6 +904,9 @@ struct CompositorServiceVerification {
     socket_blocked_expected: bool,
 }
 
+const COMPOSITOR_SERVICE_SOCKET_WAIT_MS: u64 = 2_000;
+const COMPOSITOR_SERVICE_SERVE_FOR_MS: u64 = 650;
+
 impl CompositorServiceVerification {
     fn missing() -> Self {
         Self {
@@ -1109,13 +1112,17 @@ fn run_compositor_service_client_probe(
         .arg(socket_name)
         .arg("--serve")
         .arg("--serve-for-ms")
-        .arg("650")
+        .arg(COMPOSITOR_SERVICE_SERVE_FOR_MS.to_string())
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())
         .spawn()
         .map_err(|error| format!("failed to run {}: {error}", path.display()))?;
 
-    let socket_seen = wait_for_socket(socket_path, &mut child, Duration::from_millis(400))?;
+    let socket_seen = wait_for_socket(
+        socket_path,
+        &mut child,
+        Duration::from_millis(COMPOSITOR_SERVICE_SOCKET_WAIT_MS),
+    )?;
     if !socket_seen {
         let output = child
             .wait_with_output()
@@ -3479,7 +3486,8 @@ mod tests {
 
     use super::{
         binary_name, run_systemd_activation, systemd_launch_plan, verify_systemd_units,
-        CompositorServiceVerification, Config, ServiceProbe,
+        CompositorServiceVerification, Config, ServiceProbe, COMPOSITOR_SERVICE_SERVE_FOR_MS,
+        COMPOSITOR_SERVICE_SOCKET_WAIT_MS,
     };
 
     #[test]
@@ -3551,6 +3559,12 @@ mod tests {
     #[test]
     fn binary_name_uses_platform_suffix() {
         assert!(binary_name("backlit-compositor").starts_with("backlit-compositor"));
+    }
+
+    #[test]
+    fn compositor_service_socket_wait_covers_installed_startup() {
+        assert!(COMPOSITOR_SERVICE_SOCKET_WAIT_MS > COMPOSITOR_SERVICE_SERVE_FOR_MS);
+        assert!(COMPOSITOR_SERVICE_SOCKET_WAIT_MS >= 2_000);
     }
 
     #[test]
