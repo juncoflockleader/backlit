@@ -659,6 +659,8 @@ require_contains "$host_drm_session_smoke_manifest" '"session_compositor_smithay
 require_contains "$host_drm_session_smoke_manifest" '"session_compositor_smithay_protocol_globals": true'
 require_contains "$host_drm_session_smoke_manifest" '"session_compositor_smithay_input_sources": true'
 require_contains "$host_drm_session_smoke_manifest" '"session_compositor_smithay_input_event_loop": true'
+require_contains "$host_drm_session_smoke_manifest" '"session_compositor_smithay_input_seat_handles": true'
+require_contains "$host_drm_session_smoke_manifest" '"session_compositor_smithay_input_seat_dispatch": true'
 require_contains "$host_drm_session_smoke_manifest" '"session_compositor_demo_client": true'
 require_contains "$host_drm_session_smoke_manifest" '"session_compositor_demo_app_id_preserved": true'
 require_contains "$host_drm_session_smoke_manifest" '"session_desktop_launch": true'

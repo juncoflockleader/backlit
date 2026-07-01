@@ -894,6 +894,8 @@ struct CompositorServiceVerification {
     smithay_protocol_globals: bool,
     smithay_input_sources: bool,
     smithay_input_event_loop: bool,
+    smithay_input_seat_handles: bool,
+    smithay_input_seat_dispatch: bool,
     socket_bound: bool,
     demo_client_connected: bool,
     demo_surface_mapped: bool,
@@ -913,6 +915,8 @@ impl CompositorServiceVerification {
             smithay_protocol_globals: false,
             smithay_input_sources: false,
             smithay_input_event_loop: false,
+            smithay_input_seat_handles: false,
+            smithay_input_seat_dispatch: false,
             socket_bound: false,
             demo_client_connected: false,
             demo_surface_mapped: false,
@@ -923,8 +927,14 @@ impl CompositorServiceVerification {
     }
 
     fn passed(&self) -> bool {
-        let runtime_ready = self.socket_blocked_expected
-            || (self.runtime_backend_ok && self.smithay_protocol_globals);
+        let smithay_input_ready = self.compositor_runtime != "smithay"
+            || (self.smithay_protocol_globals
+                && self.smithay_input_sources
+                && self.smithay_input_event_loop
+                && self.smithay_input_seat_handles
+                && self.smithay_input_seat_dispatch);
+        let runtime_ready =
+            self.socket_blocked_expected || (self.runtime_backend_ok && smithay_input_ready);
 
         self.service.resolved
             && self.service.exit_ok
@@ -1182,6 +1192,20 @@ fn run_compositor_service_client_probe(
     } else {
         false
     };
+    let smithay_input_seat_handles = if compositor_runtime == "smithay" {
+        stdout.contains("\"input_seat_ready\":true")
+            && stdout.contains("\"input_keyboard_handle_ready\":true")
+            && stdout.contains("\"input_pointer_handle_ready\":true")
+    } else {
+        false
+    };
+    let smithay_input_seat_dispatch = if compositor_runtime == "smithay" {
+        stdout.contains("\"input_seat_dispatch_count\":")
+            && stdout.contains("\"input_keyboard_dispatch_count\":")
+            && stdout.contains("\"input_pointer_dispatch_count\":")
+    } else {
+        false
+    };
     let socket_bound = stdout.contains("\"event\":\"compositor.socket_bound\"");
     let demo_client_connected =
         demo_client.ready && stdout.contains("\"event\":\"compositor.socket_client\"");
@@ -1212,6 +1236,12 @@ fn run_compositor_service_client_probe(
         required_stdout.push(String::from("\"input_sources_ready\":true"));
         required_stdout.push(String::from("\"input_source_count\":2"));
         required_stdout.push(String::from("\"input_event_loop_dispatch_count\":"));
+        required_stdout.push(String::from("\"input_seat_ready\":true"));
+        required_stdout.push(String::from("\"input_keyboard_handle_ready\":true"));
+        required_stdout.push(String::from("\"input_pointer_handle_ready\":true"));
+        required_stdout.push(String::from("\"input_seat_dispatch_count\":"));
+        required_stdout.push(String::from("\"input_keyboard_dispatch_count\":"));
+        required_stdout.push(String::from("\"input_pointer_dispatch_count\":"));
     }
     let service = service_probe_from_output(output, elapsed_ms, &required_stdout);
 
@@ -1224,6 +1254,8 @@ fn run_compositor_service_client_probe(
         smithay_protocol_globals,
         smithay_input_sources,
         smithay_input_event_loop,
+        smithay_input_seat_handles,
+        smithay_input_seat_dispatch,
         socket_bound,
         demo_client_connected,
         demo_surface_mapped,
@@ -1515,6 +1547,14 @@ fn emit_service_verification(config: &Config, report: &ServiceVerification, elap
             (
                 "compositor_smithay_input_event_loop",
                 FieldValue::Bool(report.compositor.smithay_input_event_loop),
+            ),
+            (
+                "compositor_smithay_input_seat_handles",
+                FieldValue::Bool(report.compositor.smithay_input_seat_handles),
+            ),
+            (
+                "compositor_smithay_input_seat_dispatch",
+                FieldValue::Bool(report.compositor.smithay_input_seat_dispatch),
             ),
             (
                 "compositor_service_socket_bound",
@@ -3541,6 +3581,8 @@ mod tests {
             smithay_protocol_globals: true,
             smithay_input_sources: false,
             smithay_input_event_loop: false,
+            smithay_input_seat_handles: false,
+            smithay_input_seat_dispatch: false,
             socket_bound: true,
             demo_client_connected: true,
             demo_surface_mapped: true,
@@ -3559,6 +3601,8 @@ mod tests {
             smithay_protocol_globals: false,
             smithay_input_sources: false,
             smithay_input_event_loop: false,
+            smithay_input_seat_handles: false,
+            smithay_input_seat_dispatch: false,
             socket_bound: false,
             demo_client_connected: false,
             demo_surface_mapped: false,

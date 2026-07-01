@@ -269,6 +269,8 @@ require_contains scripts/verify-drm-session-smoke.sh '"session_compositor_smitha
 require_contains scripts/verify-drm-session-smoke.sh '"session_compositor_smithay_protocol_globals": $drm_session_smoke_ready'
 require_contains scripts/verify-drm-session-smoke.sh '"session_compositor_smithay_input_sources": $drm_session_smoke_ready'
 require_contains scripts/verify-drm-session-smoke.sh '"session_compositor_smithay_input_event_loop": $drm_session_smoke_ready'
+require_contains scripts/verify-drm-session-smoke.sh '"session_compositor_smithay_input_seat_handles": $drm_session_smoke_ready'
+require_contains scripts/verify-drm-session-smoke.sh '"session_compositor_smithay_input_seat_dispatch": $drm_session_smoke_ready'
 
 require_contains packaging/sessions/backlit.desktop 'Exec=backlit-session --backend=drm --activate-systemd'
 require_contains packaging/applications/org.backlit.Settings.desktop 'Exec=backlit-settings'
@@ -833,6 +835,8 @@ if [ -n "$artifact_root" ] && [ -d "$artifact_root" ]; then
     require_contains "$artifact_root/drm-session-smoke/manifest.json" '"session_compositor_smithay_protocol_globals": true'
     require_contains "$artifact_root/drm-session-smoke/manifest.json" '"session_compositor_smithay_input_sources": true'
     require_contains "$artifact_root/drm-session-smoke/manifest.json" '"session_compositor_smithay_input_event_loop": true'
+    require_contains "$artifact_root/drm-session-smoke/manifest.json" '"session_compositor_smithay_input_seat_handles": true'
+    require_contains "$artifact_root/drm-session-smoke/manifest.json" '"session_compositor_smithay_input_seat_dispatch": true'
     require_contains "$artifact_root/drm-session-smoke/manifest.json" '"session_compositor_demo_app_id_preserved": true'
     require_contains "$artifact_root/drm-session-smoke/manifest.json" '"session_desktop_launch": true'
     require_contains "$artifact_root/drm-session-smoke/manifest.json" '"session_desktop_managed_window": true'

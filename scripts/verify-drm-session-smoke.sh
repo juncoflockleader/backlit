@@ -286,6 +286,8 @@ if [ "$drm_expected_ready" = true ]; then
   grep '"compositor_smithay_protocol_globals":true' "$session_log" >/dev/null
   grep '"compositor_smithay_input_sources":true' "$session_log" >/dev/null
   grep '"compositor_smithay_input_event_loop":true' "$session_log" >/dev/null
+  grep '"compositor_smithay_input_seat_handles":true' "$session_log" >/dev/null
+  grep '"compositor_smithay_input_seat_dispatch":true' "$session_log" >/dev/null
   grep '"compositor_service_socket_bound":true' "$session_log" >/dev/null
   grep '"compositor_demo_client_resolved":true' "$session_log" >/dev/null
   grep '"compositor_demo_client_exit_ok":true' "$session_log" >/dev/null
@@ -361,6 +363,8 @@ cat > "$out_dir/manifest.json" <<EOF
     "session_compositor_smithay_protocol_globals": $drm_session_smoke_ready,
     "session_compositor_smithay_input_sources": $drm_session_smoke_ready,
     "session_compositor_smithay_input_event_loop": $drm_session_smoke_ready,
+    "session_compositor_smithay_input_seat_handles": $drm_session_smoke_ready,
+    "session_compositor_smithay_input_seat_dispatch": $drm_session_smoke_ready,
     "session_compositor_demo_client": $drm_session_smoke_ready,
     "session_compositor_demo_app_id_preserved": $drm_session_smoke_ready,
     "session_desktop_launch": $drm_session_smoke_ready,
