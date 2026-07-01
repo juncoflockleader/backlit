@@ -101,6 +101,31 @@ require_matches() {
   }
 }
 
+check_guest_writable() {
+  local probe_path="/tmp/backlit-linux-e2e-write-check-$$"
+  local probe_log="$tmp_dir/guest-writeability.log"
+
+  if "$prlctl_bin" exec "$vm_name" --user root sh -lc \
+    "mount | grep ' / ' || true; if touch '$probe_path'; then rm -f '$probe_path'; echo write_probe=ok; else echo write_probe=failed; exit 1; fi" \
+    > "$probe_log" 2>&1; then
+    return 0
+  fi
+
+  cat >&2 <<EOF
+Parallels Linux E2E cannot start because the Ubuntu guest is not writable.
+
+VM: $vm_name
+Probe output:
+EOF
+  cat "$probe_log" >&2
+  cat >&2 <<EOF
+
+Restart or repair the Ubuntu VM so its root filesystem mounts read-write, then rerun:
+  $0 $host_out_dir
+EOF
+  exit 2
+}
+
 tmp_dir="$(mktemp -d "${TMPDIR:-/tmp}/backlit-parallels-e2e.XXXXXX")"
 cleanup() {
   rm -rf "$tmp_dir"
@@ -124,6 +149,7 @@ uploaded_compositor_runtime_verifier="/tmp/backlit-verify-compositor-runtime.sh"
 uploaded_smithay_compositor_runtime_verifier="/tmp/backlit-verify-smithay-compositor-runtime.sh"
 uploaded_compositor_socket_verifier="/tmp/backlit-verify-compositor-socket.sh"
 uploaded_launch_performance_verifier="/tmp/backlit-verify-launch-performance.sh"
+uploaded_resource_budget_verifier="/tmp/backlit-verify-resource-budget.sh"
 uploaded_ci_contract_verifier="/tmp/backlit-verify-ci-contract.sh"
 uploaded_launch_readiness_verifier="/tmp/backlit-verify-launch-readiness.sh"
 uploaded_session_launch_verifier="/tmp/backlit-verify-session-launch.sh"
@@ -246,6 +272,7 @@ install -m 0755 -o "\$guest_user" -g "\$guest_user" "\$uploaded_compositor_runti
 install -m 0755 -o "\$guest_user" -g "\$guest_user" "\$uploaded_smithay_compositor_runtime_verifier" "\$repo_dir/scripts/verify-smithay-compositor-runtime.sh"
 install -m 0755 -o "\$guest_user" -g "\$guest_user" "\$uploaded_compositor_socket_verifier" "\$repo_dir/scripts/verify-compositor-socket.sh"
 install -m 0755 -o "\$guest_user" -g "\$guest_user" "\$uploaded_launch_performance_verifier" "\$repo_dir/scripts/verify-launch-performance.sh"
+install -m 0755 -o "\$guest_user" -g "\$guest_user" "\$uploaded_resource_budget_verifier" "\$repo_dir/scripts/verify-resource-budget.sh"
 install -m 0755 -o "\$guest_user" -g "\$guest_user" "\$uploaded_ci_contract_verifier" "\$repo_dir/scripts/verify-ci-contract.sh"
 install -m 0755 -o "\$guest_user" -g "\$guest_user" "\$uploaded_launch_readiness_verifier" "\$repo_dir/scripts/verify-launch-readiness.sh"
 install -m 0755 -o "\$guest_user" -g "\$guest_user" "\$uploaded_session_launch_verifier" "\$repo_dir/scripts/verify-session-launch.sh"
@@ -288,6 +315,7 @@ chmod 700 "$root_runner"
 
 printf 'Using Parallels VM: %s\n' "$vm_name"
 "$prlctl_bin" list --all | grep -F "$vm_name" >/dev/null
+check_guest_writable
 
 upload_script "$repo_root/scripts/verify-linux-e2e.sh" "/tmp/backlit-verify-linux-e2e.sh"
 upload_script "$repo_root/scripts/verify-gui-smoke.sh" "/tmp/backlit-verify-gui-smoke.sh"
@@ -296,6 +324,7 @@ upload_script "$repo_root/scripts/verify-compositor-runtime.sh" "/tmp/backlit-ve
 upload_script "$repo_root/scripts/verify-smithay-compositor-runtime.sh" "/tmp/backlit-verify-smithay-compositor-runtime.sh"
 upload_script "$repo_root/scripts/verify-compositor-socket.sh" "/tmp/backlit-verify-compositor-socket.sh"
 upload_script "$repo_root/scripts/verify-launch-performance.sh" "/tmp/backlit-verify-launch-performance.sh"
+upload_script "$repo_root/scripts/verify-resource-budget.sh" "/tmp/backlit-verify-resource-budget.sh"
 upload_script "$repo_root/scripts/verify-ci-contract.sh" "/tmp/backlit-verify-ci-contract.sh"
 upload_script "$repo_root/scripts/verify-launch-readiness.sh" "/tmp/backlit-verify-launch-readiness.sh"
 upload_script "$repo_root/scripts/verify-session-launch.sh" "/tmp/backlit-verify-session-launch.sh"
@@ -328,6 +357,7 @@ host_compositor_runtime_manifest="$host_out_dir/compositor-runtime-manifest.json
 host_smithay_compositor_runtime_manifest="$host_out_dir/smithay-compositor-runtime-manifest.json"
 host_compositor_socket_manifest="$host_out_dir/compositor-socket-manifest.json"
 host_smithay_runtime_probe_manifest="$host_out_dir/smithay-runtime-probe-manifest.json"
+host_resource_budget_manifest="$host_out_dir/resource-budget-manifest.json"
 host_launch_readiness_manifest="$host_out_dir/launch-readiness-manifest.json"
 host_session_launch_manifest="$host_out_dir/session-launch-manifest.json"
 host_session_replay_manifest="$host_out_dir/session-replay-manifest.json"
@@ -357,6 +387,7 @@ rm -f \
   "$host_smithay_compositor_runtime_manifest" \
   "$host_compositor_socket_manifest" \
   "$host_smithay_runtime_probe_manifest" \
+  "$host_resource_budget_manifest" \
   "$host_launch_readiness_manifest" \
   "$host_session_launch_manifest" \
   "$host_session_replay_manifest" \
@@ -385,6 +416,7 @@ download_file "$guest_e2e_dir/compositor-runtime/manifest.json" "$host_composito
 download_file "$guest_e2e_dir/smithay-compositor-runtime/manifest.json" "$host_smithay_compositor_runtime_manifest"
 download_file "$guest_e2e_dir/compositor-socket/manifest.json" "$host_compositor_socket_manifest"
 download_file "$guest_e2e_dir/smithay-runtime-probe/manifest.json" "$host_smithay_runtime_probe_manifest"
+download_file "$guest_e2e_dir/resource-budget/manifest.json" "$host_resource_budget_manifest"
 download_file "$guest_e2e_dir/launch-readiness/manifest.json" "$host_launch_readiness_manifest"
 download_file "$guest_e2e_dir/session-launch/manifest.json" "$host_session_launch_manifest"
 download_file "$guest_e2e_dir/session-replay/manifest.json" "$host_session_replay_manifest"
@@ -490,6 +522,7 @@ require_contains "$host_guest_manifest" '"drm_master_boundary": true'
 require_contains "$host_guest_manifest" '"drm_session_smoke": true'
 require_contains "$host_guest_manifest" '"dedicated_drm_session": true'
 require_contains "$host_guest_manifest" '"dedicated_drm_handoff": true'
+require_contains "$host_guest_manifest" '"resource_budget": true'
 require_contains "$host_guest_manifest" '"nested_wayland": true'
 require_contains "$host_guest_manifest" '"mvp1_contract": true'
 require_contains "$host_gui_smoke_manifest" '"golden_checksum": true'
@@ -629,6 +662,10 @@ require_contains "$host_smithay_runtime_probe_manifest" '"smithay_wayland_displa
 require_contains "$host_smithay_runtime_probe_manifest" '"smithay_wayland_socket_bootstrap": true'
 require_contains "$host_smithay_runtime_probe_manifest" '"smithay_wayland_client_inserted": true'
 require_contains "$host_smithay_runtime_probe_manifest" '"smithay_calloop_dispatch_bootstrap": true'
+require_contains "$host_resource_budget_manifest" '"name": "backlit-resource-budget"'
+require_contains "$host_resource_budget_manifest" '"resource_budget_checked": true'
+require_contains "$host_resource_budget_manifest" '"idle_cpu_budget": true'
+require_contains "$host_resource_budget_manifest" '"idle_rss_budget": true'
 require_contains "$host_session_replay_manifest" '"session_replay_event": true'
 require_contains "$host_session_replay_manifest" '"frame_count": 9'
 require_contains "$host_session_replay_manifest" '"launcher_overlay_frame": true'
@@ -742,6 +779,7 @@ require_contains "$host_mvp1_contract_manifest" '"drm_master_boundary_artifact":
 require_contains "$host_mvp1_contract_manifest" '"dedicated_drm_session_artifact": true'
 require_contains "$host_mvp1_contract_manifest" '"drm_session_smoke_ready_artifact": true'
 require_contains "$host_mvp1_contract_manifest" '"smithay_compositor_runtime_artifact": true'
+require_contains "$host_mvp1_contract_manifest" '"resource_budget_contract": true'
 require_contains "$host_mvp1_contract_manifest" '"debian_package_install_replay_artifact": true'
 require_contains "$host_mvp1_contract_manifest" '"debian_system_install_replay_artifact": true'
 
@@ -761,6 +799,7 @@ cat > "$host_out_dir/manifest.json" <<EOF
     "smithay_compositor_runtime_manifest": "$host_smithay_compositor_runtime_manifest",
     "compositor_socket_manifest": "$host_compositor_socket_manifest",
     "smithay_runtime_probe_manifest": "$host_smithay_runtime_probe_manifest",
+    "resource_budget_manifest": "$host_resource_budget_manifest",
     "launch_readiness_manifest": "$host_launch_readiness_manifest",
     "session_launch_manifest": "$host_session_launch_manifest",
     "session_replay_manifest": "$host_session_replay_manifest",
@@ -794,6 +833,7 @@ cat > "$host_out_dir/manifest.json" <<EOF
     "smithay_compositor_runtime": true,
     "compositor_socket": true,
     "smithay_runtime_probe": true,
+    "resource_budget": true,
     "launch_readiness": true,
     "drm_launch_plan": true,
     "drm_master_boundary": true,
