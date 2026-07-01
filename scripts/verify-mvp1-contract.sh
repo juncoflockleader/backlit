@@ -51,6 +51,7 @@ require_executable scripts/verify-smithay-runtime-probe.sh
 require_executable scripts/verify-smithay-compositor-runtime.sh
 require_executable scripts/verify-nested-wayland-smoke.sh
 require_executable scripts/verify-linux-e2e.sh
+require_executable scripts/verify-parallels-ubuntu-health.sh
 require_executable scripts/verify-parallels-dedicated-drm-e2e.sh
 require_executable scripts/verify-mvp-complete.sh
 
@@ -141,6 +142,12 @@ require_contains scripts/verify-parallels-linux-e2e.sh '"resource_budget": true'
 require_contains scripts/verify-parallels-linux-e2e.sh '"resource_budget_checked": true'
 require_contains scripts/verify-parallels-linux-e2e.sh '"idle_cpu_budget": true'
 require_contains scripts/verify-parallels-linux-e2e.sh '"idle_rss_budget": true'
+require_contains scripts/verify-parallels-ubuntu-health.sh '"name": "backlit-parallels-ubuntu-health"'
+require_contains scripts/verify-parallels-ubuntu-health.sh '"root_filesystem_writable": $(json_bool "$root_filesystem_writable")'
+require_contains scripts/verify-parallels-ubuntu-health.sh '"tmp_writable": $(json_bool "$tmp_writable")'
+require_contains scripts/verify-parallels-ubuntu-health.sh 'guest-root-read-only'
+require_contains scripts/verify-parallels-ubuntu-health.sh 'verify-parallels-linux-e2e.sh'
+require_contains scripts/verify-parallels-ubuntu-health.sh 'verify-parallels-dedicated-drm-e2e.sh'
 require_contains scripts/verify-mvp-complete.sh '"name": "backlit-mvp-complete"'
 require_contains scripts/verify-mvp-complete.sh '"source_tree_ready": $source_tree_ready'
 require_contains scripts/verify-mvp-complete.sh '"worktree_clean": $worktree_clean'
