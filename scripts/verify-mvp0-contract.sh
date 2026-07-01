@@ -136,6 +136,9 @@ require_contains scripts/verify-smithay-runtime-probe.sh '"smithay_wayland_clien
 require_contains scripts/verify-smithay-compositor-runtime.sh '--features smithay-backend'
 require_contains scripts/verify-smithay-compositor-runtime.sh '--runtime=smithay'
 require_contains scripts/verify-smithay-compositor-runtime.sh '"smithay_compositor_runtime": true'
+require_contains scripts/verify-smithay-compositor-runtime.sh '"smithay_service_socket": true'
+require_contains scripts/verify-smithay-compositor-runtime.sh '"smithay_service_socket_runtime_trait": true'
+require_contains scripts/verify-smithay-compositor-runtime.sh '"smithay_demo_client_socket_lifecycle": true'
 require_contains scripts/verify-compositor-socket.sh '"demo_client_socket_launch": true'
 require_contains scripts/verify-compositor-socket.sh '"demo_client_surface_mapped": true'
 require_contains scripts/verify-compositor-socket.sh '"demo_client_surface_damaged": true'
@@ -352,6 +355,9 @@ if [ -n "$artifact_root" ] && [ -d "$artifact_root" ]; then
       require_contains "$artifact_root/smithay-compositor-runtime/manifest.json" '"smithay_runtime_trait": true'
       require_contains "$artifact_root/smithay-compositor-runtime/manifest.json" '"smithay_scripted_client": true'
       require_contains "$artifact_root/smithay-compositor-runtime/manifest.json" '"smithay_service_ready": true'
+      require_contains "$artifact_root/smithay-compositor-runtime/manifest.json" '"smithay_service_socket": true'
+      require_contains "$artifact_root/smithay-compositor-runtime/manifest.json" '"smithay_service_socket_runtime_trait": true'
+      require_contains "$artifact_root/smithay-compositor-runtime/manifest.json" '"smithay_demo_client_socket_lifecycle": true'
     else
       require_contains "$artifact_root/smithay-compositor-runtime/manifest.json" '"expected_blocked": true'
     fi

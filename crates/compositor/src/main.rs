@@ -254,8 +254,6 @@ fn run() -> Result<(), String> {
                 None
             }
         };
-        let mut socket_client_runtime = SocketClientRuntime::new();
-
         emit(
             "compositor.service_running",
             &config,
@@ -269,10 +267,9 @@ fn run() -> Result<(), String> {
         );
 
         if let Some(duration_ms) = config.serve_for_ms {
-            run_service_loop_for(
+            run_service_loop_for_config(
                 &config,
                 session_socket.as_ref(),
-                &mut socket_client_runtime,
                 Duration::from_millis(duration_ms),
             )?;
             if let Some(mut socket) = session_socket.take() {
@@ -289,10 +286,7 @@ fn run() -> Result<(), String> {
                 ],
             );
         } else {
-            loop {
-                poll_socket_clients(&config, session_socket.as_ref(), &mut socket_client_runtime)?;
-                thread::sleep(Duration::from_millis(10));
-            }
+            run_unbounded_service_loop_for_config(&config, session_socket.as_ref())?;
         }
     }
 
@@ -456,6 +450,10 @@ impl<B: CompositorRuntime> SocketClientRuntime<B> {
             manager: SurfaceManager::new(OutputLayout::new(1400, 900, 42)),
             clients: Vec::new(),
         }
+    }
+
+    fn runtime_backend(&self) -> &'static str {
+        self.backend.runtime_name()
     }
 
     fn handle_stream(&mut self, message: &str) -> Vec<SocketClientReport> {
@@ -1066,6 +1064,86 @@ impl DemoSocketCommand {
     }
 }
 
+fn run_service_loop_for_config(
+    config: &RunConfig,
+    socket: Option<&BoundSessionSocket>,
+    duration: Duration,
+) -> Result<(), String> {
+    match config.runtime {
+        RuntimeKind::Headless => {
+            let mut runtime = SocketClientRuntime::new();
+            run_service_loop_for(config, socket, &mut runtime, duration)
+        }
+        RuntimeKind::Smithay => run_service_loop_with_smithay(config, socket, duration),
+    }
+}
+
+#[cfg(all(feature = "smithay-backend", target_os = "linux"))]
+fn run_service_loop_with_smithay(
+    config: &RunConfig,
+    socket: Option<&BoundSessionSocket>,
+    duration: Duration,
+) -> Result<(), String> {
+    let backend = SmithayCompositorRuntime::try_new().map_err(|error| error.to_string())?;
+    let mut runtime = SocketClientRuntime::with_backend(backend);
+    run_service_loop_for(config, socket, &mut runtime, duration)
+}
+
+#[cfg(not(all(feature = "smithay-backend", target_os = "linux")))]
+fn run_service_loop_with_smithay(
+    _config: &RunConfig,
+    _socket: Option<&BoundSessionSocket>,
+    _duration: Duration,
+) -> Result<(), String> {
+    Err(String::from(
+        "smithay runtime requires Linux and the smithay-backend feature",
+    ))
+}
+
+fn run_unbounded_service_loop_for_config(
+    config: &RunConfig,
+    socket: Option<&BoundSessionSocket>,
+) -> Result<(), String> {
+    match config.runtime {
+        RuntimeKind::Headless => {
+            let mut runtime = SocketClientRuntime::new();
+            run_unbounded_service_loop_for(config, socket, &mut runtime)
+        }
+        RuntimeKind::Smithay => run_unbounded_service_loop_with_smithay(config, socket),
+    }
+}
+
+#[cfg(all(feature = "smithay-backend", target_os = "linux"))]
+fn run_unbounded_service_loop_with_smithay(
+    config: &RunConfig,
+    socket: Option<&BoundSessionSocket>,
+) -> Result<(), String> {
+    let backend = SmithayCompositorRuntime::try_new().map_err(|error| error.to_string())?;
+    let mut runtime = SocketClientRuntime::with_backend(backend);
+    run_unbounded_service_loop_for(config, socket, &mut runtime)
+}
+
+#[cfg(not(all(feature = "smithay-backend", target_os = "linux")))]
+fn run_unbounded_service_loop_with_smithay(
+    _config: &RunConfig,
+    _socket: Option<&BoundSessionSocket>,
+) -> Result<(), String> {
+    Err(String::from(
+        "smithay runtime requires Linux and the smithay-backend feature",
+    ))
+}
+
+fn run_unbounded_service_loop_for<B: CompositorRuntime>(
+    config: &RunConfig,
+    socket: Option<&BoundSessionSocket>,
+    runtime: &mut SocketClientRuntime<B>,
+) -> Result<(), String> {
+    loop {
+        poll_socket_clients(config, socket, runtime)?;
+        thread::sleep(Duration::from_millis(10));
+    }
+}
+
 fn run_service_loop_for<B: CompositorRuntime>(
     config: &RunConfig,
     socket: Option<&BoundSessionSocket>,
@@ -1095,9 +1173,10 @@ fn poll_socket_clients<B: CompositorRuntime>(
         return Ok(());
     };
 
+    let runtime_backend = runtime.runtime_backend();
     for message in socket.accept_messages()? {
         for report in runtime.handle_stream(message.as_str()) {
-            emit_socket_client(config, &report);
+            emit_socket_client(config, runtime_backend, &report);
         }
     }
 
@@ -2076,11 +2155,12 @@ fn emit_socket_unbound(config: &RunConfig, path: &str, removed: bool) {
     );
 }
 
-fn emit_socket_client(config: &RunConfig, report: &SocketClientReport) {
+fn emit_socket_client(config: &RunConfig, runtime_backend: &str, report: &SocketClientReport) {
     emit(
         "compositor.socket_client",
         config,
         &[
+            ("runtime_backend", FieldValue::Str(runtime_backend)),
             ("message_valid", FieldValue::Bool(report.message_valid)),
             ("action", FieldValue::Str(report.action.as_str())),
             ("title", FieldValue::Str(report.title.as_str())),
