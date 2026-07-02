@@ -35,6 +35,7 @@ require_matches() {
 }
 
 require_file docs/architecture/mvp-1.md
+require_file docs/architecture/real-shm-client-pixels.md
 require_file docs/runbooks/parallels-ubuntu-readonly.md
 require_executable scripts/verify-launch-readiness.sh
 require_executable scripts/verify-session-launch.sh
@@ -50,6 +51,7 @@ require_executable scripts/verify-launch-performance.sh
 require_executable scripts/verify-resource-budget.sh
 require_executable scripts/verify-smithay-runtime-probe.sh
 require_executable scripts/verify-smithay-compositor-runtime.sh
+require_executable scripts/verify-smithay-real-shm-frame.sh
 require_executable scripts/verify-nested-wayland-smoke.sh
 require_executable scripts/verify-linux-e2e.sh
 require_executable scripts/verify-parallels-ubuntu-health.sh
@@ -70,6 +72,9 @@ require_contains docs/architecture/mvp-1.md 'verify-mvp-complete.sh'
 require_contains docs/architecture/mvp-1.md 'does not claim the real DRM compositor loop is complete'
 require_contains docs/architecture/mvp-1.md 'parallels-ubuntu-health/manifest.json'
 require_contains docs/architecture/mvp-1.md 'docs/runbooks/parallels-ubuntu-readonly.md'
+require_contains docs/architecture/real-shm-client-pixels.md 'real `wl_shm` pixels in a Backlit-rendered frame'
+require_contains docs/architecture/real-shm-client-pixels.md 'not full GPU texture compositing'
+require_contains docs/architecture/real-shm-client-pixels.md 'scripts/verify-smithay-real-shm-frame.sh'
 require_contains docs/runbooks/parallels-ubuntu-readonly.md 'guest-root-read-only'
 require_contains docs/runbooks/parallels-ubuntu-readonly.md 'Do not run `fsck` against a'
 require_contains docs/runbooks/parallels-ubuntu-readonly.md 'mounted root filesystem'
@@ -246,6 +251,14 @@ require_contains scripts/verify-smithay-runtime-probe.sh '"smithay_wayland_clien
 require_contains scripts/verify-smithay-runtime-probe.sh '"smithay_libinput_pointer_event_count": $smithay_libinput_pointer_event_count'
 require_contains scripts/verify-linux-e2e.sh './scripts/verify-smithay-runtime-probe.sh'
 require_contains scripts/verify-linux-e2e.sh './scripts/verify-smithay-compositor-runtime.sh'
+require_contains scripts/verify-linux-e2e.sh './scripts/verify-smithay-real-shm-frame.sh'
+require_contains scripts/verify-smithay-real-shm-frame.sh '--smithay-real-shm-frame'
+require_contains scripts/verify-smithay-real-shm-frame.sh '"real_shm_pixels_captured": true'
+require_contains scripts/verify-smithay-real-shm-frame.sh '"real_shm_pixels_composited": true'
+require_contains scripts/verify-smithay-real-shm-frame.sh '"real_client_pixel_samples_verified": true'
+require_contains crates/compositor/src/main.rs '"compositor.smithay_real_shm_frame"'
+require_contains crates/compositor/src/main.rs 'smithay_real_shm_frame_output'
+require_contains crates/compositor-backend/src/lib.rs 'run_real_shm_frame_capture'
 require_contains scripts/verify-linux-e2e.sh './scripts/verify-drm-master-boundary.sh'
 require_contains scripts/verify-smithay-compositor-runtime.sh '--features smithay-backend'
 require_contains scripts/verify-smithay-compositor-runtime.sh '--runtime=smithay'
@@ -288,6 +301,7 @@ nested_wayland_artifact=false
 compositor_socket_artifact=false
 smithay_runtime_probe_artifact=false
 smithay_compositor_runtime_artifact=false
+smithay_real_shm_frame_artifact=false
 
 if [ -n "$artifact_root" ] && [ -d "$artifact_root" ]; then
   artifact_manifests_checked=true
@@ -304,6 +318,7 @@ if [ -n "$artifact_root" ] && [ -d "$artifact_root" ]; then
   require_file "$artifact_root/compositor-socket/manifest.json"
   require_file "$artifact_root/smithay-runtime-probe/manifest.json"
   require_file "$artifact_root/smithay-compositor-runtime/manifest.json"
+  require_file "$artifact_root/smithay-real-shm-frame/manifest.json"
   require_file "$artifact_root/launcher-desktop-discovery/manifest.json"
   require_file "$artifact_root/debian-package-install/manifest.json"
   require_file "$artifact_root/debian-system-install/manifest.json"
@@ -521,6 +536,32 @@ if [ -n "$artifact_root" ] && [ -d "$artifact_root" ]; then
     fi
   else
     require_contains "$artifact_root/smithay-compositor-runtime/manifest.json" '"expected_blocked": true'
+  fi
+  require_contains "$artifact_root/smithay-real-shm-frame/manifest.json" '"name": "backlit-smithay-real-shm-frame"'
+  require_contains "$artifact_root/smithay-real-shm-frame/manifest.json" '"smithay_real_shm_frame":'
+  require_contains "$artifact_root/smithay-real-shm-frame/manifest.json" '"real_wayland_client":'
+  require_contains "$artifact_root/smithay-real-shm-frame/manifest.json" '"real_wayland_metadata":'
+  require_contains "$artifact_root/smithay-real-shm-frame/manifest.json" '"real_shm_pixels_captured":'
+  require_contains "$artifact_root/smithay-real-shm-frame/manifest.json" '"real_shm_pixels_composited":'
+  require_contains "$artifact_root/smithay-real-shm-frame/manifest.json" '"real_client_pixel_samples_verified":'
+  require_contains "$artifact_root/smithay-real-shm-frame/manifest.json" '"policy_window_from_real_surface":'
+  require_contains "$artifact_root/smithay-real-shm-frame/manifest.json" '"frame_ppm_written":'
+  if grep '"checked": true' "$artifact_root/smithay-real-shm-frame/manifest.json" >/dev/null; then
+    if grep '"drm_launch_ready": true' "$artifact_root/smithay-real-shm-frame/manifest.json" >/dev/null; then
+      require_contains "$artifact_root/smithay-real-shm-frame/manifest.json" '"smithay_real_shm_frame": true'
+      require_contains "$artifact_root/smithay-real-shm-frame/manifest.json" '"real_wayland_client": true'
+      require_contains "$artifact_root/smithay-real-shm-frame/manifest.json" '"real_wayland_metadata": true'
+      require_contains "$artifact_root/smithay-real-shm-frame/manifest.json" '"real_shm_pixels_captured": true'
+      require_contains "$artifact_root/smithay-real-shm-frame/manifest.json" '"real_shm_pixels_composited": true'
+      require_contains "$artifact_root/smithay-real-shm-frame/manifest.json" '"real_client_pixel_samples_verified": true'
+      require_contains "$artifact_root/smithay-real-shm-frame/manifest.json" '"policy_window_from_real_surface": true'
+      require_contains "$artifact_root/smithay-real-shm-frame/manifest.json" '"frame_ppm_written": true'
+      smithay_real_shm_frame_artifact=true
+    else
+      require_contains "$artifact_root/smithay-real-shm-frame/manifest.json" '"expected_blocked": true'
+    fi
+  else
+    require_contains "$artifact_root/smithay-real-shm-frame/manifest.json" '"expected_blocked": true'
   fi
   require_contains "$artifact_root/smithay-runtime-probe/manifest.json" '"name": "backlit-smithay-runtime-probe"'
   require_contains "$artifact_root/smithay-runtime-probe/manifest.json" '"smithay_runtime_probe":'
@@ -752,9 +793,11 @@ cat > "$manifest" <<EOF
   "artifact_manifests_checked": $artifact_manifests_checked,
   "artifacts": {
     "architecture": "docs/architecture/mvp-1.md",
+    "real_shm_client_pixels_plan": "docs/architecture/real-shm-client-pixels.md",
     "launch_readiness_verifier": "scripts/verify-launch-readiness.sh",
     "session_launch_verifier": "scripts/verify-session-launch.sh",
     "drm_session_smoke_verifier": "scripts/verify-drm-session-smoke.sh",
+    "smithay_real_shm_frame_verifier": "scripts/verify-smithay-real-shm-frame.sh",
     "dedicated_drm_session_verifier": "scripts/verify-dedicated-drm-session.sh",
     "linux_e2e_verifier": "scripts/verify-linux-e2e.sh"
   },
@@ -776,6 +819,8 @@ cat > "$manifest" <<EOF
     "smithay_runtime_probe_artifact": $smithay_runtime_probe_artifact,
     "smithay_compositor_runtime_contract": true,
     "smithay_compositor_runtime_artifact": $smithay_compositor_runtime_artifact,
+    "smithay_real_shm_frame_contract": true,
+    "smithay_real_shm_frame_artifact": $smithay_real_shm_frame_artifact,
     "compositor_socket_contract": true,
     "compositor_socket_artifact": $compositor_socket_artifact,
     "drm_launch_ready_artifact": $drm_launch_ready_artifact,

@@ -18,7 +18,9 @@ dedicated_dpkg_install_log="$dedicated_e2e_dir/system-dpkg-install.log"
 dedicated_dpkg_purge_log="$dedicated_e2e_dir/system-dpkg-purge.log"
 launch_performance_manifest="$parallels_e2e_dir/launch-performance-manifest.json"
 resource_budget_manifest="$parallels_e2e_dir/resource-budget-manifest.json"
+real_shm_frame_manifest="$parallels_e2e_dir/smithay-real-shm-frame-manifest.json"
 parallels_preview="$parallels_e2e_dir/gui-preview-backlit-session.png"
+real_shm_frame_preview="$parallels_e2e_dir/smithay-real-shm-frame.png"
 dedicated_preview="$dedicated_e2e_dir/dedicated-session.png"
 mkdir -p "$out_dir"
 
@@ -41,6 +43,7 @@ mvp1_acceptance=false
 launch_performance_evidence=false
 resource_budget_evidence=false
 parallels_health_evidence=false
+real_shm_frame_evidence=false
 
 write_manifest() {
   passed="$1"
@@ -63,7 +66,9 @@ write_manifest() {
     "parallels_linux_health_manifest": "$parallels_health_manifest",
     "parallels_launch_performance_manifest": "$launch_performance_manifest",
     "parallels_resource_budget_manifest": "$resource_budget_manifest",
+    "parallels_real_shm_frame_manifest": "$real_shm_frame_manifest",
     "parallels_linux_gui_preview": "$parallels_preview",
+    "parallels_real_shm_frame_preview": "$real_shm_frame_preview",
     "parallels_dedicated_drm_manifest": "$dedicated_manifest",
     "parallels_dedicated_health_manifest": "$dedicated_health_manifest",
     "parallels_dedicated_drm_session_manifest": "$dedicated_session_manifest",
@@ -84,7 +89,8 @@ write_manifest() {
     "mvp1_acceptance": $mvp1_acceptance,
     "launch_performance_evidence": $launch_performance_evidence,
     "resource_budget_evidence": $resource_budget_evidence,
-    "parallels_health_evidence": $parallels_health_evidence
+    "parallels_health_evidence": $parallels_health_evidence,
+    "real_shm_frame_evidence": $real_shm_frame_evidence
   }
 }
 EOF
@@ -128,6 +134,7 @@ require_contains() {
 
 require_file backlit-design.md missing-design
 require_file docs/architecture/mvp-1.md missing-mvp1-doc
+require_file docs/architecture/real-shm-client-pixels.md missing-real-shm-plan
 require_file scripts/verify-linux-e2e.sh missing-linux-e2e
 require_file scripts/verify-parallels-linux-e2e.sh missing-parallels-linux-e2e
 require_file scripts/verify-parallels-dedicated-drm-e2e.sh missing-parallels-dedicated-drm-e2e
@@ -142,6 +149,8 @@ require_contains backlit-design.md 'Move/resize windows smoothly.' design-scope
 require_contains backlit-design.md 'Idle CPU and memory hit MVP budget.' design-scope
 require_contains docs/architecture/mvp-1.md 'MVP 1 is the bare graphical session' design-scope
 require_contains docs/architecture/mvp-1.md 'scripts/verify-parallels-dedicated-drm-e2e.sh' design-scope
+require_contains docs/architecture/real-shm-client-pixels.md 'real `wl_shm` pixels in a Backlit-rendered frame' design-scope
+require_contains docs/architecture/real-shm-client-pixels.md 'not full GPU texture compositing' design-scope
 design_scope=true
 
 if [ -n "$(git status --porcelain)" ]; then
@@ -175,6 +184,7 @@ require_file "$parallels_manifest" missing-parallels-linux-e2e-manifest
 require_file "$dedicated_manifest" missing-parallels-dedicated-drm-manifest
 require_file "$launch_performance_manifest" missing-parallels-launch-performance-manifest
 require_file "$resource_budget_manifest" missing-parallels-resource-budget-manifest
+require_file "$real_shm_frame_manifest" missing-parallels-real-shm-frame-manifest
 require_file "$dedicated_session_manifest" missing-parallels-dedicated-session-manifest
 require_file "$package_build_manifest" missing-parallels-dedicated-package-build-manifest
 require_file "$dedicated_dpkg_install_log" missing-parallels-dedicated-dpkg-install-log
@@ -187,6 +197,8 @@ require_contains "$parallels_manifest" '"actual_system_dpkg_install": true' para
 require_contains "$parallels_manifest" '"debian_system_install_replay": true' parallels-linux-e2e
 require_contains "$parallels_manifest" '"nested_wayland": true' parallels-linux-e2e
 require_contains "$parallels_manifest" '"drm_session_smoke": true' parallels-linux-e2e
+require_contains "$parallels_manifest" '"smithay_real_shm_frame": true' parallels-linux-e2e
+require_contains "$parallels_manifest" '"real_shm_frame_pixels": true' parallels-linux-e2e
 require_contains "$parallels_manifest" '"mvp1_contract": true' parallels-linux-e2e
 require_contains "$parallels_manifest" '"gui_smoke_session_desktop_managed_window": true' semantic-gui-evidence
 require_contains "$parallels_manifest" '"gui_smoke_demo_client_app_id": true' semantic-gui-evidence
@@ -208,10 +220,20 @@ require_contains "$launch_performance_manifest" '"shell_ready_budget": true' lau
 require_contains "$resource_budget_manifest" '"resource_budget_checked": true' resource-budget-evidence
 require_contains "$resource_budget_manifest" '"idle_cpu_budget": true' resource-budget-evidence
 require_contains "$resource_budget_manifest" '"idle_rss_budget": true' resource-budget-evidence
+require_contains "$real_shm_frame_manifest" '"smithay_real_shm_frame": true' real-shm-frame-evidence
+require_contains "$real_shm_frame_manifest" '"real_wayland_client": true' real-shm-frame-evidence
+require_contains "$real_shm_frame_manifest" '"real_wayland_metadata": true' real-shm-frame-evidence
+require_contains "$real_shm_frame_manifest" '"real_shm_pixels_captured": true' real-shm-frame-evidence
+require_contains "$real_shm_frame_manifest" '"real_shm_pixels_composited": true' real-shm-frame-evidence
+require_contains "$real_shm_frame_manifest" '"real_client_pixel_samples_verified": true' real-shm-frame-evidence
+require_contains "$real_shm_frame_manifest" '"policy_window_from_real_surface": true' real-shm-frame-evidence
+require_contains "$real_shm_frame_manifest" '"frame_ppm_written": true' real-shm-frame-evidence
 require_png_file "$parallels_preview" missing-parallels-linux-preview
+require_png_file "$real_shm_frame_preview" missing-real-shm-frame-preview
 normal_parallels_e2e=true
 launch_performance_evidence=true
 resource_budget_evidence=true
+real_shm_frame_evidence=true
 
 require_contains "$dedicated_manifest" '"passed": true' package-installed-dedicated-drm
 require_contains "$dedicated_manifest" "\"guest_commit\": \"$commit\"" current-commit-evidence

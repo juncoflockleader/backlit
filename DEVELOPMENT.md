@@ -138,7 +138,7 @@ The Linux-side verifier can also be run directly inside any Ubuntu checkout:
 ./scripts/verify-linux-e2e.sh
 ```
 
-It runs `cargo fmt`, workspace tests, `cargo clippy`, the deterministic GUI smoke verifier, the preview renderer, compositor-runtime verifier, compositor-socket verifier, Smithay compositor runtime verifier, launch-performance verifier, launcher desktop discovery verifier, resource-budget verifier, notification-daemon verifier, settings-daemon verifier, service-lifecycle verifier, settings-app verifier, portal-security verifier, crash-log verifier, CI contract verifier, packaging contract verifier, package-manifest verifier, Debian package-build verifier, Debian package-install verifier, Debian system-install verifier, staged session install verifier, systemd activation verifier, Smithay runtime probe, DRM-master boundary verifier, launch-readiness verifier, session launch verifier, session clean-exit verifier, nested Wayland smoke verifier, MVP 1 contract verifier, and MVP 0 contract verifier, then writes `target/linux-e2e/manifest.json`.
+It runs `cargo fmt`, workspace tests, `cargo clippy`, the deterministic GUI smoke verifier, the preview renderer, compositor-runtime verifier, compositor-socket verifier, Smithay compositor runtime verifier, real SHM client-pixel frame verifier, launch-performance verifier, launcher desktop discovery verifier, resource-budget verifier, notification-daemon verifier, settings-daemon verifier, service-lifecycle verifier, settings-app verifier, portal-security verifier, crash-log verifier, CI contract verifier, packaging contract verifier, package-manifest verifier, Debian package-build verifier, Debian package-install verifier, Debian system-install verifier, staged session install verifier, systemd activation verifier, Smithay runtime probe, DRM-master boundary verifier, launch-readiness verifier, session launch verifier, session clean-exit verifier, nested Wayland smoke verifier, MVP 1 contract verifier, and MVP 0 contract verifier, then writes `target/linux-e2e/manifest.json`.
 
 ## GUI Linux VM Workflow
 
@@ -220,6 +220,7 @@ cargo run -p backlit-session -- --backend=headless --screenshot target/backlit-s
 ./scripts/verify-crash-logs.sh
 ./scripts/verify-smithay-runtime-probe.sh
 ./scripts/verify-smithay-compositor-runtime.sh
+./scripts/verify-smithay-real-shm-frame.sh
 ./scripts/verify-launch-readiness.sh
 ./scripts/verify-session-launch.sh
 ./scripts/verify-session-replay.sh
@@ -244,8 +245,18 @@ Current compositor flags:
 
 ```text
 --backend=headless|wayland|drm
+--runtime=headless|smithay
 --socket=<name>
 --smoke-test
+--scripted-client
+--scripted-client-preview=<path>
+--smithay-client-smoke
+--smithay-real-shm-frame
+--smithay-real-shm-frame-output=<path>
+--drm-first-present-probe
+--serve
+--serve-for-ms=<ms>
+--idle-probe-ms=<ms>
 --help
 ```
 

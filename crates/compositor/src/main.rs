@@ -12,15 +12,19 @@ use std::time::Duration;
 use std::time::Instant;
 
 use backlit_common::metrics::{event_json, FieldValue};
-#[cfg(all(feature = "smithay-backend", target_os = "linux"))]
-use backlit_compositor_backend::SmithayCompositorRuntime;
 use backlit_compositor_backend::{
     backend_launch_plan, parse_args, preflight_backend_with_environment, smithay_runtime_probe,
     BackendKind, BackendLaunchPlan, BackendPreflightEnvironment, BackendPreflightReport, ClientId,
     CompositorRuntime, HeadlessCompositor, InputEventCounters, RunConfig, RuntimeKind,
     SmithayRuntimeProbe, SurfaceId as BackendSurfaceId, SurfaceOptions,
 };
+#[cfg(all(feature = "smithay-backend", target_os = "linux"))]
+use backlit_compositor_backend::{
+    RealShmPixel, SmithayCompositorRuntime, SmithayRealShmFrameCapture,
+};
 use backlit_demo_client::{render_policy_gui, verify_policy_gui};
+#[cfg(all(feature = "smithay-backend", target_os = "linux"))]
+use backlit_demo_client::{Canvas, Color};
 use backlit_surface::{SurfaceManager, SurfacePhase, SurfaceRole};
 use backlit_window_policy::{OutputLayout, WindowPolicy, WindowState};
 
@@ -50,6 +54,10 @@ fn run() -> Result<(), String> {
             (
                 "smithay_client_smoke",
                 FieldValue::Bool(config.smithay_client_smoke),
+            ),
+            (
+                "smithay_real_shm_frame",
+                FieldValue::Bool(config.smithay_real_shm_frame),
             ),
             (
                 "drm_first_present_probe",
@@ -92,6 +100,7 @@ fn run() -> Result<(), String> {
 
         if !config.scripted_client
             && !config.smithay_client_smoke
+            && !config.smithay_real_shm_frame
             && !config.smoke_test
             && !config.serve
             && config.idle_probe_ms.is_none()
@@ -356,6 +365,132 @@ fn run() -> Result<(), String> {
 
         if !smoke.passed() {
             return Err(String::from("Smithay Wayland client protocol smoke failed"));
+        }
+
+        if !config.scripted_client
+            && !config.smithay_real_shm_frame
+            && !config.smoke_test
+            && !config.serve
+            && config.idle_probe_ms.is_none()
+        {
+            emit(
+                "compositor.exit",
+                &config,
+                &[(
+                    "elapsed_ms",
+                    FieldValue::U64(started.elapsed().as_millis() as u64),
+                )],
+            );
+            return Ok(());
+        }
+    }
+
+    if config.smithay_real_shm_frame {
+        let frame = run_smithay_real_shm_frame_for_config(&config)?;
+        emit(
+            "compositor.smithay_real_shm_frame",
+            &config,
+            &[
+                ("passed", FieldValue::Bool(frame.passed())),
+                ("runtime_backend", FieldValue::Str(frame.runtime_backend)),
+                (
+                    "real_wayland_client",
+                    FieldValue::Bool(frame.real_wayland_client),
+                ),
+                (
+                    "real_wayland_metadata",
+                    FieldValue::Bool(frame.real_wayland_metadata),
+                ),
+                (
+                    "real_shm_pixels_captured",
+                    FieldValue::Bool(frame.real_shm_pixels_captured),
+                ),
+                (
+                    "real_shm_pixels_composited",
+                    FieldValue::Bool(frame.real_shm_pixels_composited),
+                ),
+                (
+                    "real_client_pixel_samples_verified",
+                    FieldValue::Bool(frame.real_client_pixel_samples_verified),
+                ),
+                (
+                    "policy_window_from_real_surface",
+                    FieldValue::Bool(frame.policy_window_from_real_surface),
+                ),
+                (
+                    "policy_app_id_preserved",
+                    FieldValue::Bool(frame.policy_app_id_preserved),
+                ),
+                (
+                    "policy_geometry_preserved",
+                    FieldValue::Bool(frame.policy_geometry_preserved),
+                ),
+                (
+                    "frame_ppm_written",
+                    FieldValue::Bool(frame.frame_ppm_written),
+                ),
+                ("frame_width", FieldValue::U64(frame.frame_width)),
+                ("frame_height", FieldValue::U64(frame.frame_height)),
+                ("client_x", FieldValue::U64(frame.client_x)),
+                ("client_y", FieldValue::U64(frame.client_y)),
+                ("client_width", FieldValue::U64(frame.client_width)),
+                ("client_height", FieldValue::U64(frame.client_height)),
+                ("shm_stride", FieldValue::U64(frame.shm_stride)),
+                (
+                    "source_pixel_count",
+                    FieldValue::U64(frame.source_pixel_count),
+                ),
+                (
+                    "composited_pixels",
+                    FieldValue::U64(frame.composited_pixels),
+                ),
+                ("frame_ppm_bytes", FieldValue::U64(frame.frame_ppm_bytes)),
+                ("frame_checksum", FieldValue::U64(frame.frame_checksum)),
+                (
+                    "source_top_left_red",
+                    FieldValue::U64(frame.source_top_left_red),
+                ),
+                (
+                    "source_top_left_green",
+                    FieldValue::U64(frame.source_top_left_green),
+                ),
+                (
+                    "source_top_left_blue",
+                    FieldValue::U64(frame.source_top_left_blue),
+                ),
+                (
+                    "source_center_red",
+                    FieldValue::U64(frame.source_center_red),
+                ),
+                (
+                    "source_center_green",
+                    FieldValue::U64(frame.source_center_green),
+                ),
+                (
+                    "source_center_blue",
+                    FieldValue::U64(frame.source_center_blue),
+                ),
+                (
+                    "source_bottom_right_red",
+                    FieldValue::U64(frame.source_bottom_right_red),
+                ),
+                (
+                    "source_bottom_right_green",
+                    FieldValue::U64(frame.source_bottom_right_green),
+                ),
+                (
+                    "source_bottom_right_blue",
+                    FieldValue::U64(frame.source_bottom_right_blue),
+                ),
+                (
+                    "frame_ppm_path",
+                    FieldValue::Str(frame.frame_ppm_path.as_str()),
+                ),
+            ],
+        );
+
+        if !frame.passed() {
+            return Err(String::from("Smithay real SHM frame verification failed"));
         }
 
         if !config.scripted_client
@@ -1885,6 +2020,64 @@ impl SmithayClientSmoke {
     }
 }
 
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct RealShmFrameSmoke {
+    runtime_backend: &'static str,
+    real_wayland_client: bool,
+    real_wayland_metadata: bool,
+    real_shm_pixels_captured: bool,
+    real_shm_pixels_composited: bool,
+    real_client_pixel_samples_verified: bool,
+    policy_window_from_real_surface: bool,
+    policy_app_id_preserved: bool,
+    policy_geometry_preserved: bool,
+    frame_ppm_written: bool,
+    frame_width: u64,
+    frame_height: u64,
+    client_x: u64,
+    client_y: u64,
+    client_width: u64,
+    client_height: u64,
+    shm_stride: u64,
+    source_pixel_count: u64,
+    composited_pixels: u64,
+    frame_ppm_bytes: u64,
+    frame_checksum: u64,
+    source_top_left_red: u64,
+    source_top_left_green: u64,
+    source_top_left_blue: u64,
+    source_center_red: u64,
+    source_center_green: u64,
+    source_center_blue: u64,
+    source_bottom_right_red: u64,
+    source_bottom_right_green: u64,
+    source_bottom_right_blue: u64,
+    frame_ppm_path: String,
+}
+
+impl RealShmFrameSmoke {
+    fn passed(&self) -> bool {
+        self.runtime_backend == "smithay-compositor-runtime"
+            && self.real_wayland_client
+            && self.real_wayland_metadata
+            && self.real_shm_pixels_captured
+            && self.real_shm_pixels_composited
+            && self.real_client_pixel_samples_verified
+            && self.policy_window_from_real_surface
+            && self.policy_app_id_preserved
+            && self.policy_geometry_preserved
+            && self.frame_ppm_written
+            && self.frame_width >= 320
+            && self.frame_height >= 240
+            && self.client_width == 320
+            && self.client_height == 240
+            && self.source_pixel_count == 320 * 240
+            && self.composited_pixels == self.source_pixel_count
+            && self.frame_ppm_bytes > self.source_pixel_count
+            && self.frame_checksum > 0
+    }
+}
+
 #[cfg(all(feature = "smithay-backend", target_os = "linux"))]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 struct SmithayPolicySurfaceSmoke {
@@ -2032,10 +2225,173 @@ fn map_smithay_smoke_into_policy(
     }
 }
 
+#[cfg(all(feature = "smithay-backend", target_os = "linux"))]
+fn run_smithay_real_shm_frame_for_config(config: &RunConfig) -> Result<RealShmFrameSmoke, String> {
+    if config.runtime != RuntimeKind::Smithay {
+        return Err(String::from(
+            "Smithay real SHM frame requires --runtime=smithay",
+        ));
+    }
+
+    let mut runtime = SmithayCompositorRuntime::try_new().map_err(|error| error.to_string())?;
+    let runtime_backend = runtime.runtime_name();
+    let capture = runtime
+        .run_real_shm_frame_capture()
+        .map_err(|error| error.to_string())?;
+    compose_real_shm_capture(runtime_backend, &capture, config)
+}
+
+#[cfg(all(feature = "smithay-backend", target_os = "linux"))]
+fn compose_real_shm_capture(
+    runtime_backend: &'static str,
+    capture: &SmithayRealShmFrameCapture,
+    config: &RunConfig,
+) -> Result<RealShmFrameSmoke, String> {
+    let frame_width = 800u32;
+    let frame_height = 520u32;
+    let layout = OutputLayout::new(frame_width as i32, frame_height as i32, 42);
+    let mut manager = SurfaceManager::new(layout);
+    let surface = map_scripted_app_toplevel(
+        &mut manager,
+        capture.surface.title.as_str(),
+        capture.surface.app_id.as_str(),
+        capture.surface.width as i32,
+        capture.surface.height as i32,
+    )?;
+    let window_id = manager
+        .surface(surface)
+        .and_then(|surface| surface.window_id)
+        .ok_or_else(|| String::from("real-shm-frame:missing-policy-window"))?;
+    let window = manager
+        .policy()
+        .window(window_id)
+        .cloned()
+        .ok_or_else(|| String::from("real-shm-frame:missing-window-geometry"))?;
+    let mut frame = render_policy_gui(frame_width, frame_height, manager.policy(), layout);
+    let mut composited_pixels = 0u64;
+
+    for y in 0..capture.surface.height {
+        for x in 0..capture.surface.width {
+            let Some(pixel) = capture.surface.pixel(x, y) else {
+                continue;
+            };
+            let frame_x = window.geometry.x + x as i32;
+            let frame_y = window.geometry.y + y as i32;
+            if frame_x < 0 || frame_y < 0 {
+                continue;
+            }
+            if frame.set_pixel(frame_x as u32, frame_y as u32, real_shm_color(pixel)) {
+                composited_pixels += 1;
+            }
+        }
+    }
+
+    let source_sample_points = capture.surface.sample_coordinates;
+    let frame_top_left =
+        frame_real_shm_sample(&frame, window.geometry, source_sample_points.top_left);
+    let frame_center = frame_real_shm_sample(&frame, window.geometry, source_sample_points.center);
+    let frame_bottom_right =
+        frame_real_shm_sample(&frame, window.geometry, source_sample_points.bottom_right);
+    let real_client_pixel_samples_verified = capture.surface.samples_verified()
+        && frame_color_matches_real_pixel(frame_top_left, capture.surface.samples.top_left)
+        && frame_color_matches_real_pixel(frame_center, capture.surface.samples.center)
+        && frame_color_matches_real_pixel(frame_bottom_right, capture.surface.samples.bottom_right);
+
+    let output_path = config
+        .smithay_real_shm_frame_output
+        .as_deref()
+        .unwrap_or("target/smithay-real-shm-frame/backlit-real-shm-frame.ppm");
+    let frame_ppm_written = frame.write_ppm(output_path).is_ok();
+    let frame_ppm_bytes = if frame_ppm_written {
+        fs::metadata(output_path)
+            .map(|metadata| metadata.len())
+            .unwrap_or_default()
+    } else {
+        0
+    };
+
+    Ok(RealShmFrameSmoke {
+        runtime_backend,
+        real_wayland_client: capture.smoke.passed(),
+        real_wayland_metadata: capture.smoke.title_matched
+            && capture.smoke.app_id_matched
+            && capture.surface.title == capture.smoke.observed_title
+            && capture.surface.app_id == capture.smoke.observed_app_id,
+        real_shm_pixels_captured: capture.surface.width > 0
+            && capture.surface.height > 0
+            && capture.surface.pixels.len()
+                == capture.surface.width.saturating_mul(capture.surface.height) as usize
+            && capture.surface.stride >= capture.surface.width.saturating_mul(4)
+            && capture.surface.format == "ARGB8888",
+        real_shm_pixels_composited: composited_pixels
+            == capture.surface.width.saturating_mul(capture.surface.height) as u64,
+        real_client_pixel_samples_verified,
+        policy_window_from_real_surface: window.title == capture.surface.title
+            && manager.policy().focused() == Some(window.id),
+        policy_app_id_preserved: window.app_id.as_deref() == Some(capture.surface.app_id.as_str()),
+        policy_geometry_preserved: window.geometry.width == capture.surface.width as i32
+            && window.geometry.height == capture.surface.height as i32,
+        frame_ppm_written: frame_ppm_written && frame_ppm_bytes > 0,
+        frame_width: frame.width() as u64,
+        frame_height: frame.height() as u64,
+        client_x: window.geometry.x.max(0) as u64,
+        client_y: window.geometry.y.max(0) as u64,
+        client_width: capture.surface.width as u64,
+        client_height: capture.surface.height as u64,
+        shm_stride: capture.surface.stride as u64,
+        source_pixel_count: capture.surface.pixels.len() as u64,
+        composited_pixels,
+        frame_ppm_bytes,
+        frame_checksum: frame.checksum(),
+        source_top_left_red: capture.surface.samples.top_left.red as u64,
+        source_top_left_green: capture.surface.samples.top_left.green as u64,
+        source_top_left_blue: capture.surface.samples.top_left.blue as u64,
+        source_center_red: capture.surface.samples.center.red as u64,
+        source_center_green: capture.surface.samples.center.green as u64,
+        source_center_blue: capture.surface.samples.center.blue as u64,
+        source_bottom_right_red: capture.surface.samples.bottom_right.red as u64,
+        source_bottom_right_green: capture.surface.samples.bottom_right.green as u64,
+        source_bottom_right_blue: capture.surface.samples.bottom_right.blue as u64,
+        frame_ppm_path: output_path.to_string(),
+    })
+}
+
+#[cfg(all(feature = "smithay-backend", target_os = "linux"))]
+fn real_shm_color(pixel: RealShmPixel) -> Color {
+    Color::rgb(pixel.red, pixel.green, pixel.blue)
+}
+
+#[cfg(all(feature = "smithay-backend", target_os = "linux"))]
+fn frame_real_shm_sample(
+    frame: &Canvas,
+    geometry: backlit_window_policy::Rect,
+    sample: (u32, u32),
+) -> Option<Color> {
+    let x = geometry.x + sample.0 as i32;
+    let y = geometry.y + sample.1 as i32;
+    if x < 0 || y < 0 {
+        return None;
+    }
+
+    frame.pixel(x as u32, y as u32)
+}
+
+#[cfg(all(feature = "smithay-backend", target_os = "linux"))]
+fn frame_color_matches_real_pixel(frame_color: Option<Color>, pixel: RealShmPixel) -> bool {
+    frame_color == Some(real_shm_color(pixel))
+}
+
 #[cfg(not(all(feature = "smithay-backend", target_os = "linux")))]
 fn run_smithay_client_smoke_for_config(_config: &RunConfig) -> Result<SmithayClientSmoke, String> {
     Err(String::from(
         "Smithay Wayland client smoke requires Linux and the smithay-backend feature",
+    ))
+}
+
+#[cfg(not(all(feature = "smithay-backend", target_os = "linux")))]
+fn run_smithay_real_shm_frame_for_config(_config: &RunConfig) -> Result<RealShmFrameSmoke, String> {
+    Err(String::from(
+        "Smithay real SHM frame requires Linux and the smithay-backend feature",
     ))
 }
 
@@ -3415,7 +3771,7 @@ fn print_help() {
 backlit-compositor
 
 Usage:
-  backlit-compositor [--backend=headless|wayland|drm] [--runtime=headless|smithay] [--socket=backlit-0] [--smoke-test] [--scripted-client] [--smithay-client-smoke] [--drm-first-present-probe] [--scripted-client-preview=path] [--serve] [--serve-for-ms=1000] [--idle-probe-ms=1000]
+  backlit-compositor [--backend=headless|wayland|drm] [--runtime=headless|smithay] [--socket=backlit-0] [--smoke-test] [--scripted-client] [--smithay-client-smoke] [--smithay-real-shm-frame] [--drm-first-present-probe] [--scripted-client-preview=path] [--smithay-real-shm-frame-output=path] [--serve] [--serve-for-ms=1000] [--idle-probe-ms=1000]
 
 Flags:
   --backend      Select compositor backend. Defaults to headless.
@@ -3426,10 +3782,14 @@ Flags:
                  Run a deterministic app-client lifecycle through the compositor runtime.
   --smithay-client-smoke
                  Run a real Wayland registry/surface/xdg-toplevel protocol smoke through Smithay.
+  --smithay-real-shm-frame
+                 Render generated wl_shm client pixels into a Backlit policy frame and verify samples.
   --drm-first-present-probe
                  Probe Smithay DRM/KMS first-present framebuffer, plane state, and commit boundary.
   --scripted-client-preview
                  Write the scripted client policy preview frame to a PPM file.
+  --smithay-real-shm-frame-output
+                 Write the real SHM Backlit frame to a PPM file.
   --serve        Stay alive after readiness for systemd session service mode.
   --serve-for-ms Stay alive for a bounded service-lifecycle probe duration.
   --idle-probe-ms

@@ -3036,6 +3036,8 @@ pub struct RunConfig {
     pub scripted_client: bool,
     pub scripted_client_preview: Option<String>,
     pub smithay_client_smoke: bool,
+    pub smithay_real_shm_frame: bool,
+    pub smithay_real_shm_frame_output: Option<String>,
     pub drm_first_present_probe: bool,
     pub serve: bool,
     pub serve_for_ms: Option<u64>,
@@ -3053,6 +3055,8 @@ impl Default for RunConfig {
             scripted_client: false,
             scripted_client_preview: None,
             smithay_client_smoke: false,
+            smithay_real_shm_frame: false,
+            smithay_real_shm_frame_output: None,
             drm_first_present_probe: false,
             serve: false,
             serve_for_ms: None,
@@ -3100,6 +3104,17 @@ where
             config.scripted_client = true;
         } else if arg == "--smithay-client-smoke" {
             config.smithay_client_smoke = true;
+        } else if arg == "--smithay-real-shm-frame" {
+            config.smithay_real_shm_frame = true;
+        } else if let Some(value) = arg.strip_prefix("--smithay-real-shm-frame-output=") {
+            config.smithay_real_shm_frame = true;
+            config.smithay_real_shm_frame_output = Some(value.to_string());
+        } else if arg == "--smithay-real-shm-frame-output" {
+            config.smithay_real_shm_frame = true;
+            config.smithay_real_shm_frame_output = Some(
+                args.next()
+                    .ok_or(ArgError::MissingValue("--smithay-real-shm-frame-output"))?,
+            );
         } else if arg == "--drm-first-present-probe" {
             config.drm_first_present_probe = true;
         } else if let Some(value) = arg.strip_prefix("--scripted-client-preview=") {
@@ -3740,6 +3755,126 @@ const SMITHAY_RUNTIME_PROTOCOL_GLOBALS: u64 = 10;
 const SMITHAY_MVP_PROTOCOL_GLOBALS: u64 = 7;
 
 #[cfg(all(feature = "smithay-backend", target_os = "linux"))]
+const SMITHAY_REAL_SHM_TOP_LEFT_SAMPLE: (u32, u32) = (16, 16);
+
+#[cfg(all(feature = "smithay-backend", target_os = "linux"))]
+const SMITHAY_REAL_SHM_CENTER_SAMPLE: (u32, u32) = (
+    SMITHAY_SMOKE_WIDTH as u32 / 2,
+    SMITHAY_SMOKE_HEIGHT as u32 / 2,
+);
+
+#[cfg(all(feature = "smithay-backend", target_os = "linux"))]
+const SMITHAY_REAL_SHM_BOTTOM_RIGHT_SAMPLE: (u32, u32) = (
+    SMITHAY_SMOKE_WIDTH as u32 - 16,
+    SMITHAY_SMOKE_HEIGHT as u32 - 16,
+);
+
+#[cfg(all(feature = "smithay-backend", target_os = "linux"))]
+const SMITHAY_REAL_SHM_RED_SAMPLE: RealShmPixel = RealShmPixel::rgba(238, 38, 48, 255);
+
+#[cfg(all(feature = "smithay-backend", target_os = "linux"))]
+const SMITHAY_REAL_SHM_GREEN_SAMPLE: RealShmPixel = RealShmPixel::rgba(50, 187, 92, 255);
+
+#[cfg(all(feature = "smithay-backend", target_os = "linux"))]
+const SMITHAY_REAL_SHM_BLUE_SAMPLE: RealShmPixel = RealShmPixel::rgba(55, 116, 224, 255);
+
+#[cfg(all(feature = "smithay-backend", target_os = "linux"))]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct RealShmPixel {
+    pub red: u8,
+    pub green: u8,
+    pub blue: u8,
+    pub alpha: u8,
+}
+
+#[cfg(all(feature = "smithay-backend", target_os = "linux"))]
+impl RealShmPixel {
+    pub const fn rgba(red: u8, green: u8, blue: u8, alpha: u8) -> Self {
+        Self {
+            red,
+            green,
+            blue,
+            alpha,
+        }
+    }
+}
+
+#[cfg(all(feature = "smithay-backend", target_os = "linux"))]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct RealShmSampleCoordinates {
+    pub top_left: (u32, u32),
+    pub center: (u32, u32),
+    pub bottom_right: (u32, u32),
+}
+
+#[cfg(all(feature = "smithay-backend", target_os = "linux"))]
+impl RealShmSampleCoordinates {
+    pub const fn smoke_samples() -> Self {
+        Self {
+            top_left: SMITHAY_REAL_SHM_TOP_LEFT_SAMPLE,
+            center: SMITHAY_REAL_SHM_CENTER_SAMPLE,
+            bottom_right: SMITHAY_REAL_SHM_BOTTOM_RIGHT_SAMPLE,
+        }
+    }
+}
+
+#[cfg(all(feature = "smithay-backend", target_os = "linux"))]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct RealShmPixelSamples {
+    pub top_left: RealShmPixel,
+    pub center: RealShmPixel,
+    pub bottom_right: RealShmPixel,
+}
+
+#[cfg(all(feature = "smithay-backend", target_os = "linux"))]
+impl RealShmPixelSamples {
+    pub const fn expected_smoke_samples() -> Self {
+        Self {
+            top_left: SMITHAY_REAL_SHM_RED_SAMPLE,
+            center: SMITHAY_REAL_SHM_GREEN_SAMPLE,
+            bottom_right: SMITHAY_REAL_SHM_BLUE_SAMPLE,
+        }
+    }
+}
+
+#[cfg(all(feature = "smithay-backend", target_os = "linux"))]
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct RealShmSurfaceFrame {
+    pub width: u32,
+    pub height: u32,
+    pub stride: u32,
+    pub format: &'static str,
+    pub title: String,
+    pub app_id: String,
+    pub sample_coordinates: RealShmSampleCoordinates,
+    pub expected_samples: RealShmPixelSamples,
+    pub samples: RealShmPixelSamples,
+    pub pixels: Vec<RealShmPixel>,
+}
+
+#[cfg(all(feature = "smithay-backend", target_os = "linux"))]
+impl RealShmSurfaceFrame {
+    pub fn pixel(&self, x: u32, y: u32) -> Option<RealShmPixel> {
+        if x >= self.width || y >= self.height {
+            return None;
+        }
+
+        self.pixels.get((y * self.width + x) as usize).copied()
+    }
+
+    pub fn samples_verified(&self) -> bool {
+        self.samples == self.expected_samples
+    }
+}
+
+#[cfg(all(feature = "smithay-backend", target_os = "linux"))]
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct SmithayRealShmFrameCapture {
+    pub smoke: SmithayWaylandClientSmokeReport,
+    pub surface: RealShmSurfaceFrame,
+}
+
+#[cfg(all(feature = "smithay-backend", target_os = "linux"))]
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct SmithayWaylandClientSmokeReport {
     pub protocol_globals: u64,
@@ -3903,6 +4038,9 @@ struct WaylandClientEventState {
     shm_pool: Option<wayland_client::protocol::wl_shm_pool::WlShmPool>,
     shm_buffer: Option<wayland_client::protocol::wl_buffer::WlBuffer>,
     shm_file: Option<std::fs::File>,
+    shm_stride: u32,
+    shm_byte_len: usize,
+    shm_format: &'static str,
     base_surface: Option<wayland_client::protocol::wl_surface::WlSurface>,
     wm_base: Option<wayland_protocols::xdg::shell::client::xdg_wm_base::XdgWmBase>,
     xdg_surface: Option<wayland_protocols::xdg::shell::client::xdg_surface::XdgSurface>,
@@ -4021,6 +4159,9 @@ impl WaylandClientEventState {
                 self.shm_pool = Some(pool);
                 self.shm_buffer = Some(buffer);
                 self.shm_file = Some(file);
+                self.shm_stride = stride as u32;
+                self.shm_byte_len = byte_len as usize;
+                self.shm_format = "ARGB8888";
                 self.shm_buffer_created = true;
             }
             Err(error) => {
@@ -4046,6 +4187,122 @@ impl WaylandClientEventState {
         self.shm_buffer_attached = true;
         self.surface_committed = true;
     }
+
+    fn capture_real_shm_surface_frame(
+        &mut self,
+        title: impl Into<String>,
+        app_id: impl Into<String>,
+    ) -> Result<RealShmSurfaceFrame, String> {
+        use std::io::{Read, Seek, SeekFrom};
+
+        if !self.surface_committed || !self.shm_buffer_attached {
+            return Err(String::from("real-shm-capture:surface-not-committed"));
+        }
+        if self.shm_stride == 0 || self.shm_byte_len == 0 {
+            return Err(String::from("real-shm-capture:missing-shm-metadata"));
+        }
+
+        let Some(file) = self.shm_file.as_mut() else {
+            return Err(String::from("real-shm-capture:missing-shm-file"));
+        };
+
+        file.seek(SeekFrom::Start(0))
+            .map_err(|error| format!("real-shm-capture:seek:{error}"))?;
+        let mut bytes = vec![0u8; self.shm_byte_len];
+        file.read_exact(&mut bytes)
+            .map_err(|error| format!("real-shm-capture:read:{error}"))?;
+
+        let width = SMITHAY_SMOKE_WIDTH as u32;
+        let height = SMITHAY_SMOKE_HEIGHT as u32;
+        let stride = self.shm_stride as usize;
+        let mut pixels = Vec::with_capacity(width.saturating_mul(height) as usize);
+
+        for y in 0..height as usize {
+            for x in 0..width as usize {
+                let offset = y * stride + x * 4;
+                let Some(pixel_bytes) = bytes.get(offset..offset + 4) else {
+                    return Err(String::from("real-shm-capture:short-row"));
+                };
+                pixels.push(RealShmPixel::rgba(
+                    pixel_bytes[2],
+                    pixel_bytes[1],
+                    pixel_bytes[0],
+                    pixel_bytes[3],
+                ));
+            }
+        }
+
+        let sample_coordinates = RealShmSampleCoordinates::smoke_samples();
+        let samples = RealShmPixelSamples {
+            top_left: sample_pixel_from_vec(
+                &pixels,
+                width,
+                sample_coordinates.top_left.0,
+                sample_coordinates.top_left.1,
+            )?,
+            center: sample_pixel_from_vec(
+                &pixels,
+                width,
+                sample_coordinates.center.0,
+                sample_coordinates.center.1,
+            )?,
+            bottom_right: sample_pixel_from_vec(
+                &pixels,
+                width,
+                sample_coordinates.bottom_right.0,
+                sample_coordinates.bottom_right.1,
+            )?,
+        };
+
+        Ok(RealShmSurfaceFrame {
+            width,
+            height,
+            stride: self.shm_stride,
+            format: self.shm_format,
+            title: title.into(),
+            app_id: app_id.into(),
+            sample_coordinates,
+            expected_samples: RealShmPixelSamples::expected_smoke_samples(),
+            samples,
+            pixels,
+        })
+    }
+}
+
+#[cfg(all(feature = "smithay-backend", target_os = "linux"))]
+fn sample_pixel_from_vec(
+    pixels: &[RealShmPixel],
+    width: u32,
+    x: u32,
+    y: u32,
+) -> Result<RealShmPixel, String> {
+    pixels
+        .get((y * width + x) as usize)
+        .copied()
+        .ok_or_else(|| format!("real-shm-capture:missing-sample:{x}:{y}"))
+}
+
+#[cfg(all(feature = "smithay-backend", target_os = "linux"))]
+fn smoke_shm_pixel(x: i32, y: i32) -> RealShmPixel {
+    let top_left = SMITHAY_REAL_SHM_TOP_LEFT_SAMPLE;
+    let center = SMITHAY_REAL_SHM_CENTER_SAMPLE;
+    let bottom_right = SMITHAY_REAL_SHM_BOTTOM_RIGHT_SAMPLE;
+    let x = x as u32;
+    let y = y as u32;
+
+    if x.abs_diff(top_left.0) <= 12 && y.abs_diff(top_left.1) <= 12 {
+        return SMITHAY_REAL_SHM_RED_SAMPLE;
+    }
+    if x.abs_diff(center.0) <= 14 && y.abs_diff(center.1) <= 14 {
+        return SMITHAY_REAL_SHM_GREEN_SAMPLE;
+    }
+    if x.abs_diff(bottom_right.0) <= 12 && y.abs_diff(bottom_right.1) <= 12 {
+        return SMITHAY_REAL_SHM_BLUE_SAMPLE;
+    }
+
+    let red = ((x * 255) / SMITHAY_SMOKE_WIDTH as u32) as u8;
+    let green = ((y * 255) / SMITHAY_SMOKE_HEIGHT as u32) as u8;
+    RealShmPixel::rgba(red, green, 0x66, 255)
 }
 
 #[cfg(all(feature = "smithay-backend", target_os = "linux"))]
@@ -4078,11 +4335,8 @@ fn create_smoke_shm_file() -> Result<std::fs::File, String> {
 
     for y in 0..SMITHAY_SMOKE_HEIGHT {
         for x in 0..SMITHAY_SMOKE_WIDTH {
-            let alpha = 0xffu8;
-            let red = ((x * 255) / SMITHAY_SMOKE_WIDTH) as u8;
-            let green = ((y * 255) / SMITHAY_SMOKE_HEIGHT) as u8;
-            let blue = 0x66u8;
-            file.write_all(&[blue, green, red, alpha])
+            let pixel = smoke_shm_pixel(x, y);
+            file.write_all(&[pixel.blue, pixel.green, pixel.red, pixel.alpha])
                 .map_err(|error| format!("shm-file-write:{error}"))?;
         }
     }
@@ -4950,7 +5204,30 @@ impl SmithayCompositorRuntime {
     pub fn run_wayland_client_smoke(
         &mut self,
     ) -> Result<SmithayWaylandClientSmokeReport, SmithayRuntimeError> {
-        let client_stream = self.connect_and_insert_wayland_client("real-wayland-smoke")?;
+        let client_state = self.run_wayland_client_smoke_state("real-wayland-smoke")?;
+        Ok(self.build_wayland_client_smoke_report(&client_state))
+    }
+
+    pub fn run_real_shm_frame_capture(
+        &mut self,
+    ) -> Result<SmithayRealShmFrameCapture, SmithayRuntimeError> {
+        let mut client_state = self.run_wayland_client_smoke_state("real-shm-frame")?;
+        let smoke = self.build_wayland_client_smoke_report(&client_state);
+        let surface = client_state
+            .capture_real_shm_surface_frame(
+                smoke.observed_title.as_str(),
+                smoke.observed_app_id.as_str(),
+            )
+            .map_err(SmithayRuntimeError)?;
+
+        Ok(SmithayRealShmFrameCapture { smoke, surface })
+    }
+
+    fn run_wayland_client_smoke_state(
+        &mut self,
+        client_name: &str,
+    ) -> Result<WaylandClientEventState, SmithayRuntimeError> {
+        let client_stream = self.connect_and_insert_wayland_client(client_name)?;
         let client_connection = wayland_client::Connection::from_socket(client_stream)
             .map_err(|error| SmithayRuntimeError(format!("client-connect:{error}")))?;
         let mut event_queue = client_connection.new_event_queue::<WaylandClientEventState>();
@@ -4986,7 +5263,14 @@ impl SmithayCompositorRuntime {
             }
         }
 
-        let report = SmithayWaylandClientSmokeReport {
+        Ok(client_state)
+    }
+
+    fn build_wayland_client_smoke_report(
+        &self,
+        client_state: &WaylandClientEventState,
+    ) -> SmithayWaylandClientSmokeReport {
+        SmithayWaylandClientSmokeReport {
             protocol_globals: self.state.protocol_global_count,
             registry_global_count: client_state.globals.len() as u64,
             registry_announced: client_state.registry_announced(),
@@ -5051,9 +5335,7 @@ impl SmithayCompositorRuntime {
             shm_buffer_width: self.state.shm_buffer_width,
             shm_buffer_height: self.state.shm_buffer_height,
             shm_buffer_pixels: self.state.shm_buffer_pixels,
-        };
-
-        Ok(report)
+        }
     }
 
     fn connect_and_insert_wayland_client(
@@ -5365,6 +5647,9 @@ mod tests {
             "--smoke-test",
             "--scripted-client",
             "--smithay-client-smoke",
+            "--smithay-real-shm-frame",
+            "--smithay-real-shm-frame-output",
+            "target/smithay-real-shm-frame/frame.ppm",
             "--drm-first-present-probe",
             "--scripted-client-preview",
             "target/compositor-runtime/preview.ppm",
@@ -5381,6 +5666,11 @@ mod tests {
         assert!(config.smoke_test);
         assert!(config.scripted_client);
         assert!(config.smithay_client_smoke);
+        assert!(config.smithay_real_shm_frame);
+        assert_eq!(
+            config.smithay_real_shm_frame_output.as_deref(),
+            Some("target/smithay-real-shm-frame/frame.ppm")
+        );
         assert!(config.drm_first_present_probe);
         assert_eq!(
             config.scripted_client_preview.as_deref(),

@@ -83,6 +83,16 @@ impl Canvas {
         self.pixels.get(index).copied()
     }
 
+    pub fn set_pixel(&mut self, x: u32, y: u32, color: Color) -> bool {
+        if x >= self.width || y >= self.height {
+            return false;
+        }
+
+        let index = (y * self.width + x) as usize;
+        self.pixels[index] = color;
+        true
+    }
+
     pub fn fill_rect(&mut self, x: u32, y: u32, width: u32, height: u32, color: Color) {
         let max_x = x.saturating_add(width).min(self.width);
         let max_y = y.saturating_add(height).min(self.height);
