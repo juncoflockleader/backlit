@@ -18,6 +18,7 @@ dedicated_dpkg_install_log="$dedicated_e2e_dir/system-dpkg-install.log"
 dedicated_dpkg_purge_log="$dedicated_e2e_dir/system-dpkg-purge.log"
 launch_performance_manifest="$parallels_e2e_dir/launch-performance-manifest.json"
 resource_budget_manifest="$parallels_e2e_dir/resource-budget-manifest.json"
+live_surface_snapshots_manifest="$parallels_e2e_dir/smithay-live-surface-snapshots-manifest.json"
 real_shm_frame_manifest="$parallels_e2e_dir/smithay-real-shm-frame-manifest.json"
 parallels_preview="$parallels_e2e_dir/gui-preview-backlit-session.png"
 real_shm_frame_preview="$parallels_e2e_dir/smithay-real-shm-frame.png"
@@ -43,6 +44,7 @@ mvp1_acceptance=false
 launch_performance_evidence=false
 resource_budget_evidence=false
 parallels_health_evidence=false
+live_surface_snapshots_evidence=false
 real_shm_frame_evidence=false
 
 write_manifest() {
@@ -66,6 +68,7 @@ write_manifest() {
     "parallels_linux_health_manifest": "$parallels_health_manifest",
     "parallels_launch_performance_manifest": "$launch_performance_manifest",
     "parallels_resource_budget_manifest": "$resource_budget_manifest",
+    "parallels_live_surface_snapshots_manifest": "$live_surface_snapshots_manifest",
     "parallels_real_shm_frame_manifest": "$real_shm_frame_manifest",
     "parallels_linux_gui_preview": "$parallels_preview",
     "parallels_real_shm_frame_preview": "$real_shm_frame_preview",
@@ -90,6 +93,7 @@ write_manifest() {
     "launch_performance_evidence": $launch_performance_evidence,
     "resource_budget_evidence": $resource_budget_evidence,
     "parallels_health_evidence": $parallels_health_evidence,
+    "live_surface_snapshots_evidence": $live_surface_snapshots_evidence,
     "real_shm_frame_evidence": $real_shm_frame_evidence
   }
 }
@@ -184,6 +188,7 @@ require_file "$parallels_manifest" missing-parallels-linux-e2e-manifest
 require_file "$dedicated_manifest" missing-parallels-dedicated-drm-manifest
 require_file "$launch_performance_manifest" missing-parallels-launch-performance-manifest
 require_file "$resource_budget_manifest" missing-parallels-resource-budget-manifest
+require_file "$live_surface_snapshots_manifest" missing-parallels-live-surface-snapshots-manifest
 require_file "$real_shm_frame_manifest" missing-parallels-real-shm-frame-manifest
 require_file "$dedicated_session_manifest" missing-parallels-dedicated-session-manifest
 require_file "$package_build_manifest" missing-parallels-dedicated-package-build-manifest
@@ -197,6 +202,7 @@ require_contains "$parallels_manifest" '"actual_system_dpkg_install": true' para
 require_contains "$parallels_manifest" '"debian_system_install_replay": true' parallels-linux-e2e
 require_contains "$parallels_manifest" '"nested_wayland": true' parallels-linux-e2e
 require_contains "$parallels_manifest" '"drm_session_smoke": true' parallels-linux-e2e
+require_contains "$parallels_manifest" '"smithay_live_surface_snapshots": true' parallels-linux-e2e
 require_contains "$parallels_manifest" '"smithay_real_shm_frame": true' parallels-linux-e2e
 require_contains "$parallels_manifest" '"real_shm_frame_pixels": true' parallels-linux-e2e
 require_contains "$parallels_manifest" '"mvp1_contract": true' parallels-linux-e2e
@@ -220,6 +226,15 @@ require_contains "$launch_performance_manifest" '"shell_ready_budget": true' lau
 require_contains "$resource_budget_manifest" '"resource_budget_checked": true' resource-budget-evidence
 require_contains "$resource_budget_manifest" '"idle_cpu_budget": true' resource-budget-evidence
 require_contains "$resource_budget_manifest" '"idle_rss_budget": true' resource-budget-evidence
+require_contains "$live_surface_snapshots_manifest" '"smithay_live_surface_snapshots": true' live-surface-snapshots-evidence
+require_contains "$live_surface_snapshots_manifest" '"real_wayland_client": true' live-surface-snapshots-evidence
+require_contains "$live_surface_snapshots_manifest" '"live_snapshot_pipeline": true' live-surface-snapshots-evidence
+require_contains "$live_surface_snapshots_manifest" '"live_snapshot_persisted": true' live-surface-snapshots-evidence
+require_contains "$live_surface_snapshots_manifest" '"live_snapshot_metadata_preserved": true' live-surface-snapshots-evidence
+require_contains "$live_surface_snapshots_manifest" '"live_snapshot_pixels_copied": true' live-surface-snapshots-evidence
+require_contains "$live_surface_snapshots_manifest" '"live_snapshot_damage_recorded": true' live-surface-snapshots-evidence
+require_contains "$live_surface_snapshots_manifest" '"live_snapshot_samples_verified": true' live-surface-snapshots-evidence
+require_contains "$live_surface_snapshots_manifest" '"policy_window_from_live_snapshot": true' live-surface-snapshots-evidence
 require_contains "$real_shm_frame_manifest" '"smithay_real_shm_frame": true' real-shm-frame-evidence
 require_contains "$real_shm_frame_manifest" '"real_wayland_client": true' real-shm-frame-evidence
 require_contains "$real_shm_frame_manifest" '"real_wayland_metadata": true' real-shm-frame-evidence
@@ -233,6 +248,7 @@ require_png_file "$real_shm_frame_preview" missing-real-shm-frame-preview
 normal_parallels_e2e=true
 launch_performance_evidence=true
 resource_budget_evidence=true
+live_surface_snapshots_evidence=true
 real_shm_frame_evidence=true
 
 require_contains "$dedicated_manifest" '"passed": true' package-installed-dedicated-drm

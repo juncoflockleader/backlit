@@ -163,6 +163,7 @@ uploaded_gui_smoke_verifier="/tmp/backlit-verify-gui-smoke.sh"
 uploaded_gui_preview_renderer="/tmp/backlit-render-gui-preview.sh"
 uploaded_compositor_runtime_verifier="/tmp/backlit-verify-compositor-runtime.sh"
 uploaded_smithay_compositor_runtime_verifier="/tmp/backlit-verify-smithay-compositor-runtime.sh"
+uploaded_smithay_live_surface_snapshots_verifier="/tmp/backlit-verify-smithay-live-surface-snapshots.sh"
 uploaded_smithay_real_shm_frame_verifier="/tmp/backlit-verify-smithay-real-shm-frame.sh"
 uploaded_compositor_socket_verifier="/tmp/backlit-verify-compositor-socket.sh"
 uploaded_launch_performance_verifier="/tmp/backlit-verify-launch-performance.sh"
@@ -287,6 +288,7 @@ install -m 0755 -o "\$guest_user" -g "\$guest_user" "\$uploaded_gui_smoke_verifi
 install -m 0755 -o "\$guest_user" -g "\$guest_user" "\$uploaded_gui_preview_renderer" "\$repo_dir/scripts/render-gui-preview.sh"
 install -m 0755 -o "\$guest_user" -g "\$guest_user" "\$uploaded_compositor_runtime_verifier" "\$repo_dir/scripts/verify-compositor-runtime.sh"
 install -m 0755 -o "\$guest_user" -g "\$guest_user" "\$uploaded_smithay_compositor_runtime_verifier" "\$repo_dir/scripts/verify-smithay-compositor-runtime.sh"
+install -m 0755 -o "\$guest_user" -g "\$guest_user" "\$uploaded_smithay_live_surface_snapshots_verifier" "\$repo_dir/scripts/verify-smithay-live-surface-snapshots.sh"
 install -m 0755 -o "\$guest_user" -g "\$guest_user" "\$uploaded_smithay_real_shm_frame_verifier" "\$repo_dir/scripts/verify-smithay-real-shm-frame.sh"
 install -m 0755 -o "\$guest_user" -g "\$guest_user" "\$uploaded_compositor_socket_verifier" "\$repo_dir/scripts/verify-compositor-socket.sh"
 install -m 0755 -o "\$guest_user" -g "\$guest_user" "\$uploaded_launch_performance_verifier" "\$repo_dir/scripts/verify-launch-performance.sh"
@@ -341,6 +343,7 @@ upload_script "$repo_root/scripts/verify-gui-smoke.sh" "/tmp/backlit-verify-gui-
 upload_script "$repo_root/scripts/render-gui-preview.sh" "/tmp/backlit-render-gui-preview.sh"
 upload_script "$repo_root/scripts/verify-compositor-runtime.sh" "/tmp/backlit-verify-compositor-runtime.sh"
 upload_script "$repo_root/scripts/verify-smithay-compositor-runtime.sh" "/tmp/backlit-verify-smithay-compositor-runtime.sh"
+upload_script "$repo_root/scripts/verify-smithay-live-surface-snapshots.sh" "/tmp/backlit-verify-smithay-live-surface-snapshots.sh"
 upload_script "$repo_root/scripts/verify-smithay-real-shm-frame.sh" "/tmp/backlit-verify-smithay-real-shm-frame.sh"
 upload_script "$repo_root/scripts/verify-compositor-socket.sh" "/tmp/backlit-verify-compositor-socket.sh"
 upload_script "$repo_root/scripts/verify-launch-performance.sh" "/tmp/backlit-verify-launch-performance.sh"
@@ -375,6 +378,7 @@ host_gui_smoke_manifest="$host_out_dir/gui-smoke-manifest.json"
 host_gui_preview_manifest="$host_out_dir/gui-preview-manifest.json"
 host_compositor_runtime_manifest="$host_out_dir/compositor-runtime-manifest.json"
 host_smithay_compositor_runtime_manifest="$host_out_dir/smithay-compositor-runtime-manifest.json"
+host_smithay_live_surface_snapshots_manifest="$host_out_dir/smithay-live-surface-snapshots-manifest.json"
 host_smithay_real_shm_frame_manifest="$host_out_dir/smithay-real-shm-frame-manifest.json"
 host_compositor_socket_manifest="$host_out_dir/compositor-socket-manifest.json"
 host_smithay_runtime_probe_manifest="$host_out_dir/smithay-runtime-probe-manifest.json"
@@ -409,6 +413,7 @@ rm -f \
   "$host_gui_preview_manifest" \
   "$host_compositor_runtime_manifest" \
   "$host_smithay_compositor_runtime_manifest" \
+  "$host_smithay_live_surface_snapshots_manifest" \
   "$host_smithay_real_shm_frame_manifest" \
   "$host_compositor_socket_manifest" \
   "$host_smithay_runtime_probe_manifest" \
@@ -442,6 +447,7 @@ download_file "$guest_e2e_dir/gui-smoke/manifest.json" "$host_gui_smoke_manifest
 download_file "$guest_e2e_dir/gui-preview/manifest.json" "$host_gui_preview_manifest"
 download_file "$guest_e2e_dir/compositor-runtime/manifest.json" "$host_compositor_runtime_manifest"
 download_file "$guest_e2e_dir/smithay-compositor-runtime/manifest.json" "$host_smithay_compositor_runtime_manifest"
+download_file "$guest_e2e_dir/smithay-live-surface-snapshots/manifest.json" "$host_smithay_live_surface_snapshots_manifest"
 download_file "$guest_e2e_dir/smithay-real-shm-frame/manifest.json" "$host_smithay_real_shm_frame_manifest"
 download_file "$guest_e2e_dir/compositor-socket/manifest.json" "$host_compositor_socket_manifest"
 download_file "$guest_e2e_dir/smithay-runtime-probe/manifest.json" "$host_smithay_runtime_probe_manifest"
@@ -587,6 +593,7 @@ require_contains "$host_guest_manifest" '"debian_package_build": true'
 require_contains "$host_guest_manifest" '"debian_package_install": true'
 require_contains "$host_guest_manifest" '"launch_readiness": true'
 require_contains "$host_guest_manifest" '"smithay_compositor_runtime": true'
+require_contains "$host_guest_manifest" '"smithay_live_surface_snapshots": true'
 require_contains "$host_guest_manifest" '"smithay_real_shm_frame": true'
 require_contains "$host_guest_manifest" '"drm_master_boundary": true'
 require_contains "$host_guest_manifest" '"drm_session_smoke": true'
@@ -633,6 +640,16 @@ require_contains "$host_smithay_compositor_runtime_manifest" '"smithay_service_s
 require_contains "$host_smithay_compositor_runtime_manifest" '"smithay_event_loop_service_socket": true'
 require_contains "$host_smithay_compositor_runtime_manifest" '"smithay_demo_client_socket_lifecycle": true'
 require_contains "$host_smithay_compositor_runtime_manifest" '"drm_launch_ready": true'
+require_contains "$host_smithay_live_surface_snapshots_manifest" '"smithay_live_surface_snapshots": true'
+require_contains "$host_smithay_live_surface_snapshots_manifest" '"real_wayland_client": true'
+require_contains "$host_smithay_live_surface_snapshots_manifest" '"live_snapshot_pipeline": true'
+require_contains "$host_smithay_live_surface_snapshots_manifest" '"live_snapshot_persisted": true'
+require_contains "$host_smithay_live_surface_snapshots_manifest" '"live_snapshot_metadata_preserved": true'
+require_contains "$host_smithay_live_surface_snapshots_manifest" '"live_snapshot_pixels_copied": true'
+require_contains "$host_smithay_live_surface_snapshots_manifest" '"live_snapshot_damage_recorded": true'
+require_contains "$host_smithay_live_surface_snapshots_manifest" '"live_snapshot_samples_verified": true'
+require_contains "$host_smithay_live_surface_snapshots_manifest" '"policy_window_from_live_snapshot": true'
+require_contains "$host_smithay_live_surface_snapshots_manifest" '"drm_launch_ready": true'
 require_contains "$host_smithay_real_shm_frame_manifest" '"smithay_real_shm_frame": true'
 require_contains "$host_smithay_real_shm_frame_manifest" '"real_wayland_client": true'
 require_contains "$host_smithay_real_shm_frame_manifest" '"real_wayland_metadata": true'
@@ -862,6 +879,7 @@ require_contains "$host_mvp1_contract_manifest" '"drm_master_boundary_artifact":
 require_contains "$host_mvp1_contract_manifest" '"dedicated_drm_session_artifact": true'
 require_contains "$host_mvp1_contract_manifest" '"drm_session_smoke_ready_artifact": true'
 require_contains "$host_mvp1_contract_manifest" '"smithay_compositor_runtime_artifact": true'
+require_contains "$host_mvp1_contract_manifest" '"smithay_live_surface_snapshots_artifact": true'
 require_contains "$host_mvp1_contract_manifest" '"smithay_real_shm_frame_artifact": true'
 require_contains "$host_mvp1_contract_manifest" '"resource_budget_contract": true'
 require_contains "$host_mvp1_contract_manifest" '"debian_package_install_replay_artifact": true'
@@ -884,6 +902,7 @@ cat > "$host_out_dir/manifest.json" <<EOF
     "gui_preview_manifest": "$host_gui_preview_manifest",
     "compositor_runtime_manifest": "$host_compositor_runtime_manifest",
     "smithay_compositor_runtime_manifest": "$host_smithay_compositor_runtime_manifest",
+    "smithay_live_surface_snapshots_manifest": "$host_smithay_live_surface_snapshots_manifest",
     "smithay_real_shm_frame_manifest": "$host_smithay_real_shm_frame_manifest",
     "compositor_socket_manifest": "$host_compositor_socket_manifest",
     "smithay_runtime_probe_manifest": "$host_smithay_runtime_probe_manifest",
@@ -924,6 +943,7 @@ cat > "$host_out_dir/manifest.json" <<EOF
     "compositor_runtime": true,
     "compositor_runtime_policy_preview": true,
     "smithay_compositor_runtime": true,
+    "smithay_live_surface_snapshots": true,
     "smithay_real_shm_frame": true,
     "real_shm_frame_pixels": true,
     "compositor_socket": true,

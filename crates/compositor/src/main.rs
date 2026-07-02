@@ -20,7 +20,8 @@ use backlit_compositor_backend::{
 };
 #[cfg(all(feature = "smithay-backend", target_os = "linux"))]
 use backlit_compositor_backend::{
-    RealShmPixel, SmithayCompositorRuntime, SmithayRealShmFrameCapture,
+    RealShmPixel, SmithayCompositorRuntime, SmithayLiveSurfaceSnapshot,
+    SmithayLiveSurfaceSnapshotReport, SmithayRealShmFrameCapture,
 };
 use backlit_demo_client::{render_policy_gui, verify_policy_gui};
 #[cfg(all(feature = "smithay-backend", target_os = "linux"))]
@@ -54,6 +55,10 @@ fn run() -> Result<(), String> {
             (
                 "smithay_client_smoke",
                 FieldValue::Bool(config.smithay_client_smoke),
+            ),
+            (
+                "smithay_live_surface_snapshots",
+                FieldValue::Bool(config.smithay_live_surface_snapshots),
             ),
             (
                 "smithay_real_shm_frame",
@@ -100,6 +105,7 @@ fn run() -> Result<(), String> {
 
         if !config.scripted_client
             && !config.smithay_client_smoke
+            && !config.smithay_live_surface_snapshots
             && !config.smithay_real_shm_frame
             && !config.smoke_test
             && !config.serve
@@ -365,6 +371,130 @@ fn run() -> Result<(), String> {
 
         if !smoke.passed() {
             return Err(String::from("Smithay Wayland client protocol smoke failed"));
+        }
+
+        if !config.scripted_client
+            && !config.smithay_live_surface_snapshots
+            && !config.smithay_real_shm_frame
+            && !config.smoke_test
+            && !config.serve
+            && config.idle_probe_ms.is_none()
+        {
+            emit(
+                "compositor.exit",
+                &config,
+                &[(
+                    "elapsed_ms",
+                    FieldValue::U64(started.elapsed().as_millis() as u64),
+                )],
+            );
+            return Ok(());
+        }
+    }
+
+    if config.smithay_live_surface_snapshots {
+        let snapshots = run_smithay_live_surface_snapshots_for_config(&config)?;
+        emit(
+            "compositor.smithay_live_surface_snapshots",
+            &config,
+            &[
+                ("passed", FieldValue::Bool(snapshots.passed())),
+                (
+                    "runtime_backend",
+                    FieldValue::Str(snapshots.runtime_backend),
+                ),
+                (
+                    "real_wayland_client",
+                    FieldValue::Bool(snapshots.real_wayland_client),
+                ),
+                (
+                    "live_snapshot_pipeline",
+                    FieldValue::Bool(snapshots.live_snapshot_pipeline),
+                ),
+                (
+                    "live_snapshot_persisted",
+                    FieldValue::Bool(snapshots.live_snapshot_persisted),
+                ),
+                (
+                    "live_snapshot_metadata_preserved",
+                    FieldValue::Bool(snapshots.live_snapshot_metadata_preserved),
+                ),
+                (
+                    "live_snapshot_pixels_copied",
+                    FieldValue::Bool(snapshots.live_snapshot_pixels_copied),
+                ),
+                (
+                    "live_snapshot_damage_recorded",
+                    FieldValue::Bool(snapshots.live_snapshot_damage_recorded),
+                ),
+                (
+                    "live_snapshot_samples_verified",
+                    FieldValue::Bool(snapshots.live_snapshot_samples_verified),
+                ),
+                (
+                    "policy_window_from_live_snapshot",
+                    FieldValue::Bool(snapshots.policy_window_from_live_snapshot),
+                ),
+                (
+                    "policy_app_id_preserved",
+                    FieldValue::Bool(snapshots.policy_app_id_preserved),
+                ),
+                (
+                    "policy_geometry_preserved",
+                    FieldValue::Bool(snapshots.policy_geometry_preserved),
+                ),
+                ("snapshot_count", FieldValue::U64(snapshots.snapshot_count)),
+                (
+                    "persisted_snapshot_count",
+                    FieldValue::U64(snapshots.persisted_snapshot_count),
+                ),
+                (
+                    "latest_snapshot_id",
+                    FieldValue::U64(snapshots.latest_snapshot_id),
+                ),
+                ("commit_serial", FieldValue::U64(snapshots.commit_serial)),
+                ("commit_count", FieldValue::U64(snapshots.commit_count)),
+                ("damage_count", FieldValue::U64(snapshots.damage_count)),
+                ("damage_x", FieldValue::U64(snapshots.damage_x)),
+                ("damage_y", FieldValue::U64(snapshots.damage_y)),
+                ("damage_width", FieldValue::U64(snapshots.damage_width)),
+                ("damage_height", FieldValue::U64(snapshots.damage_height)),
+                ("snapshot_width", FieldValue::U64(snapshots.snapshot_width)),
+                (
+                    "snapshot_height",
+                    FieldValue::U64(snapshots.snapshot_height),
+                ),
+                (
+                    "snapshot_stride",
+                    FieldValue::U64(snapshots.snapshot_stride),
+                ),
+                (
+                    "snapshot_pixel_count",
+                    FieldValue::U64(snapshots.snapshot_pixel_count),
+                ),
+                (
+                    "snapshot_pixel_checksum",
+                    FieldValue::U64(snapshots.snapshot_pixel_checksum),
+                ),
+                (
+                    "source_top_left_red",
+                    FieldValue::U64(snapshots.source_top_left_red),
+                ),
+                (
+                    "source_center_green",
+                    FieldValue::U64(snapshots.source_center_green),
+                ),
+                (
+                    "source_bottom_right_blue",
+                    FieldValue::U64(snapshots.source_bottom_right_blue),
+                ),
+            ],
+        );
+
+        if !snapshots.passed() {
+            return Err(String::from(
+                "Smithay live surface snapshot verification failed",
+            ));
         }
 
         if !config.scripted_client
@@ -2055,6 +2185,73 @@ struct RealShmFrameSmoke {
     frame_ppm_path: String,
 }
 
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct LiveSurfaceSnapshotsSmoke {
+    runtime_backend: &'static str,
+    real_wayland_client: bool,
+    live_snapshot_pipeline: bool,
+    live_snapshot_persisted: bool,
+    live_snapshot_metadata_preserved: bool,
+    live_snapshot_pixels_copied: bool,
+    live_snapshot_damage_recorded: bool,
+    live_snapshot_samples_verified: bool,
+    policy_window_from_live_snapshot: bool,
+    policy_app_id_preserved: bool,
+    policy_geometry_preserved: bool,
+    snapshot_count: u64,
+    persisted_snapshot_count: u64,
+    latest_snapshot_id: u64,
+    commit_serial: u64,
+    commit_count: u64,
+    damage_count: u64,
+    damage_x: u64,
+    damage_y: u64,
+    damage_width: u64,
+    damage_height: u64,
+    snapshot_width: u64,
+    snapshot_height: u64,
+    snapshot_stride: u64,
+    snapshot_pixel_count: u64,
+    snapshot_pixel_checksum: u64,
+    source_top_left_red: u64,
+    source_center_green: u64,
+    source_bottom_right_blue: u64,
+}
+
+impl LiveSurfaceSnapshotsSmoke {
+    fn passed(&self) -> bool {
+        self.runtime_backend == "smithay-compositor-runtime"
+            && self.real_wayland_client
+            && self.live_snapshot_pipeline
+            && self.live_snapshot_persisted
+            && self.live_snapshot_metadata_preserved
+            && self.live_snapshot_pixels_copied
+            && self.live_snapshot_damage_recorded
+            && self.live_snapshot_samples_verified
+            && self.policy_window_from_live_snapshot
+            && self.policy_app_id_preserved
+            && self.policy_geometry_preserved
+            && self.snapshot_count >= 1
+            && self.persisted_snapshot_count >= 1
+            && self.latest_snapshot_id >= 1
+            && self.commit_serial >= 1
+            && self.commit_count >= 2
+            && self.damage_count >= 1
+            && self.damage_x == 0
+            && self.damage_y == 0
+            && self.damage_width == self.snapshot_width
+            && self.damage_height == self.snapshot_height
+            && self.snapshot_width == 320
+            && self.snapshot_height == 240
+            && self.snapshot_stride >= self.snapshot_width * 4
+            && self.snapshot_pixel_count == 320 * 240
+            && self.snapshot_pixel_checksum > 0
+            && self.source_top_left_red == 238
+            && self.source_center_green == 187
+            && self.source_bottom_right_blue == 224
+    }
+}
+
 impl RealShmFrameSmoke {
     fn passed(&self) -> bool {
         self.runtime_backend == "smithay-compositor-runtime"
@@ -2226,6 +2423,116 @@ fn map_smithay_smoke_into_policy(
 }
 
 #[cfg(all(feature = "smithay-backend", target_os = "linux"))]
+fn run_smithay_live_surface_snapshots_for_config(
+    config: &RunConfig,
+) -> Result<LiveSurfaceSnapshotsSmoke, String> {
+    if config.runtime != RuntimeKind::Smithay {
+        return Err(String::from(
+            "Smithay live surface snapshots require --runtime=smithay",
+        ));
+    }
+
+    let mut runtime = SmithayCompositorRuntime::try_new().map_err(|error| error.to_string())?;
+    let runtime_backend = runtime.runtime_name();
+    let report = runtime
+        .run_live_surface_snapshot_capture()
+        .map_err(|error| error.to_string())?;
+    build_live_surface_snapshot_smoke(runtime_backend, &report)
+}
+
+#[cfg(all(feature = "smithay-backend", target_os = "linux"))]
+fn build_live_surface_snapshot_smoke(
+    runtime_backend: &'static str,
+    report: &SmithayLiveSurfaceSnapshotReport,
+) -> Result<LiveSurfaceSnapshotsSmoke, String> {
+    let snapshot = report
+        .snapshots
+        .last()
+        .ok_or_else(|| String::from("live-surface-snapshot:missing-snapshot"))?;
+    let policy = map_live_snapshot_into_policy(snapshot)?;
+
+    Ok(LiveSurfaceSnapshotsSmoke {
+        runtime_backend,
+        real_wayland_client: report.smoke.passed(),
+        live_snapshot_pipeline: report.passed(),
+        live_snapshot_persisted: report.persisted_snapshot_count >= 1
+            && report.latest_snapshot_id == snapshot.id
+            && report.snapshots.iter().any(|known| known.id == snapshot.id),
+        live_snapshot_metadata_preserved: snapshot.title == report.smoke.observed_title
+            && snapshot.app_id == report.smoke.observed_app_id
+            && report.smoke.title_matched
+            && report.smoke.app_id_matched,
+        live_snapshot_pixels_copied: snapshot.pixel_count()
+            == snapshot.width.saturating_mul(snapshot.height) as u64
+            && snapshot.pixel_checksum > 0
+            && snapshot.stride >= snapshot.width.saturating_mul(4)
+            && snapshot.format == "ARGB8888",
+        live_snapshot_damage_recorded: snapshot.damage.x == 0
+            && snapshot.damage.y == 0
+            && snapshot.damage.width == snapshot.width
+            && snapshot.damage.height == snapshot.height
+            && report.damage_count >= 1,
+        live_snapshot_samples_verified: snapshot.samples_verified(),
+        policy_window_from_live_snapshot: policy.window_mapped,
+        policy_app_id_preserved: policy.app_id_preserved,
+        policy_geometry_preserved: policy.geometry_preserved,
+        snapshot_count: report.snapshots.len() as u64,
+        persisted_snapshot_count: report.persisted_snapshot_count,
+        latest_snapshot_id: report.latest_snapshot_id,
+        commit_serial: snapshot.commit_serial,
+        commit_count: report.commit_count,
+        damage_count: report.damage_count,
+        damage_x: snapshot.damage.x as u64,
+        damage_y: snapshot.damage.y as u64,
+        damage_width: snapshot.damage.width as u64,
+        damage_height: snapshot.damage.height as u64,
+        snapshot_width: snapshot.width as u64,
+        snapshot_height: snapshot.height as u64,
+        snapshot_stride: snapshot.stride as u64,
+        snapshot_pixel_count: snapshot.pixel_count(),
+        snapshot_pixel_checksum: snapshot.pixel_checksum,
+        source_top_left_red: snapshot.samples.top_left.red as u64,
+        source_center_green: snapshot.samples.center.green as u64,
+        source_bottom_right_blue: snapshot.samples.bottom_right.blue as u64,
+    })
+}
+
+#[cfg(all(feature = "smithay-backend", target_os = "linux"))]
+fn map_live_snapshot_into_policy(
+    snapshot: &SmithayLiveSurfaceSnapshot,
+) -> Result<SmithayPolicySurfaceSmoke, String> {
+    let mut manager = SurfaceManager::new(OutputLayout::new(800, 520, 42));
+    let surface = map_scripted_app_toplevel(
+        &mut manager,
+        snapshot.title.as_str(),
+        snapshot.app_id.as_str(),
+        snapshot.width as i32,
+        snapshot.height as i32,
+    )?;
+    let window_id = manager
+        .surface(surface)
+        .and_then(|surface| surface.window_id)
+        .ok_or_else(|| String::from("live-surface-snapshot:missing-policy-window"))?;
+    let policy_window = manager.policy().window(window_id);
+
+    Ok(SmithayPolicySurfaceSmoke {
+        window_mapped: policy_window.is_some(),
+        app_id_preserved: policy_window.and_then(|window| window.app_id.as_deref())
+            == Some(snapshot.app_id.as_str()),
+        focused_after_map: manager.policy().focused() == Some(window_id),
+        geometry_preserved: policy_window
+            .map(|window| {
+                window.geometry.width == snapshot.width as i32
+                    && window.geometry.height == snapshot.height as i32
+            })
+            .unwrap_or(false),
+        windows: manager.policy().windows().len() as u64,
+        backend_surface_presented: true,
+        presented_pixels: snapshot.pixel_count(),
+    })
+}
+
+#[cfg(all(feature = "smithay-backend", target_os = "linux"))]
 fn run_smithay_real_shm_frame_for_config(config: &RunConfig) -> Result<RealShmFrameSmoke, String> {
     if config.runtime != RuntimeKind::Smithay {
         return Err(String::from(
@@ -2385,6 +2692,15 @@ fn frame_color_matches_real_pixel(frame_color: Option<Color>, pixel: RealShmPixe
 fn run_smithay_client_smoke_for_config(_config: &RunConfig) -> Result<SmithayClientSmoke, String> {
     Err(String::from(
         "Smithay Wayland client smoke requires Linux and the smithay-backend feature",
+    ))
+}
+
+#[cfg(not(all(feature = "smithay-backend", target_os = "linux")))]
+fn run_smithay_live_surface_snapshots_for_config(
+    _config: &RunConfig,
+) -> Result<LiveSurfaceSnapshotsSmoke, String> {
+    Err(String::from(
+        "Smithay live surface snapshots require Linux and the smithay-backend feature",
     ))
 }
 
@@ -3771,7 +4087,7 @@ fn print_help() {
 backlit-compositor
 
 Usage:
-  backlit-compositor [--backend=headless|wayland|drm] [--runtime=headless|smithay] [--socket=backlit-0] [--smoke-test] [--scripted-client] [--smithay-client-smoke] [--smithay-real-shm-frame] [--drm-first-present-probe] [--scripted-client-preview=path] [--smithay-real-shm-frame-output=path] [--serve] [--serve-for-ms=1000] [--idle-probe-ms=1000]
+  backlit-compositor [--backend=headless|wayland|drm] [--runtime=headless|smithay] [--socket=backlit-0] [--smoke-test] [--scripted-client] [--smithay-client-smoke] [--smithay-live-surface-snapshots] [--smithay-real-shm-frame] [--drm-first-present-probe] [--scripted-client-preview=path] [--smithay-real-shm-frame-output=path] [--serve] [--serve-for-ms=1000] [--idle-probe-ms=1000]
 
 Flags:
   --backend      Select compositor backend. Defaults to headless.
@@ -3782,6 +4098,8 @@ Flags:
                  Run a deterministic app-client lifecycle through the compositor runtime.
   --smithay-client-smoke
                  Run a real Wayland registry/surface/xdg-toplevel protocol smoke through Smithay.
+  --smithay-live-surface-snapshots
+                 Capture live Smithay-observed wl_shm surface snapshots and map them into Backlit policy.
   --smithay-real-shm-frame
                  Render generated wl_shm client pixels into a Backlit policy frame and verify samples.
   --drm-first-present-probe

@@ -3036,6 +3036,7 @@ pub struct RunConfig {
     pub scripted_client: bool,
     pub scripted_client_preview: Option<String>,
     pub smithay_client_smoke: bool,
+    pub smithay_live_surface_snapshots: bool,
     pub smithay_real_shm_frame: bool,
     pub smithay_real_shm_frame_output: Option<String>,
     pub drm_first_present_probe: bool,
@@ -3055,6 +3056,7 @@ impl Default for RunConfig {
             scripted_client: false,
             scripted_client_preview: None,
             smithay_client_smoke: false,
+            smithay_live_surface_snapshots: false,
             smithay_real_shm_frame: false,
             smithay_real_shm_frame_output: None,
             drm_first_present_probe: false,
@@ -3104,6 +3106,8 @@ where
             config.scripted_client = true;
         } else if arg == "--smithay-client-smoke" {
             config.smithay_client_smoke = true;
+        } else if arg == "--smithay-live-surface-snapshots" {
+            config.smithay_live_surface_snapshots = true;
         } else if arg == "--smithay-real-shm-frame" {
             config.smithay_real_shm_frame = true;
         } else if let Some(value) = arg.strip_prefix("--smithay-real-shm-frame-output=") {
@@ -3673,6 +3677,8 @@ pub struct SmithayCompositorRuntime {
     inserted_wayland_clients: u64,
     wayland_dispatch_count: u64,
     calloop_dispatch_count: u64,
+    live_surface_snapshots: Vec<SmithayLiveSurfaceSnapshot>,
+    next_live_surface_snapshot_id: u64,
     last_error: Option<String>,
 }
 
@@ -3865,6 +3871,10 @@ impl RealShmSurfaceFrame {
     pub fn samples_verified(&self) -> bool {
         self.samples == self.expected_samples
     }
+
+    pub fn pixel_checksum(&self) -> u64 {
+        real_shm_pixel_checksum(&self.pixels)
+    }
 }
 
 #[cfg(all(feature = "smithay-backend", target_os = "linux"))]
@@ -3872,6 +3882,122 @@ impl RealShmSurfaceFrame {
 pub struct SmithayRealShmFrameCapture {
     pub smoke: SmithayWaylandClientSmokeReport,
     pub surface: RealShmSurfaceFrame,
+}
+
+#[cfg(all(feature = "smithay-backend", target_os = "linux"))]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct SmithaySurfaceDamageRect {
+    pub x: u32,
+    pub y: u32,
+    pub width: u32,
+    pub height: u32,
+}
+
+#[cfg(all(feature = "smithay-backend", target_os = "linux"))]
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct SmithayLiveSurfaceSnapshot {
+    pub id: u64,
+    pub title: String,
+    pub app_id: String,
+    pub width: u32,
+    pub height: u32,
+    pub stride: u32,
+    pub format: &'static str,
+    pub commit_serial: u64,
+    pub damage: SmithaySurfaceDamageRect,
+    pub sample_coordinates: RealShmSampleCoordinates,
+    pub expected_samples: RealShmPixelSamples,
+    pub samples: RealShmPixelSamples,
+    pub pixel_checksum: u64,
+    pub pixels: Vec<RealShmPixel>,
+}
+
+#[cfg(all(feature = "smithay-backend", target_os = "linux"))]
+impl SmithayLiveSurfaceSnapshot {
+    fn from_surface_frame(id: u64, commit_serial: u64, frame: RealShmSurfaceFrame) -> Self {
+        let pixel_checksum = frame.pixel_checksum();
+        Self {
+            id,
+            title: frame.title,
+            app_id: frame.app_id,
+            width: frame.width,
+            height: frame.height,
+            stride: frame.stride,
+            format: frame.format,
+            commit_serial,
+            damage: SmithaySurfaceDamageRect {
+                x: 0,
+                y: 0,
+                width: frame.width,
+                height: frame.height,
+            },
+            sample_coordinates: frame.sample_coordinates,
+            expected_samples: frame.expected_samples,
+            samples: frame.samples,
+            pixel_checksum,
+            pixels: frame.pixels,
+        }
+    }
+
+    pub fn pixel_count(&self) -> u64 {
+        self.pixels.len() as u64
+    }
+
+    pub fn samples_verified(&self) -> bool {
+        self.samples == self.expected_samples
+    }
+}
+
+#[cfg(all(feature = "smithay-backend", target_os = "linux"))]
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct SmithayLiveSurfaceSnapshotReport {
+    pub smoke: SmithayWaylandClientSmokeReport,
+    pub snapshots: Vec<SmithayLiveSurfaceSnapshot>,
+    pub persisted_snapshot_count: u64,
+    pub latest_snapshot_id: u64,
+    pub commit_count: u64,
+    pub damage_count: u64,
+}
+
+#[cfg(all(feature = "smithay-backend", target_os = "linux"))]
+impl SmithayLiveSurfaceSnapshotReport {
+    pub fn passed(&self) -> bool {
+        let Some(snapshot) = self.snapshots.last() else {
+            return false;
+        };
+
+        self.smoke.passed()
+            && self.persisted_snapshot_count >= 1
+            && self.latest_snapshot_id == snapshot.id
+            && self.commit_count >= 2
+            && self.damage_count >= 1
+            && snapshot.title == self.smoke.observed_title
+            && snapshot.app_id == self.smoke.observed_app_id
+            && snapshot.width == SMITHAY_SMOKE_WIDTH as u32
+            && snapshot.height == SMITHAY_SMOKE_HEIGHT as u32
+            && snapshot.stride >= snapshot.width.saturating_mul(4)
+            && snapshot.format == "ARGB8888"
+            && snapshot.pixel_count() == (snapshot.width * snapshot.height) as u64
+            && snapshot.pixel_checksum > 0
+            && snapshot.commit_serial >= 1
+            && snapshot.damage.x == 0
+            && snapshot.damage.y == 0
+            && snapshot.damage.width == snapshot.width
+            && snapshot.damage.height == snapshot.height
+            && snapshot.samples_verified()
+    }
+}
+
+#[cfg(all(feature = "smithay-backend", target_os = "linux"))]
+fn real_shm_pixel_checksum(pixels: &[RealShmPixel]) -> u64 {
+    pixels.iter().fold(0u64, |checksum, pixel| {
+        checksum
+            .wrapping_mul(16_777_619)
+            .wrapping_add(pixel.red as u64)
+            .wrapping_add((pixel.green as u64) << 8)
+            .wrapping_add((pixel.blue as u64) << 16)
+            .wrapping_add((pixel.alpha as u64) << 24)
+    })
 }
 
 #[cfg(all(feature = "smithay-backend", target_os = "linux"))]
@@ -5133,6 +5259,8 @@ impl SmithayCompositorRuntime {
             inserted_wayland_clients: 0,
             wayland_dispatch_count: 0,
             calloop_dispatch_count: 0,
+            live_surface_snapshots: Vec::new(),
+            next_live_surface_snapshot_id: 1,
             last_error: None,
         })
     }
@@ -5201,6 +5329,10 @@ impl SmithayCompositorRuntime {
         self.last_error.as_deref()
     }
 
+    pub fn live_surface_snapshots(&self) -> &[SmithayLiveSurfaceSnapshot] {
+        &self.live_surface_snapshots
+    }
+
     pub fn run_wayland_client_smoke(
         &mut self,
     ) -> Result<SmithayWaylandClientSmokeReport, SmithayRuntimeError> {
@@ -5221,6 +5353,36 @@ impl SmithayCompositorRuntime {
             .map_err(SmithayRuntimeError)?;
 
         Ok(SmithayRealShmFrameCapture { smoke, surface })
+    }
+
+    pub fn run_live_surface_snapshot_capture(
+        &mut self,
+    ) -> Result<SmithayLiveSurfaceSnapshotReport, SmithayRuntimeError> {
+        let mut client_state = self.run_wayland_client_smoke_state("live-surface-snapshot")?;
+        let smoke = self.build_wayland_client_smoke_report(&client_state);
+        let surface = client_state
+            .capture_real_shm_surface_frame(
+                smoke.observed_title.as_str(),
+                smoke.observed_app_id.as_str(),
+            )
+            .map_err(SmithayRuntimeError)?;
+        let snapshot_id = self.next_live_surface_snapshot_id;
+        self.next_live_surface_snapshot_id += 1;
+        let snapshot = SmithayLiveSurfaceSnapshot::from_surface_frame(
+            snapshot_id,
+            self.state.surface_commit_count,
+            surface,
+        );
+        self.live_surface_snapshots.push(snapshot);
+
+        Ok(SmithayLiveSurfaceSnapshotReport {
+            smoke,
+            snapshots: self.live_surface_snapshots.clone(),
+            persisted_snapshot_count: self.live_surface_snapshots.len() as u64,
+            latest_snapshot_id: snapshot_id,
+            commit_count: self.state.surface_commit_count,
+            damage_count: self.live_surface_snapshots.len() as u64,
+        })
     }
 
     fn run_wayland_client_smoke_state(
@@ -5647,6 +5809,7 @@ mod tests {
             "--smoke-test",
             "--scripted-client",
             "--smithay-client-smoke",
+            "--smithay-live-surface-snapshots",
             "--smithay-real-shm-frame",
             "--smithay-real-shm-frame-output",
             "target/smithay-real-shm-frame/frame.ppm",
@@ -5666,6 +5829,7 @@ mod tests {
         assert!(config.smoke_test);
         assert!(config.scripted_client);
         assert!(config.smithay_client_smoke);
+        assert!(config.smithay_live_surface_snapshots);
         assert!(config.smithay_real_shm_frame);
         assert_eq!(
             config.smithay_real_shm_frame_output.as_deref(),

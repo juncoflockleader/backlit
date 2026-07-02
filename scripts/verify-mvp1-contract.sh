@@ -251,7 +251,14 @@ require_contains scripts/verify-smithay-runtime-probe.sh '"smithay_wayland_clien
 require_contains scripts/verify-smithay-runtime-probe.sh '"smithay_libinput_pointer_event_count": $smithay_libinput_pointer_event_count'
 require_contains scripts/verify-linux-e2e.sh './scripts/verify-smithay-runtime-probe.sh'
 require_contains scripts/verify-linux-e2e.sh './scripts/verify-smithay-compositor-runtime.sh'
+require_contains scripts/verify-linux-e2e.sh './scripts/verify-smithay-live-surface-snapshots.sh'
 require_contains scripts/verify-linux-e2e.sh './scripts/verify-smithay-real-shm-frame.sh'
+require_contains scripts/verify-smithay-live-surface-snapshots.sh '--smithay-live-surface-snapshots'
+require_contains scripts/verify-smithay-live-surface-snapshots.sh '"live_snapshot_pixels_copied": true'
+require_contains scripts/verify-smithay-live-surface-snapshots.sh '"live_snapshot_damage_recorded": true'
+require_contains scripts/verify-smithay-live-surface-snapshots.sh '"policy_window_from_live_snapshot": true'
+require_contains crates/compositor/src/main.rs '"compositor.smithay_live_surface_snapshots"'
+require_contains crates/compositor-backend/src/lib.rs 'run_live_surface_snapshot_capture'
 require_contains scripts/verify-smithay-real-shm-frame.sh '--smithay-real-shm-frame'
 require_contains scripts/verify-smithay-real-shm-frame.sh '"real_shm_pixels_captured": true'
 require_contains scripts/verify-smithay-real-shm-frame.sh '"real_shm_pixels_composited": true'
@@ -301,6 +308,7 @@ nested_wayland_artifact=false
 compositor_socket_artifact=false
 smithay_runtime_probe_artifact=false
 smithay_compositor_runtime_artifact=false
+smithay_live_surface_snapshots_artifact=false
 smithay_real_shm_frame_artifact=false
 
 if [ -n "$artifact_root" ] && [ -d "$artifact_root" ]; then
@@ -318,6 +326,7 @@ if [ -n "$artifact_root" ] && [ -d "$artifact_root" ]; then
   require_file "$artifact_root/compositor-socket/manifest.json"
   require_file "$artifact_root/smithay-runtime-probe/manifest.json"
   require_file "$artifact_root/smithay-compositor-runtime/manifest.json"
+  require_file "$artifact_root/smithay-live-surface-snapshots/manifest.json"
   require_file "$artifact_root/smithay-real-shm-frame/manifest.json"
   require_file "$artifact_root/launcher-desktop-discovery/manifest.json"
   require_file "$artifact_root/debian-package-install/manifest.json"
@@ -536,6 +545,34 @@ if [ -n "$artifact_root" ] && [ -d "$artifact_root" ]; then
     fi
   else
     require_contains "$artifact_root/smithay-compositor-runtime/manifest.json" '"expected_blocked": true'
+  fi
+  require_contains "$artifact_root/smithay-live-surface-snapshots/manifest.json" '"name": "backlit-smithay-live-surface-snapshots"'
+  require_contains "$artifact_root/smithay-live-surface-snapshots/manifest.json" '"smithay_live_surface_snapshots":'
+  require_contains "$artifact_root/smithay-live-surface-snapshots/manifest.json" '"real_wayland_client":'
+  require_contains "$artifact_root/smithay-live-surface-snapshots/manifest.json" '"live_snapshot_pipeline":'
+  require_contains "$artifact_root/smithay-live-surface-snapshots/manifest.json" '"live_snapshot_persisted":'
+  require_contains "$artifact_root/smithay-live-surface-snapshots/manifest.json" '"live_snapshot_metadata_preserved":'
+  require_contains "$artifact_root/smithay-live-surface-snapshots/manifest.json" '"live_snapshot_pixels_copied":'
+  require_contains "$artifact_root/smithay-live-surface-snapshots/manifest.json" '"live_snapshot_damage_recorded":'
+  require_contains "$artifact_root/smithay-live-surface-snapshots/manifest.json" '"live_snapshot_samples_verified":'
+  require_contains "$artifact_root/smithay-live-surface-snapshots/manifest.json" '"policy_window_from_live_snapshot":'
+  if grep '"checked": true' "$artifact_root/smithay-live-surface-snapshots/manifest.json" >/dev/null; then
+    if grep '"drm_launch_ready": true' "$artifact_root/smithay-live-surface-snapshots/manifest.json" >/dev/null; then
+      require_contains "$artifact_root/smithay-live-surface-snapshots/manifest.json" '"smithay_live_surface_snapshots": true'
+      require_contains "$artifact_root/smithay-live-surface-snapshots/manifest.json" '"real_wayland_client": true'
+      require_contains "$artifact_root/smithay-live-surface-snapshots/manifest.json" '"live_snapshot_pipeline": true'
+      require_contains "$artifact_root/smithay-live-surface-snapshots/manifest.json" '"live_snapshot_persisted": true'
+      require_contains "$artifact_root/smithay-live-surface-snapshots/manifest.json" '"live_snapshot_metadata_preserved": true'
+      require_contains "$artifact_root/smithay-live-surface-snapshots/manifest.json" '"live_snapshot_pixels_copied": true'
+      require_contains "$artifact_root/smithay-live-surface-snapshots/manifest.json" '"live_snapshot_damage_recorded": true'
+      require_contains "$artifact_root/smithay-live-surface-snapshots/manifest.json" '"live_snapshot_samples_verified": true'
+      require_contains "$artifact_root/smithay-live-surface-snapshots/manifest.json" '"policy_window_from_live_snapshot": true'
+      smithay_live_surface_snapshots_artifact=true
+    else
+      require_contains "$artifact_root/smithay-live-surface-snapshots/manifest.json" '"expected_blocked": true'
+    fi
+  else
+    require_contains "$artifact_root/smithay-live-surface-snapshots/manifest.json" '"expected_blocked": true'
   fi
   require_contains "$artifact_root/smithay-real-shm-frame/manifest.json" '"name": "backlit-smithay-real-shm-frame"'
   require_contains "$artifact_root/smithay-real-shm-frame/manifest.json" '"smithay_real_shm_frame":'
@@ -797,6 +834,7 @@ cat > "$manifest" <<EOF
     "launch_readiness_verifier": "scripts/verify-launch-readiness.sh",
     "session_launch_verifier": "scripts/verify-session-launch.sh",
     "drm_session_smoke_verifier": "scripts/verify-drm-session-smoke.sh",
+    "smithay_live_surface_snapshots_verifier": "scripts/verify-smithay-live-surface-snapshots.sh",
     "smithay_real_shm_frame_verifier": "scripts/verify-smithay-real-shm-frame.sh",
     "dedicated_drm_session_verifier": "scripts/verify-dedicated-drm-session.sh",
     "linux_e2e_verifier": "scripts/verify-linux-e2e.sh"
@@ -819,6 +857,8 @@ cat > "$manifest" <<EOF
     "smithay_runtime_probe_artifact": $smithay_runtime_probe_artifact,
     "smithay_compositor_runtime_contract": true,
     "smithay_compositor_runtime_artifact": $smithay_compositor_runtime_artifact,
+    "smithay_live_surface_snapshots_contract": true,
+    "smithay_live_surface_snapshots_artifact": $smithay_live_surface_snapshots_artifact,
     "smithay_real_shm_frame_contract": true,
     "smithay_real_shm_frame_artifact": $smithay_real_shm_frame_artifact,
     "compositor_socket_contract": true,
