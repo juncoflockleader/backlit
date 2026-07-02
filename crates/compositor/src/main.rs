@@ -23,8 +23,8 @@ use backlit_compositor_backend::{
 #[cfg(all(feature = "smithay-backend", target_os = "linux"))]
 use backlit_compositor_backend::{
     RealShmPixel, SmithayCompositorRuntime, SmithayLiveSurfaceSnapshot,
-    SmithayLiveSurfaceSnapshotReport, SmithayRealAppE2eReport, SmithayRealShmFrameCapture,
-    SmithaySurfaceLifecycleReport,
+    SmithayLiveSurfaceSnapshotReport, SmithayRealAppE2eReport, SmithayRealInputReport,
+    SmithayRealShmFrameCapture, SmithaySurfaceLifecycleReport,
 };
 use backlit_demo_client::{render_policy_gui, verify_policy_gui};
 #[cfg(all(feature = "smithay-backend", target_os = "linux"))]
@@ -1143,6 +1143,70 @@ fn run() -> Result<(), String> {
                 (
                     "real_surface_resized_checksum",
                     FieldValue::U64(runtime.real_surface_resized_checksum),
+                ),
+                (
+                    "real_input_to_clients",
+                    FieldValue::Bool(runtime.real_input_to_clients),
+                ),
+                (
+                    "real_input_pointer_entered",
+                    FieldValue::Bool(runtime.real_input_pointer_entered),
+                ),
+                (
+                    "real_input_pointer_motion",
+                    FieldValue::Bool(runtime.real_input_pointer_motion),
+                ),
+                (
+                    "real_input_pointer_button",
+                    FieldValue::Bool(runtime.real_input_pointer_button),
+                ),
+                (
+                    "real_input_keyboard_entered",
+                    FieldValue::Bool(runtime.real_input_keyboard_entered),
+                ),
+                (
+                    "real_input_keyboard_key",
+                    FieldValue::Bool(runtime.real_input_keyboard_key),
+                ),
+                (
+                    "real_input_focus_routed_to_second_client",
+                    FieldValue::Bool(runtime.real_input_focus_routed_to_second_client),
+                ),
+                (
+                    "real_input_shortcut_filter_preserved",
+                    FieldValue::Bool(runtime.real_input_shortcut_filter_preserved),
+                ),
+                (
+                    "real_input_primary_pointer_button_events",
+                    FieldValue::U64(runtime.real_input_primary_pointer_button_events),
+                ),
+                (
+                    "real_input_secondary_pointer_button_events",
+                    FieldValue::U64(runtime.real_input_secondary_pointer_button_events),
+                ),
+                (
+                    "real_input_primary_key_events",
+                    FieldValue::U64(runtime.real_input_primary_key_events),
+                ),
+                (
+                    "real_input_secondary_key_events",
+                    FieldValue::U64(runtime.real_input_secondary_key_events),
+                ),
+                (
+                    "real_input_keyboard_focus_set_count",
+                    FieldValue::U64(runtime.real_input_keyboard_focus_set_count),
+                ),
+                (
+                    "real_input_pointer_focus_set_count",
+                    FieldValue::U64(runtime.real_input_pointer_focus_set_count),
+                ),
+                (
+                    "real_input_shortcut_intercept_count",
+                    FieldValue::U64(runtime.real_input_shortcut_intercept_count),
+                ),
+                (
+                    "real_input_forwarded_key_count",
+                    FieldValue::U64(runtime.real_input_forwarded_key_count),
                 ),
             ],
         );
@@ -3328,6 +3392,22 @@ struct ScriptedClientRuntime {
     real_surface_resized_height: u64,
     real_surface_resized_pixel_count: u64,
     real_surface_resized_checksum: u64,
+    real_input_to_clients: bool,
+    real_input_pointer_entered: bool,
+    real_input_pointer_motion: bool,
+    real_input_pointer_button: bool,
+    real_input_keyboard_entered: bool,
+    real_input_keyboard_key: bool,
+    real_input_focus_routed_to_second_client: bool,
+    real_input_shortcut_filter_preserved: bool,
+    real_input_primary_pointer_button_events: u64,
+    real_input_secondary_pointer_button_events: u64,
+    real_input_primary_key_events: u64,
+    real_input_secondary_key_events: u64,
+    real_input_keyboard_focus_set_count: u64,
+    real_input_pointer_focus_set_count: u64,
+    real_input_shortcut_intercept_count: u64,
+    real_input_forwarded_key_count: u64,
 }
 
 impl ScriptedClientRuntime {
@@ -3363,6 +3443,7 @@ impl ScriptedClientRuntime {
             && self.policy_preview_non_background_pixels > 10_000
             && self.smithay_normal_frame_ok()
             && self.smithay_surface_lifecycle_ok()
+            && self.smithay_real_input_ok()
     }
 
     fn smithay_event_loop_runtime_ok(self) -> bool {
@@ -3434,6 +3515,26 @@ impl ScriptedClientRuntime {
                 && self.real_surface_resized_pixel_count == 420 * 300
                 && self.real_surface_resized_checksum > 0)
     }
+
+    fn smithay_real_input_ok(self) -> bool {
+        self.runtime_backend != "smithay-compositor-runtime"
+            || (self.real_input_to_clients
+                && self.real_input_pointer_entered
+                && self.real_input_pointer_motion
+                && self.real_input_pointer_button
+                && self.real_input_keyboard_entered
+                && self.real_input_keyboard_key
+                && self.real_input_focus_routed_to_second_client
+                && self.real_input_shortcut_filter_preserved
+                && self.real_input_primary_pointer_button_events >= 2
+                && self.real_input_secondary_pointer_button_events >= 2
+                && self.real_input_primary_key_events >= 2
+                && self.real_input_secondary_key_events >= 2
+                && self.real_input_keyboard_focus_set_count >= 4
+                && self.real_input_pointer_focus_set_count >= 2
+                && self.real_input_shortcut_intercept_count >= 2
+                && self.real_input_forwarded_key_count >= 6)
+    }
 }
 
 #[cfg(all(feature = "smithay-backend", target_os = "linux"))]
@@ -3490,6 +3591,27 @@ struct SmithaySurfaceLifecycleSmoke {
     resized_checksum: u64,
 }
 
+#[cfg(all(feature = "smithay-backend", target_os = "linux"))]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+struct SmithayRealInputSmoke {
+    input_passed: bool,
+    pointer_entered: bool,
+    pointer_motion: bool,
+    pointer_button: bool,
+    keyboard_entered: bool,
+    keyboard_key: bool,
+    focus_routed_to_second_client: bool,
+    shortcut_filter_preserved: bool,
+    primary_pointer_button_events: u64,
+    secondary_pointer_button_events: u64,
+    primary_key_events: u64,
+    secondary_key_events: u64,
+    keyboard_focus_set_count: u64,
+    pointer_focus_set_count: u64,
+    shortcut_intercept_count: u64,
+    forwarded_key_count: u64,
+}
+
 fn run_scripted_client_runtime(
     policy_preview_path: Option<&str>,
 ) -> Result<ScriptedClientRuntime, String> {
@@ -3513,6 +3635,7 @@ fn run_scripted_client_runtime_with_smithay(
     let mut runtime = SmithayCompositorRuntime::try_new().map_err(|error| error.to_string())?;
     let normal_frame = run_smithay_normal_live_snapshot_frame(&mut runtime, policy_preview_path)?;
     let lifecycle = run_smithay_surface_lifecycle(&mut runtime)?;
+    let real_input = run_smithay_real_input(&mut runtime)?;
     let mut report = run_scripted_client_runtime_with_backend(runtime, None)?;
 
     report.policy_preview_requested = policy_preview_path.is_some();
@@ -3567,6 +3690,22 @@ fn run_scripted_client_runtime_with_smithay(
     report.real_surface_resized_height = lifecycle.resized_height;
     report.real_surface_resized_pixel_count = lifecycle.resized_pixel_count;
     report.real_surface_resized_checksum = lifecycle.resized_checksum;
+    report.real_input_to_clients = real_input.input_passed;
+    report.real_input_pointer_entered = real_input.pointer_entered;
+    report.real_input_pointer_motion = real_input.pointer_motion;
+    report.real_input_pointer_button = real_input.pointer_button;
+    report.real_input_keyboard_entered = real_input.keyboard_entered;
+    report.real_input_keyboard_key = real_input.keyboard_key;
+    report.real_input_focus_routed_to_second_client = real_input.focus_routed_to_second_client;
+    report.real_input_shortcut_filter_preserved = real_input.shortcut_filter_preserved;
+    report.real_input_primary_pointer_button_events = real_input.primary_pointer_button_events;
+    report.real_input_secondary_pointer_button_events = real_input.secondary_pointer_button_events;
+    report.real_input_primary_key_events = real_input.primary_key_events;
+    report.real_input_secondary_key_events = real_input.secondary_key_events;
+    report.real_input_keyboard_focus_set_count = real_input.keyboard_focus_set_count;
+    report.real_input_pointer_focus_set_count = real_input.pointer_focus_set_count;
+    report.real_input_shortcut_intercept_count = real_input.shortcut_intercept_count;
+    report.real_input_forwarded_key_count = real_input.forwarded_key_count;
 
     Ok(report)
 }
@@ -3800,6 +3939,58 @@ fn build_smithay_surface_lifecycle_smoke(
     })
 }
 
+#[cfg(all(feature = "smithay-backend", target_os = "linux"))]
+fn run_smithay_real_input(
+    runtime: &mut SmithayCompositorRuntime,
+) -> Result<SmithayRealInputSmoke, String> {
+    let report = runtime
+        .run_real_input_capture()
+        .map_err(|error| error.to_string())?;
+    build_smithay_real_input_smoke(&report)
+}
+
+#[cfg(all(feature = "smithay-backend", target_os = "linux"))]
+fn build_smithay_real_input_smoke(
+    report: &SmithayRealInputReport,
+) -> Result<SmithayRealInputSmoke, String> {
+    let primary_pointer_button_events =
+        report.primary_pointer_button_press_count + report.primary_pointer_button_release_count;
+    let secondary_pointer_button_events =
+        report.secondary_pointer_button_press_count + report.secondary_pointer_button_release_count;
+    let primary_key_events =
+        report.primary_keyboard_key_press_count + report.primary_keyboard_key_release_count;
+    let secondary_key_events =
+        report.secondary_keyboard_key_press_count + report.secondary_keyboard_key_release_count;
+
+    Ok(SmithayRealInputSmoke {
+        input_passed: report.passed(),
+        pointer_entered: report.primary_pointer_enter_count >= 1
+            && report.secondary_pointer_enter_count >= 1,
+        pointer_motion: report.primary_pointer_motion_count >= 1
+            && report.secondary_pointer_motion_count >= 1,
+        pointer_button: report.primary_pointer_button_press_count >= 1
+            && report.primary_pointer_button_release_count >= 1
+            && report.secondary_pointer_button_press_count >= 1
+            && report.secondary_pointer_button_release_count >= 1,
+        keyboard_entered: report.primary_keyboard_enter_count >= 1
+            && report.secondary_keyboard_enter_count >= 1,
+        keyboard_key: report.primary_keyboard_key_press_count >= 1
+            && report.primary_keyboard_key_release_count >= 1
+            && report.secondary_keyboard_key_press_count >= 1
+            && report.secondary_keyboard_key_release_count >= 1,
+        focus_routed_to_second_client: report.focus_routed_to_secondary,
+        shortcut_filter_preserved: report.shortcut_intercepted && report.shortcut_not_forwarded,
+        primary_pointer_button_events,
+        secondary_pointer_button_events,
+        primary_key_events,
+        secondary_key_events,
+        keyboard_focus_set_count: report.keyboard_focus_set_count,
+        pointer_focus_set_count: report.pointer_focus_set_count,
+        shortcut_intercept_count: report.shortcut_intercept_count,
+        forwarded_key_count: report.forwarded_key_count,
+    })
+}
+
 fn run_scripted_client_runtime_with_backend<B: CompositorRuntime>(
     mut backend: B,
     policy_preview_path: Option<&str>,
@@ -3957,6 +4148,22 @@ fn run_scripted_client_runtime_with_backend<B: CompositorRuntime>(
         real_surface_resized_height: 0,
         real_surface_resized_pixel_count: 0,
         real_surface_resized_checksum: 0,
+        real_input_to_clients: false,
+        real_input_pointer_entered: false,
+        real_input_pointer_motion: false,
+        real_input_pointer_button: false,
+        real_input_keyboard_entered: false,
+        real_input_keyboard_key: false,
+        real_input_focus_routed_to_second_client: false,
+        real_input_shortcut_filter_preserved: false,
+        real_input_primary_pointer_button_events: 0,
+        real_input_secondary_pointer_button_events: 0,
+        real_input_primary_key_events: 0,
+        real_input_secondary_key_events: 0,
+        real_input_keyboard_focus_set_count: 0,
+        real_input_pointer_focus_set_count: 0,
+        real_input_shortcut_intercept_count: 0,
+        real_input_forwarded_key_count: 0,
     })
 }
 

@@ -153,6 +153,7 @@ cat > "$out_dir/manifest.json" <<EOF
     "smithay_compositor_runtime": true,
     "smithay_normal_runtime_real_pixels": true,
     "smithay_real_surface_lifecycle": true,
+    "smithay_real_client_input": true,
     "smithay_live_surface_snapshots": true,
     "smithay_real_app_e2e": true,
     "smithay_real_shm_frame": true,

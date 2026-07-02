@@ -3727,6 +3727,8 @@ struct SmithayCompositorState {
     seat: smithay::input::Seat<SmithayCompositorState>,
     keyboard_handle: smithay::input::keyboard::KeyboardHandle<SmithayCompositorState>,
     pointer_handle: smithay::input::pointer::PointerHandle<SmithayCompositorState>,
+    active_input_surface:
+        Option<smithay::reexports::wayland_server::protocol::wl_surface::WlSurface>,
     protocol_global_count: u64,
     seat_global_count: u64,
     seat_keyboard_capability: bool,
@@ -3736,6 +3738,11 @@ struct SmithayCompositorState {
     input_event_loop_dispatch_count: u64,
     input_keyboard_dispatch_count: u64,
     input_pointer_dispatch_count: u64,
+    input_keyboard_focus_set_count: u64,
+    input_pointer_focus_set_count: u64,
+    input_shortcut_filter_checked_count: u64,
+    input_shortcut_intercept_count: u64,
+    input_forwarded_key_count: u64,
     pointer_location: smithay::utils::Point<f64, smithay::utils::Logical>,
     libseat_session_created: bool,
     libseat_event_source_inserted: bool,
@@ -4214,6 +4221,85 @@ impl SmithaySurfaceLifecycleReport {
 }
 
 #[cfg(all(feature = "smithay-backend", target_os = "linux"))]
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct SmithayRealInputReport {
+    pub primary_smoke: SmithayWaylandClientSmokeReport,
+    pub secondary_smoke: SmithayWaylandClientSmokeReport,
+    pub inserted_wayland_clients: u64,
+    pub wayland_dispatch_count: u64,
+    pub calloop_dispatch_count: u64,
+    pub keyboard_dispatch_count: u64,
+    pub pointer_dispatch_count: u64,
+    pub keyboard_focus_set_count: u64,
+    pub pointer_focus_set_count: u64,
+    pub shortcut_filter_checked_count: u64,
+    pub shortcut_intercept_count: u64,
+    pub forwarded_key_count: u64,
+    pub primary_pointer_enter_count: u64,
+    pub primary_pointer_leave_count: u64,
+    pub primary_pointer_motion_count: u64,
+    pub primary_pointer_button_press_count: u64,
+    pub primary_pointer_button_release_count: u64,
+    pub primary_keyboard_enter_count: u64,
+    pub primary_keyboard_leave_count: u64,
+    pub primary_keyboard_key_press_count: u64,
+    pub primary_keyboard_key_release_count: u64,
+    pub secondary_pointer_enter_count: u64,
+    pub secondary_pointer_motion_count: u64,
+    pub secondary_pointer_button_press_count: u64,
+    pub secondary_pointer_button_release_count: u64,
+    pub secondary_keyboard_enter_count: u64,
+    pub secondary_keyboard_key_press_count: u64,
+    pub secondary_keyboard_key_release_count: u64,
+    pub primary_button_events_before_secondary: u64,
+    pub primary_button_events_after_secondary: u64,
+    pub primary_key_events_before_secondary: u64,
+    pub primary_key_events_after_secondary: u64,
+    pub secondary_key_events_before_shortcut: u64,
+    pub secondary_key_events_after_shortcut: u64,
+    pub focus_routed_to_secondary: bool,
+    pub shortcut_intercepted: bool,
+    pub shortcut_not_forwarded: bool,
+}
+
+#[cfg(all(feature = "smithay-backend", target_os = "linux"))]
+impl SmithayRealInputReport {
+    pub fn passed(&self) -> bool {
+        self.primary_smoke.passed()
+            && self.secondary_smoke.passed()
+            && self.inserted_wayland_clients >= 2
+            && self.wayland_dispatch_count >= 10
+            && self.calloop_dispatch_count >= 10
+            && self.keyboard_dispatch_count >= 8
+            && self.pointer_dispatch_count >= 7
+            && self.keyboard_focus_set_count >= 4
+            && self.pointer_focus_set_count >= 2
+            && self.shortcut_filter_checked_count >= 8
+            && self.shortcut_intercept_count >= 2
+            && self.forwarded_key_count >= 6
+            && self.primary_pointer_enter_count >= 1
+            && self.primary_pointer_leave_count >= 1
+            && self.primary_pointer_motion_count >= 1
+            && self.primary_pointer_button_press_count >= 1
+            && self.primary_pointer_button_release_count >= 1
+            && self.primary_keyboard_enter_count >= 1
+            && self.primary_keyboard_leave_count >= 1
+            && self.primary_keyboard_key_press_count >= 1
+            && self.primary_keyboard_key_release_count >= 1
+            && self.secondary_pointer_enter_count >= 1
+            && self.secondary_pointer_motion_count >= 1
+            && self.secondary_pointer_button_press_count >= 1
+            && self.secondary_pointer_button_release_count >= 1
+            && self.secondary_keyboard_enter_count >= 1
+            && self.secondary_keyboard_key_press_count >= 1
+            && self.secondary_keyboard_key_release_count >= 1
+            && self.focus_routed_to_secondary
+            && self.shortcut_intercepted
+            && self.shortcut_not_forwarded
+    }
+}
+
+#[cfg(all(feature = "smithay-backend", target_os = "linux"))]
 fn real_shm_pixel_checksum(pixels: &[RealShmPixel]) -> u64 {
     pixels.iter().fold(0u64, |checksum, pixel| {
         checksum
@@ -4370,6 +4456,19 @@ struct WaylandClientEventState {
     seat_pointer_capability: bool,
     keyboard_bound: bool,
     pointer_bound: bool,
+    keyboard_keymap_count: u64,
+    keyboard_enter_count: u64,
+    keyboard_leave_count: u64,
+    keyboard_key_press_count: u64,
+    keyboard_key_release_count: u64,
+    keyboard_modifiers_count: u64,
+    keyboard_repeat_info_count: u64,
+    pointer_enter_count: u64,
+    pointer_leave_count: u64,
+    pointer_motion_count: u64,
+    pointer_button_press_count: u64,
+    pointer_button_release_count: u64,
+    pointer_frame_count: u64,
     shm_buffer_created: bool,
     shm_buffer_attached: bool,
     xdg_wm_base_bound: bool,
@@ -4458,6 +4557,14 @@ impl WaylandClientEventState {
 
     fn mvp_protocol_globals_announced(&self) -> bool {
         self.mvp_protocol_globals() >= SMITHAY_MVP_PROTOCOL_GLOBALS
+    }
+
+    fn pointer_button_event_count(&self) -> u64 {
+        self.pointer_button_press_count + self.pointer_button_release_count
+    }
+
+    fn keyboard_key_event_count(&self) -> u64 {
+        self.keyboard_key_press_count + self.keyboard_key_release_count
     }
 
     fn init_xdg_toplevel(&mut self, qh: &wayland_client::QueueHandle<Self>) {
@@ -5049,10 +5156,95 @@ wayland_client::delegate_noop!(WaylandClientEventState: ignore wayland_client::p
 wayland_client::delegate_noop!(WaylandClientEventState: ignore wayland_client::protocol::wl_buffer::WlBuffer);
 
 #[cfg(all(feature = "smithay-backend", target_os = "linux"))]
-wayland_client::delegate_noop!(WaylandClientEventState: ignore wayland_client::protocol::wl_keyboard::WlKeyboard);
+impl wayland_client::Dispatch<wayland_client::protocol::wl_keyboard::WlKeyboard, ()>
+    for WaylandClientEventState
+{
+    fn event(
+        state: &mut Self,
+        _: &wayland_client::protocol::wl_keyboard::WlKeyboard,
+        event: wayland_client::protocol::wl_keyboard::Event,
+        _: &(),
+        _: &wayland_client::Connection,
+        _: &wayland_client::QueueHandle<Self>,
+    ) {
+        use wayland_client::protocol::wl_keyboard;
+
+        match event {
+            wl_keyboard::Event::Keymap { .. } => {
+                state.keyboard_keymap_count += 1;
+            }
+            wl_keyboard::Event::Enter { .. } => {
+                state.keyboard_enter_count += 1;
+            }
+            wl_keyboard::Event::Leave { .. } => {
+                state.keyboard_leave_count += 1;
+            }
+            wl_keyboard::Event::Key {
+                state: wayland_client::WEnum::Value(wl_keyboard::KeyState::Pressed),
+                ..
+            } => {
+                state.keyboard_key_press_count += 1;
+            }
+            wl_keyboard::Event::Key {
+                state: wayland_client::WEnum::Value(wl_keyboard::KeyState::Released),
+                ..
+            } => {
+                state.keyboard_key_release_count += 1;
+            }
+            wl_keyboard::Event::Modifiers { .. } => {
+                state.keyboard_modifiers_count += 1;
+            }
+            wl_keyboard::Event::RepeatInfo { .. } => {
+                state.keyboard_repeat_info_count += 1;
+            }
+            _ => {}
+        }
+    }
+}
 
 #[cfg(all(feature = "smithay-backend", target_os = "linux"))]
-wayland_client::delegate_noop!(WaylandClientEventState: ignore wayland_client::protocol::wl_pointer::WlPointer);
+impl wayland_client::Dispatch<wayland_client::protocol::wl_pointer::WlPointer, ()>
+    for WaylandClientEventState
+{
+    fn event(
+        state: &mut Self,
+        _: &wayland_client::protocol::wl_pointer::WlPointer,
+        event: wayland_client::protocol::wl_pointer::Event,
+        _: &(),
+        _: &wayland_client::Connection,
+        _: &wayland_client::QueueHandle<Self>,
+    ) {
+        use wayland_client::protocol::wl_pointer;
+
+        match event {
+            wl_pointer::Event::Enter { .. } => {
+                state.pointer_enter_count += 1;
+            }
+            wl_pointer::Event::Leave { .. } => {
+                state.pointer_leave_count += 1;
+            }
+            wl_pointer::Event::Motion { .. } => {
+                state.pointer_motion_count += 1;
+            }
+            wl_pointer::Event::Button {
+                state: wayland_client::WEnum::Value(wl_pointer::ButtonState::Pressed),
+                ..
+            } => {
+                state.pointer_button_press_count += 1;
+            }
+            wl_pointer::Event::Button {
+                state: wayland_client::WEnum::Value(wl_pointer::ButtonState::Released),
+                ..
+            } => {
+                state.pointer_button_release_count += 1;
+            }
+            wl_pointer::Event::Frame => {
+                state.pointer_frame_count += 1;
+            }
+            _ => {}
+        }
+    }
+}
 
 #[cfg(all(feature = "smithay-backend", target_os = "linux"))]
 wayland_client::delegate_noop!(WaylandClientEventState: ignore wayland_protocols::xdg::xdg_output::zv1::client::zxdg_output_manager_v1::ZxdgOutputManagerV1);
@@ -5141,6 +5333,7 @@ impl SmithayCompositorState {
             seat,
             keyboard_handle,
             pointer_handle,
+            active_input_surface: None,
             protocol_global_count: SMITHAY_RUNTIME_PROTOCOL_GLOBALS,
             seat_global_count: 1,
             seat_keyboard_capability: true,
@@ -5150,6 +5343,11 @@ impl SmithayCompositorState {
             input_event_loop_dispatch_count: 0,
             input_keyboard_dispatch_count: 0,
             input_pointer_dispatch_count: 0,
+            input_keyboard_focus_set_count: 0,
+            input_pointer_focus_set_count: 0,
+            input_shortcut_filter_checked_count: 0,
+            input_shortcut_intercept_count: 0,
+            input_forwarded_key_count: 0,
             pointer_location: smithay::utils::Point::new(0.0, 0.0),
             libseat_session_created: false,
             libseat_event_source_inserted: false,
@@ -5212,18 +5410,67 @@ impl SmithayCompositorState {
         self.input_keyboard_dispatch_count + self.input_pointer_dispatch_count
     }
 
+    fn active_input_focus(
+        &self,
+    ) -> Option<(
+        smithay::reexports::wayland_server::protocol::wl_surface::WlSurface,
+        smithay::utils::Point<f64, smithay::utils::Logical>,
+    )> {
+        self.active_input_surface
+            .as_ref()
+            .map(|surface| (surface.clone(), smithay::utils::Point::new(0.0, 0.0)))
+    }
+
+    fn focus_active_keyboard_surface(&mut self) -> bool {
+        let Some(surface) = self.active_input_surface.clone() else {
+            return false;
+        };
+
+        let keyboard_handle = self.keyboard_handle.clone();
+        keyboard_handle.set_focus(
+            self,
+            Some(surface),
+            smithay::utils::SERIAL_COUNTER.next_serial(),
+        );
+        self.input_keyboard_focus_set_count += 1;
+        true
+    }
+
     fn dispatch_keyboard_key(
         &mut self,
         keycode: smithay::backend::input::Keycode,
         state: smithay::backend::input::KeyState,
         time: u32,
     ) {
+        self.focus_active_keyboard_surface();
         let keyboard_handle = self.keyboard_handle.clone();
         let serial = smithay::utils::SERIAL_COUNTER.next_serial();
-        let _ = keyboard_handle.input::<(), _>(self, keycode, state, serial, time, |_, _, _| {
-            smithay::input::keyboard::FilterResult::Forward
-        });
+        let _ =
+            keyboard_handle.input::<(), _>(self, keycode, state, serial, time, |state, _, _| {
+                state.input_shortcut_filter_checked_count += 1;
+                state.input_forwarded_key_count += 1;
+                smithay::input::keyboard::FilterResult::Forward
+            });
         self.input_keyboard_dispatch_count += 1;
+    }
+
+    fn dispatch_keyboard_shortcut_probe(
+        &mut self,
+        keycode: smithay::backend::input::Keycode,
+        state: smithay::backend::input::KeyState,
+        time: u32,
+    ) -> bool {
+        self.focus_active_keyboard_surface();
+        let keyboard_handle = self.keyboard_handle.clone();
+        let serial = smithay::utils::SERIAL_COUNTER.next_serial();
+        let intercepted =
+            keyboard_handle.input::<bool, _>(self, keycode, state, serial, time, |state, _, _| {
+                state.input_shortcut_filter_checked_count += 1;
+                state.input_shortcut_intercept_count += 1;
+                smithay::input::keyboard::FilterResult::Intercept(true)
+            });
+        self.input_keyboard_dispatch_count += 1;
+        intercepted.unwrap_or(false)
     }
 
     fn dispatch_pointer_motion(&mut self, delta_x: f64, delta_y: f64, time: u32) {
@@ -5238,7 +5485,11 @@ impl SmithayCompositorState {
             serial,
             time,
         };
-        pointer_handle.motion(self, None, &event);
+        let focus = self.active_input_focus();
+        if focus.is_some() {
+            self.input_pointer_focus_set_count += 1;
+        }
+        pointer_handle.motion(self, focus, &event);
         pointer_handle.frame(self);
         self.input_pointer_dispatch_count += 1;
     }
@@ -5297,9 +5548,11 @@ impl smithay::wayland::compositor::CompositorHandler for SmithayCompositorState 
                 self.xdg_unmap_count += 1;
             }
             self.live_surface_mapped = false;
+            self.active_input_surface = None;
         }
         if let Some((width, height)) = smithay_committed_buffer_dimensions(surface) {
             self.live_surface_mapped = true;
+            self.active_input_surface = Some(surface.clone());
             self.shm_buffer_commit_count += 1;
             self.shm_buffer_width = width;
             self.shm_buffer_height = height;
@@ -5644,6 +5897,7 @@ impl smithay::wayland::shell::xdg::XdgShellHandler for SmithayCompositorState {
     fn toplevel_destroyed(&mut self, _surface: smithay::wayland::shell::xdg::ToplevelSurface) {
         self.xdg_toplevel_destroyed_count += 1;
         self.active_toplevel = None;
+        self.active_input_surface = None;
         self.live_surface_mapped = false;
     }
 
@@ -6146,6 +6400,177 @@ impl SmithayCompositorRuntime {
         })
     }
 
+    pub fn run_real_input_capture(
+        &mut self,
+    ) -> Result<SmithayRealInputReport, SmithayRuntimeError> {
+        let (primary_connection, mut primary_queue, mut primary_state) =
+            self.connect_generated_client("real-input-primary")?;
+        let first_minimum_shm_commits = self.state.shm_buffer_commit_count + 1;
+        self.pump_generated_client_until_ready(
+            &primary_connection,
+            &mut primary_queue,
+            &mut primary_state,
+            first_minimum_shm_commits,
+        )?;
+        let primary_smoke = self.build_wayland_client_smoke_report(&primary_state);
+
+        self.state.dispatch_pointer_motion(42.0, 34.0, 20);
+        self.dispatch_wayland();
+        drain_wayland_client_queue(&mut primary_queue, &mut primary_state)?;
+        self.state.dispatch_pointer_motion(4.0, 3.0, 21);
+        self.dispatch_wayland();
+        drain_wayland_client_queue(&mut primary_queue, &mut primary_state)?;
+        self.state.dispatch_pointer_button(
+            0x110,
+            smithay::backend::input::ButtonState::Pressed,
+            22,
+        );
+        self.dispatch_wayland();
+        drain_wayland_client_queue(&mut primary_queue, &mut primary_state)?;
+        self.state.dispatch_pointer_button(
+            0x110,
+            smithay::backend::input::ButtonState::Released,
+            23,
+        );
+        self.dispatch_wayland();
+        drain_wayland_client_queue(&mut primary_queue, &mut primary_state)?;
+        self.state.dispatch_keyboard_key(
+            smithay::backend::input::Keycode::from(30u32),
+            smithay::backend::input::KeyState::Pressed,
+            24,
+        );
+        self.dispatch_wayland();
+        drain_wayland_client_queue(&mut primary_queue, &mut primary_state)?;
+        self.state.dispatch_keyboard_key(
+            smithay::backend::input::Keycode::from(30u32),
+            smithay::backend::input::KeyState::Released,
+            25,
+        );
+        self.dispatch_wayland();
+        drain_wayland_client_queue(&mut primary_queue, &mut primary_state)?;
+
+        let primary_button_events_before_secondary = primary_state.pointer_button_event_count();
+        let primary_key_events_before_secondary = primary_state.keyboard_key_event_count();
+
+        let (secondary_connection, mut secondary_queue, mut secondary_state) =
+            self.connect_generated_client("real-input-secondary")?;
+        let second_minimum_shm_commits = self.state.shm_buffer_commit_count + 1;
+        self.pump_generated_client_until_ready(
+            &secondary_connection,
+            &mut secondary_queue,
+            &mut secondary_state,
+            second_minimum_shm_commits,
+        )?;
+        let secondary_smoke = self.build_wayland_client_smoke_report(&secondary_state);
+
+        self.state.dispatch_pointer_motion(18.0, 16.0, 30);
+        self.dispatch_wayland();
+        drain_wayland_client_queue(&mut primary_queue, &mut primary_state)?;
+        drain_wayland_client_queue(&mut secondary_queue, &mut secondary_state)?;
+        self.state.dispatch_pointer_motion(3.0, 2.0, 31);
+        self.dispatch_wayland();
+        drain_wayland_client_queue(&mut primary_queue, &mut primary_state)?;
+        drain_wayland_client_queue(&mut secondary_queue, &mut secondary_state)?;
+        self.state.dispatch_pointer_button(
+            0x110,
+            smithay::backend::input::ButtonState::Pressed,
+            32,
+        );
+        self.dispatch_wayland();
+        drain_wayland_client_queue(&mut primary_queue, &mut primary_state)?;
+        drain_wayland_client_queue(&mut secondary_queue, &mut secondary_state)?;
+        self.state.dispatch_pointer_button(
+            0x110,
+            smithay::backend::input::ButtonState::Released,
+            33,
+        );
+        self.dispatch_wayland();
+        drain_wayland_client_queue(&mut primary_queue, &mut primary_state)?;
+        drain_wayland_client_queue(&mut secondary_queue, &mut secondary_state)?;
+        self.state.dispatch_keyboard_key(
+            smithay::backend::input::Keycode::from(31u32),
+            smithay::backend::input::KeyState::Pressed,
+            34,
+        );
+        self.dispatch_wayland();
+        drain_wayland_client_queue(&mut primary_queue, &mut primary_state)?;
+        drain_wayland_client_queue(&mut secondary_queue, &mut secondary_state)?;
+        self.state.dispatch_keyboard_key(
+            smithay::backend::input::Keycode::from(31u32),
+            smithay::backend::input::KeyState::Released,
+            35,
+        );
+        self.dispatch_wayland();
+        drain_wayland_client_queue(&mut primary_queue, &mut primary_state)?;
+        drain_wayland_client_queue(&mut secondary_queue, &mut secondary_state)?;
+
+        let primary_button_events_after_secondary = primary_state.pointer_button_event_count();
+        let primary_key_events_after_secondary = primary_state.keyboard_key_event_count();
+        let secondary_key_events_before_shortcut = secondary_state.keyboard_key_event_count();
+        let shortcut_pressed = self.state.dispatch_keyboard_shortcut_probe(
+            smithay::backend::input::Keycode::from(32u32),
+            smithay::backend::input::KeyState::Pressed,
+            40,
+        );
+        self.dispatch_wayland();
+        drain_wayland_client_queue(&mut primary_queue, &mut primary_state)?;
+        drain_wayland_client_queue(&mut secondary_queue, &mut secondary_state)?;
+        let shortcut_released = self.state.dispatch_keyboard_shortcut_probe(
+            smithay::backend::input::Keycode::from(32u32),
+            smithay::backend::input::KeyState::Released,
+            41,
+        );
+        self.dispatch_wayland();
+        drain_wayland_client_queue(&mut primary_queue, &mut primary_state)?;
+        drain_wayland_client_queue(&mut secondary_queue, &mut secondary_state)?;
+        let secondary_key_events_after_shortcut = secondary_state.keyboard_key_event_count();
+
+        Ok(SmithayRealInputReport {
+            primary_smoke,
+            secondary_smoke,
+            inserted_wayland_clients: self.inserted_wayland_clients,
+            wayland_dispatch_count: self.wayland_dispatch_count,
+            calloop_dispatch_count: self.calloop_dispatch_count,
+            keyboard_dispatch_count: self.state.input_keyboard_dispatch_count,
+            pointer_dispatch_count: self.state.input_pointer_dispatch_count,
+            keyboard_focus_set_count: self.state.input_keyboard_focus_set_count,
+            pointer_focus_set_count: self.state.input_pointer_focus_set_count,
+            shortcut_filter_checked_count: self.state.input_shortcut_filter_checked_count,
+            shortcut_intercept_count: self.state.input_shortcut_intercept_count,
+            forwarded_key_count: self.state.input_forwarded_key_count,
+            primary_pointer_enter_count: primary_state.pointer_enter_count,
+            primary_pointer_leave_count: primary_state.pointer_leave_count,
+            primary_pointer_motion_count: primary_state.pointer_motion_count,
+            primary_pointer_button_press_count: primary_state.pointer_button_press_count,
+            primary_pointer_button_release_count: primary_state.pointer_button_release_count,
+            primary_keyboard_enter_count: primary_state.keyboard_enter_count,
+            primary_keyboard_leave_count: primary_state.keyboard_leave_count,
+            primary_keyboard_key_press_count: primary_state.keyboard_key_press_count,
+            primary_keyboard_key_release_count: primary_state.keyboard_key_release_count,
+            secondary_pointer_enter_count: secondary_state.pointer_enter_count,
+            secondary_pointer_motion_count: secondary_state.pointer_motion_count,
+            secondary_pointer_button_press_count: secondary_state.pointer_button_press_count,
+            secondary_pointer_button_release_count: secondary_state.pointer_button_release_count,
+            secondary_keyboard_enter_count: secondary_state.keyboard_enter_count,
+            secondary_keyboard_key_press_count: secondary_state.keyboard_key_press_count,
+            secondary_keyboard_key_release_count: secondary_state.keyboard_key_release_count,
+            primary_button_events_before_secondary,
+            primary_button_events_after_secondary,
+            primary_key_events_before_secondary,
+            primary_key_events_after_secondary,
+            secondary_key_events_before_shortcut,
+            secondary_key_events_after_shortcut,
+            focus_routed_to_secondary: primary_button_events_after_secondary
+                == primary_button_events_before_secondary
+                && primary_key_events_after_secondary == primary_key_events_before_secondary
+                && secondary_state.pointer_button_event_count() >= 2
+                && secondary_state.keyboard_key_event_count() >= 2,
+            shortcut_intercepted: shortcut_pressed && shortcut_released,
+            shortcut_not_forwarded: secondary_key_events_after_shortcut
+                == secondary_key_events_before_shortcut,
+        })
+    }
+
     pub fn run_real_app_e2e_capture(
         &mut self,
         app_command: &str,
@@ -6345,6 +6770,59 @@ impl SmithayCompositorRuntime {
             shm_buffer_height: self.state.shm_buffer_height,
             shm_buffer_pixels: self.state.shm_buffer_pixels,
         }
+    }
+
+    fn connect_generated_client(
+        &mut self,
+        client_name: &str,
+    ) -> Result<
+        (
+            wayland_client::Connection,
+            wayland_client::EventQueue<WaylandClientEventState>,
+            WaylandClientEventState,
+        ),
+        SmithayRuntimeError,
+    > {
+        let client_stream = self.connect_and_insert_wayland_client(client_name)?;
+        let client_connection = wayland_client::Connection::from_socket(client_stream)
+            .map_err(|error| SmithayRuntimeError(format!("client-connect:{error}")))?;
+        let event_queue = client_connection.new_event_queue::<WaylandClientEventState>();
+        let qh = event_queue.handle();
+        let client_state = WaylandClientEventState::default();
+        client_connection.display().get_registry(&qh, ());
+
+        Ok((client_connection, event_queue, client_state))
+    }
+
+    fn pump_generated_client_until_ready(
+        &mut self,
+        client_connection: &wayland_client::Connection,
+        event_queue: &mut wayland_client::EventQueue<WaylandClientEventState>,
+        client_state: &mut WaylandClientEventState,
+        minimum_shm_commits: u64,
+    ) -> Result<(), SmithayRuntimeError> {
+        for _ in 0..24 {
+            pump_wayland_client(self, client_connection, event_queue, client_state)?;
+            if let Some(error) = client_state.failure.as_ref() {
+                return Err(SmithayRuntimeError(error.clone()));
+            }
+            if client_state.registry_announced()
+                && client_state.mvp_protocol_globals_announced()
+                && client_state.wl_output_bound
+                && client_state.xdg_output_manager_bound
+                && client_state.viewporter_bound
+                && client_state.presentation_bound
+                && client_state.linux_dmabuf_bound
+                && client_state.configure_acked
+                && client_state.surface_committed
+                && self.state.shm_buffer_commit_count >= minimum_shm_commits
+                && self.state.active_input_surface.is_some()
+            {
+                break;
+            }
+        }
+
+        Ok(())
     }
 
     fn send_active_toplevel_resize_configure(

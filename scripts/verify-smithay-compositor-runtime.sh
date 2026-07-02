@@ -120,6 +120,11 @@ write_blocked_manifest() {
     "smithay_real_xdg_unmap_cleanup": false,
     "smithay_real_xdg_close_disconnect": false,
     "smithay_policy_lifecycle_cleanup": false,
+    "smithay_real_client_input": false,
+    "smithay_real_pointer_input": false,
+    "smithay_real_keyboard_input": false,
+    "smithay_real_input_focus_routing": false,
+    "smithay_shortcut_filter_preserved": false,
     "smithay_real_wayland_policy_window": false,
     "smithay_event_loop_runtime": false,
     "smithay_drm_first_present_probe": false,
@@ -251,6 +256,24 @@ require_matches "$log" '"real_surface_configure_ack_count":([2-9]|[1-9][0-9]+)'
 require_matches "$log" '"real_surface_unmap_count":[1-9][0-9]*'
 require_matches "$log" '"real_surface_toplevel_destroyed_count":[1-9][0-9]*'
 require_matches "$log" '"real_surface_resized_checksum":[1-9][0-9]*'
+require_line_contains_all "$log" \
+  '"event":"compositor.scripted_client"' \
+  '"real_input_to_clients":true' \
+  '"real_input_pointer_entered":true' \
+  '"real_input_pointer_motion":true' \
+  '"real_input_pointer_button":true' \
+  '"real_input_keyboard_entered":true' \
+  '"real_input_keyboard_key":true' \
+  '"real_input_focus_routed_to_second_client":true' \
+  '"real_input_shortcut_filter_preserved":true'
+require_matches "$log" '"real_input_primary_pointer_button_events":([2-9]|[1-9][0-9]+)'
+require_matches "$log" '"real_input_secondary_pointer_button_events":([2-9]|[1-9][0-9]+)'
+require_matches "$log" '"real_input_primary_key_events":([2-9]|[1-9][0-9]+)'
+require_matches "$log" '"real_input_secondary_key_events":([2-9]|[1-9][0-9]+)'
+require_matches "$log" '"real_input_keyboard_focus_set_count":([4-9]|[1-9][0-9]+)'
+require_matches "$log" '"real_input_pointer_focus_set_count":([2-9]|[1-9][0-9]+)'
+require_matches "$log" '"real_input_shortcut_intercept_count":([2-9]|[1-9][0-9]+)'
+require_matches "$log" '"real_input_forwarded_key_count":([6-9]|[1-9][0-9]+)'
 test -s "$normal_frame_ppm" || fail "missing Smithay normal runtime real client frame $normal_frame_ppm"
 require_contains "$log" '"event":"compositor.ready"'
 require_contains "$log" '"ready":true'
@@ -643,6 +666,11 @@ cat > "$out_dir/manifest.json" <<EOF
     "smithay_real_xdg_unmap_cleanup": true,
     "smithay_real_xdg_close_disconnect": true,
     "smithay_policy_lifecycle_cleanup": true,
+    "smithay_real_client_input": true,
+    "smithay_real_pointer_input": true,
+    "smithay_real_keyboard_input": true,
+    "smithay_real_input_focus_routing": true,
+    "smithay_shortcut_filter_preserved": true,
     "smithay_real_wayland_policy_window": true,
     "smithay_event_loop_runtime": true,
     "smithay_drm_first_present_probe": true,

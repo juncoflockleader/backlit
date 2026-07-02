@@ -10,13 +10,13 @@ The next milestones move those proof paths from focused verifiers into the norma
 | --- | --- | --- |
 | 1. Live Surface Snapshots | Complete | `scripts/verify-smithay-live-surface-snapshots.sh` and Linux/Parallels E2E manifests include copied real `wl_shm` snapshots. |
 | 2. Real Clients In The Normal Frame Loop | Complete | `--runtime=smithay --scripted-client` emits normal-frame live snapshot evidence and exports a Backlit frame composed from real generated `wl_shm` pixels; MVP-complete passed on commit `4ce6c97`. |
-| 3. Surface Lifecycle | In progress | xdg map, resize, unmap, close, and disconnect update Backlit policy without stale windows. |
-| 4. Input To Real Clients | Pending | Keyboard and pointer events reach real clients while Backlit shortcuts still work. |
+| 3. Surface Lifecycle | Complete | `--runtime=smithay --scripted-client` emits generated-client resize, unmap, close, destroy, disconnect, and Backlit policy cleanup evidence; Parallels Linux E2E passed on commit `b931ddb`. |
+| 4. Input To Real Clients | In progress | Keyboard and pointer events reach real generated clients while compositor shortcut filtering remains active. |
 | 5. Real App E2E | Complete | Parallels exports a Backlit frame containing pixels from `/usr/bin/weston-simple-shm`, with server-side SHM capture and Backlit frame sample verification. |
 | 6. GPU Texture Compositing | Pending | Real client buffers render through the GPU path with SHM CPU upload as fallback. |
 | 7. MVP 1 Closure | Pending | MVP contract and complete gates require real client/rendering evidence. |
 
-The active implementation target is **Milestone 3: Surface Lifecycle**. Milestone 2 moved generated-client pixels into the normal Smithay scripted runtime frame; Milestone 3 extends that real-client path through xdg configure/ack, resize, unmap, close, and disconnect policy cleanup.
+The active implementation target is **Milestone 4: Input To Real Clients**. Milestone 3 extended the real-client path through xdg configure/ack, resize, unmap, close, and disconnect policy cleanup; Milestone 4 now routes Smithay seat keyboard and pointer events into real generated Wayland clients.
 
 ## Milestone 1: Live Surface Snapshots
 
@@ -149,9 +149,17 @@ Route keyboard and pointer input from the Backlit/Smithay runtime into real Wayl
 
 - `cargo test --workspace`
 - `backlit-input --verify`
+- `./scripts/verify-smithay-compositor-runtime.sh`
 - `./scripts/verify-drm-session-smoke.sh`
 - `./scripts/verify-linux-e2e.sh`
 - `./scripts/verify-parallels-mvp-e2e.sh`
+
+### Current Slice
+
+- `SmithayCompositorRuntime::run_real_input_capture()` maps two generated real `wl_shm` xdg clients, focuses the active SHM toplevel through Smithay keyboard and pointer handles, sends pointer enter/motion/button events and keyboard enter/key events, then maps a second client and verifies new input routes to the second client without adding button/key events to the first.
+- The generated client records `wl_pointer` enter, leave, motion, button, and frame events plus `wl_keyboard` keymap, enter, leave, key, modifiers, and repeat-info events.
+- The Smithay keyboard filter now proves ordinary keys are forwarded to the focused real client while a compositor-reserved shortcut probe is intercepted and not forwarded.
+- `scripts/verify-smithay-compositor-runtime.sh`, Linux E2E, Parallels export, MVP 1 contract, and MVP-complete require `smithay_real_client_input`, `smithay_real_pointer_input`, `smithay_real_keyboard_input`, `smithay_real_input_focus_routing`, and `smithay_shortcut_filter_preserved`.
 
 ### Dependencies
 

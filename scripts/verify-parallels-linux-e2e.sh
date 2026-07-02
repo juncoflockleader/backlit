@@ -687,6 +687,7 @@ require_contains "$host_guest_manifest" '"launch_readiness": true'
 require_contains "$host_guest_manifest" '"smithay_compositor_runtime": true'
 require_contains "$host_guest_manifest" '"smithay_normal_runtime_real_pixels": true'
 require_contains "$host_guest_manifest" '"smithay_real_surface_lifecycle": true'
+require_contains "$host_guest_manifest" '"smithay_real_client_input": true'
 require_contains "$host_guest_manifest" '"smithay_live_surface_snapshots": true'
 require_contains "$host_guest_manifest" '"smithay_real_app_e2e": true'
 require_contains "$host_guest_manifest" '"smithay_real_shm_frame": true'
@@ -733,6 +734,11 @@ require_contains "$host_smithay_compositor_runtime_manifest" '"smithay_real_xdg_
 require_contains "$host_smithay_compositor_runtime_manifest" '"smithay_real_xdg_unmap_cleanup": true'
 require_contains "$host_smithay_compositor_runtime_manifest" '"smithay_real_xdg_close_disconnect": true'
 require_contains "$host_smithay_compositor_runtime_manifest" '"smithay_policy_lifecycle_cleanup": true'
+require_contains "$host_smithay_compositor_runtime_manifest" '"smithay_real_client_input": true'
+require_contains "$host_smithay_compositor_runtime_manifest" '"smithay_real_pointer_input": true'
+require_contains "$host_smithay_compositor_runtime_manifest" '"smithay_real_keyboard_input": true'
+require_contains "$host_smithay_compositor_runtime_manifest" '"smithay_real_input_focus_routing": true'
+require_contains "$host_smithay_compositor_runtime_manifest" '"smithay_shortcut_filter_preserved": true'
 require_contains "$host_smithay_compositor_runtime_manifest" '"smithay_real_wayland_policy_window": true'
 require_contains "$host_smithay_compositor_runtime_manifest" '"smithay_event_loop_runtime": true'
 require_contains "$host_smithay_compositor_runtime_manifest" '"smithay_drm_first_present_probe": true'
@@ -1063,6 +1069,7 @@ cat > "$host_out_dir/manifest.json" <<EOF
     "smithay_compositor_runtime": true,
     "smithay_normal_runtime_real_pixels": true,
     "smithay_real_surface_lifecycle": true,
+    "smithay_real_client_input": true,
     "smithay_live_surface_snapshots": true,
     "smithay_real_app_e2e": true,
     "real_app_e2e_pixels": true,

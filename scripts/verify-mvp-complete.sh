@@ -218,6 +218,7 @@ require_contains "$parallels_manifest" '"nested_wayland": true' parallels-linux-
 require_contains "$parallels_manifest" '"drm_session_smoke": true' parallels-linux-e2e
 require_contains "$parallels_manifest" '"smithay_normal_runtime_real_pixels": true' parallels-linux-e2e
 require_contains "$parallels_manifest" '"smithay_real_surface_lifecycle": true' parallels-linux-e2e
+require_contains "$parallels_manifest" '"smithay_real_client_input": true' parallels-linux-e2e
 require_contains "$parallels_manifest" '"smithay_live_surface_snapshots": true' parallels-linux-e2e
 require_contains "$parallels_manifest" '"smithay_real_app_e2e": true' parallels-linux-e2e
 require_contains "$parallels_manifest" '"real_app_e2e_pixels": true' parallels-linux-e2e
@@ -251,6 +252,11 @@ require_contains "$smithay_compositor_runtime_manifest" '"smithay_real_xdg_resiz
 require_contains "$smithay_compositor_runtime_manifest" '"smithay_real_xdg_unmap_cleanup": true' smithay-surface-lifecycle-evidence
 require_contains "$smithay_compositor_runtime_manifest" '"smithay_real_xdg_close_disconnect": true' smithay-surface-lifecycle-evidence
 require_contains "$smithay_compositor_runtime_manifest" '"smithay_policy_lifecycle_cleanup": true' smithay-surface-lifecycle-evidence
+require_contains "$smithay_compositor_runtime_manifest" '"smithay_real_client_input": true' smithay-real-input-evidence
+require_contains "$smithay_compositor_runtime_manifest" '"smithay_real_pointer_input": true' smithay-real-input-evidence
+require_contains "$smithay_compositor_runtime_manifest" '"smithay_real_keyboard_input": true' smithay-real-input-evidence
+require_contains "$smithay_compositor_runtime_manifest" '"smithay_real_input_focus_routing": true' smithay-real-input-evidence
+require_contains "$smithay_compositor_runtime_manifest" '"smithay_shortcut_filter_preserved": true' smithay-real-input-evidence
 require_contains "$smithay_compositor_runtime_manifest" '"smithay_real_wayland_client": true' smithay-normal-runtime-evidence
 require_contains "$smithay_compositor_runtime_manifest" '"smithay_real_shm_buffer": true' smithay-normal-runtime-evidence
 require_contains "$live_surface_snapshots_manifest" '"smithay_live_surface_snapshots": true' live-surface-snapshots-evidence
