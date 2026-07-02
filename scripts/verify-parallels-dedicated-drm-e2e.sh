@@ -160,7 +160,7 @@ dedicated_tty=$(quote_shell "$dedicated_tty")
 tty_number=$(quote_shell "$tty_number")
 unit_name="backlit-dedicated-drm-e2e-\$\$"
 unit_log="/tmp/backlit-dedicated-drm-e2e.log"
-inner_runner="/tmp/backlit-dedicated-drm-e2e-inner.sh"
+inner_runner="\$repo_dir/\$guest_out_dir/dedicated-drm-e2e-inner.sh"
 
 export DEBIAN_FRONTEND=noninteractive
 
