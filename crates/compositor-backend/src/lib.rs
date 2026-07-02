@@ -3695,6 +3695,9 @@ impl CompositorRuntime for HeadlessCompositor {
 #[cfg(all(feature = "smithay-backend", target_os = "linux"))]
 pub struct SmithayCompositorRuntime {
     inner: HeadlessCompositor,
+    live_frame: u64,
+    live_frame_presented_once: bool,
+    synthetic_surface_submitted: bool,
     display: smithay::reexports::wayland_server::Display<SmithayCompositorState>,
     event_loop: smithay::reexports::calloop::EventLoop<'static, SmithayCompositorState>,
     state: SmithayCompositorState,
@@ -4066,6 +4069,33 @@ impl SmithayLiveSurfaceSnapshot {
             pixel_checksum,
             pixels: frame.pixels,
         }
+    }
+
+    fn from_committed_shm_snapshot(id: u64, snapshot: SmithayCommittedShmSnapshot) -> Self {
+        Self {
+            id,
+            title: snapshot.title,
+            app_id: snapshot.app_id,
+            width: snapshot.width,
+            height: snapshot.height,
+            stride: snapshot.stride,
+            format: snapshot.format,
+            commit_serial: snapshot.commit_serial,
+            damage: snapshot.damage,
+            sample_coordinates: snapshot.sample_coordinates,
+            expected_samples: RealShmPixelSamples::expected_smoke_samples(),
+            samples: snapshot.samples,
+            pixel_checksum: snapshot.pixel_checksum,
+            pixels: snapshot.pixels,
+        }
+    }
+
+    pub fn pixel(&self, x: u32, y: u32) -> Option<RealShmPixel> {
+        if x >= self.width || y >= self.height {
+            return None;
+        }
+
+        self.pixels.get((y * self.width + x) as usize).copied()
     }
 
     pub fn pixel_count(&self) -> u64 {
@@ -5572,6 +5602,9 @@ impl SmithayCompositorRuntime {
 
         Ok(Self {
             inner: HeadlessCompositor::default(),
+            live_frame: 0,
+            live_frame_presented_once: false,
+            synthetic_surface_submitted: false,
             display,
             event_loop,
             state,
@@ -5685,19 +5718,23 @@ impl SmithayCompositorRuntime {
     ) -> Result<SmithayLiveSurfaceSnapshotReport, SmithayRuntimeError> {
         let mut client_state = self.run_wayland_client_smoke_state("live-surface-snapshot")?;
         let smoke = self.build_wayland_client_smoke_report(&client_state);
-        let surface = client_state
-            .capture_real_shm_surface_frame(
-                smoke.observed_title.as_str(),
-                smoke.observed_app_id.as_str(),
-            )
-            .map_err(SmithayRuntimeError)?;
         let snapshot_id = self.next_live_surface_snapshot_id;
         self.next_live_surface_snapshot_id += 1;
-        let snapshot = SmithayLiveSurfaceSnapshot::from_surface_frame(
-            snapshot_id,
-            self.state.surface_commit_count,
-            surface,
-        );
+        let snapshot = if let Some(committed) = self.state.committed_shm_snapshots.last().cloned() {
+            SmithayLiveSurfaceSnapshot::from_committed_shm_snapshot(snapshot_id, committed)
+        } else {
+            let surface = client_state
+                .capture_real_shm_surface_frame(
+                    smoke.observed_title.as_str(),
+                    smoke.observed_app_id.as_str(),
+                )
+                .map_err(SmithayRuntimeError)?;
+            SmithayLiveSurfaceSnapshot::from_surface_frame(
+                snapshot_id,
+                self.state.surface_commit_count,
+                surface,
+            )
+        };
         self.live_surface_snapshots.push(snapshot);
 
         Ok(SmithayLiveSurfaceSnapshotReport {
@@ -6148,9 +6185,12 @@ impl CompositorRuntime for SmithayCompositorRuntime {
         height: u32,
         options: SurfaceOptions,
     ) -> Result<SurfaceId, Self::Error> {
-        self.inner
+        let surface = self
+            .inner
             .submit_surface_with_options(client, title, width, height, options)
-            .map_err(|error| SmithayRuntimeError(error.to_string()))
+            .map_err(|error| SmithayRuntimeError(error.to_string()))?;
+        self.synthetic_surface_submitted = true;
+        Ok(surface)
     }
 
     fn mark_damaged(&mut self, surface: SurfaceId) -> Result<(), Self::Error> {
@@ -6173,6 +6213,29 @@ impl CompositorRuntime for SmithayCompositorRuntime {
 
     fn present(&mut self) -> FrameReport {
         self.dispatch_wayland();
+        if !self.synthetic_surface_submitted
+            && self.inner.surface_count() == 0
+            && !self.live_surface_snapshots.is_empty()
+        {
+            self.live_frame += 1;
+            let damaged_surfaces = if self.live_frame_presented_once {
+                0
+            } else {
+                self.live_surface_snapshots.len() as u64
+            };
+            self.live_frame_presented_once = true;
+            return FrameReport {
+                frame: self.live_frame,
+                client_count: self.inserted_wayland_clients,
+                surface_count: self.live_surface_snapshots.len() as u64,
+                damaged_surfaces,
+                total_pixels: self
+                    .live_surface_snapshots
+                    .iter()
+                    .map(SmithayLiveSurfaceSnapshot::pixel_count)
+                    .sum(),
+            };
+        }
         self.inner.present()
     }
 

@@ -9,14 +9,14 @@ The next milestones move those proof paths from focused verifiers into the norma
 | Milestone | Status | Exit evidence |
 | --- | --- | --- |
 | 1. Live Surface Snapshots | Complete | `scripts/verify-smithay-live-surface-snapshots.sh` and Linux/Parallels E2E manifests include copied real `wl_shm` snapshots. |
-| 2. Real Clients In The Normal Frame Loop | Pending | A normal Smithay runtime frame uses real surface snapshots instead of mock/demo window pixels. |
+| 2. Real Clients In The Normal Frame Loop | In progress | `--runtime=smithay --scripted-client` emits normal-frame live snapshot evidence and exports a Backlit frame composed from real generated `wl_shm` pixels. |
 | 3. Surface Lifecycle | Pending | xdg map, resize, unmap, close, and disconnect update Backlit policy without stale windows. |
 | 4. Input To Real Clients | Pending | Keyboard and pointer events reach real clients while Backlit shortcuts still work. |
 | 5. Real App E2E | Complete | Parallels exports a Backlit frame containing pixels from `/usr/bin/weston-simple-shm`, with server-side SHM capture and Backlit frame sample verification. |
 | 6. GPU Texture Compositing | Pending | Real client buffers render through the GPU path with SHM CPU upload as fallback. |
 | 7. MVP 1 Closure | Pending | MVP contract and complete gates require real client/rendering evidence. |
 
-The active implementation target is **Milestone 2: Real Clients In The Normal Frame Loop**. Milestone 5 proved an installed external app in a focused E2E path; the next product step is to make normal Smithay compositor frames use those real surface snapshots instead of mock/demo window pixels.
+The active implementation target is **Milestone 2: Real Clients In The Normal Frame Loop**. Milestone 5 proved an installed external app in a focused E2E path; Milestone 2 moves the generated-client snapshot path into the normal Smithay scripted runtime event and frame artifact.
 
 ## Milestone 1: Live Surface Snapshots
 
@@ -75,6 +75,12 @@ Render live real Wayland client snapshots in the normal Backlit compositor frame
 - `./scripts/verify-compositor-runtime.sh`
 - `./scripts/verify-smithay-compositor-runtime.sh`
 - `./scripts/verify-linux-e2e.sh`
+
+### Current Slice
+
+- `SmithayCompositorRuntime::present()` can report live snapshot-backed frames when a real generated client has committed pixels and no mock backend surfaces are present.
+- `backlit-compositor --backend=drm --runtime=smithay --scripted-client --scripted-client-preview <path>` writes a normal runtime frame with the live snapshot composited through Backlit policy geometry.
+- `scripts/verify-smithay-compositor-runtime.sh` requires `smithay_normal_runtime_live_snapshot_frame`, `smithay_normal_runtime_real_pixels`, and sample-verified real pixels before passing on launch-ready Linux.
 
 ### Dependencies
 

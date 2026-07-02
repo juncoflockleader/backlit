@@ -407,6 +407,8 @@ host_ppm="$host_out_dir/gui-preview-backlit-session.ppm"
 host_png="$host_out_dir/gui-preview-backlit-session.png"
 host_compositor_preview_ppm="$host_out_dir/compositor-runtime-scripted-client-policy-preview.ppm"
 host_compositor_preview_png="$host_out_dir/compositor-runtime-scripted-client-policy-preview.png"
+host_smithay_normal_frame_ppm="$host_out_dir/smithay-normal-runtime-real-client-frame.ppm"
+host_smithay_normal_frame_png="$host_out_dir/smithay-normal-runtime-real-client-frame.png"
 host_smithay_real_app_e2e_ppm="$host_out_dir/smithay-real-app-e2e.ppm"
 host_smithay_real_app_e2e_png="$host_out_dir/smithay-real-app-e2e.png"
 host_smithay_real_shm_frame_ppm="$host_out_dir/smithay-real-shm-frame.ppm"
@@ -445,6 +447,8 @@ rm -f \
   "$host_png" \
   "$host_compositor_preview_ppm" \
   "$host_compositor_preview_png" \
+  "$host_smithay_normal_frame_ppm" \
+  "$host_smithay_normal_frame_png" \
   "$host_smithay_real_app_e2e_ppm" \
   "$host_smithay_real_app_e2e_png" \
   "$host_smithay_real_shm_frame_ppm" \
@@ -481,6 +485,7 @@ download_file "$guest_e2e_dir/mvp0-contract/manifest.json" "$host_mvp0_contract_
 download_file "$guest_e2e_dir/mvp1-contract/manifest.json" "$host_mvp1_contract_manifest"
 download_file "$guest_e2e_dir/gui-preview/backlit-session.ppm" "$host_ppm"
 download_file "$guest_e2e_dir/compositor-runtime/scripted-client-policy-preview.ppm" "$host_compositor_preview_ppm"
+download_file "$guest_e2e_dir/smithay-compositor-runtime/smithay-normal-runtime-real-client-frame.ppm" "$host_smithay_normal_frame_ppm"
 download_file "$guest_e2e_dir/smithay-real-app-e2e/backlit-real-app-frame.ppm" "$host_smithay_real_app_e2e_ppm"
 download_file "$guest_e2e_dir/smithay-real-shm-frame/backlit-real-shm-frame.ppm" "$host_smithay_real_shm_frame_ppm"
 
@@ -559,6 +564,44 @@ fi
 
 compositor_preview_ppm_bytes="$(wc -c < "$host_compositor_preview_ppm" | tr -d ' ')"
 test "$compositor_preview_ppm_bytes" -gt 10000
+
+smithay_normal_frame_image="$host_smithay_normal_frame_ppm"
+smithay_normal_frame_format="ppm"
+smithay_normal_frame_png_written=false
+smithay_normal_frame_converter="none"
+
+if command -v sips >/dev/null 2>&1; then
+  if sips -s format png "$host_smithay_normal_frame_ppm" --out "$host_smithay_normal_frame_png" >/dev/null 2>&1; then
+    smithay_normal_frame_image="$host_smithay_normal_frame_png"
+    smithay_normal_frame_format="png"
+    smithay_normal_frame_png_written=true
+    smithay_normal_frame_converter="sips"
+  fi
+elif command -v magick >/dev/null 2>&1; then
+  if magick "$host_smithay_normal_frame_ppm" "$host_smithay_normal_frame_png" >/dev/null 2>&1; then
+    smithay_normal_frame_image="$host_smithay_normal_frame_png"
+    smithay_normal_frame_format="png"
+    smithay_normal_frame_png_written=true
+    smithay_normal_frame_converter="magick"
+  fi
+elif command -v convert >/dev/null 2>&1; then
+  if convert "$host_smithay_normal_frame_ppm" "$host_smithay_normal_frame_png" >/dev/null 2>&1; then
+    smithay_normal_frame_image="$host_smithay_normal_frame_png"
+    smithay_normal_frame_format="png"
+    smithay_normal_frame_png_written=true
+    smithay_normal_frame_converter="convert"
+  fi
+elif command -v pnmtopng >/dev/null 2>&1; then
+  if pnmtopng "$host_smithay_normal_frame_ppm" > "$host_smithay_normal_frame_png"; then
+    smithay_normal_frame_image="$host_smithay_normal_frame_png"
+    smithay_normal_frame_format="png"
+    smithay_normal_frame_png_written=true
+    smithay_normal_frame_converter="pnmtopng"
+  fi
+fi
+
+smithay_normal_frame_ppm_bytes="$(wc -c < "$host_smithay_normal_frame_ppm" | tr -d ' ')"
+test "$smithay_normal_frame_ppm_bytes" -gt 10000
 
 real_app_e2e_image="$host_smithay_real_app_e2e_ppm"
 real_app_e2e_format="ppm"
@@ -642,6 +685,7 @@ require_contains "$host_guest_manifest" '"debian_package_build": true'
 require_contains "$host_guest_manifest" '"debian_package_install": true'
 require_contains "$host_guest_manifest" '"launch_readiness": true'
 require_contains "$host_guest_manifest" '"smithay_compositor_runtime": true'
+require_contains "$host_guest_manifest" '"smithay_normal_runtime_real_pixels": true'
 require_contains "$host_guest_manifest" '"smithay_live_surface_snapshots": true'
 require_contains "$host_guest_manifest" '"smithay_real_app_e2e": true'
 require_contains "$host_guest_manifest" '"smithay_real_shm_frame": true'
@@ -681,6 +725,8 @@ require_contains "$host_smithay_compositor_runtime_manifest" '"smithay_input_eve
 require_contains "$host_smithay_compositor_runtime_manifest" '"smithay_real_wayland_client": true'
 require_contains "$host_smithay_compositor_runtime_manifest" '"smithay_real_wayland_metadata": true'
 require_contains "$host_smithay_compositor_runtime_manifest" '"smithay_real_shm_buffer": true'
+require_contains "$host_smithay_compositor_runtime_manifest" '"smithay_normal_runtime_live_snapshot_frame": true'
+require_contains "$host_smithay_compositor_runtime_manifest" '"smithay_normal_runtime_real_pixels": true'
 require_contains "$host_smithay_compositor_runtime_manifest" '"smithay_real_wayland_policy_window": true'
 require_contains "$host_smithay_compositor_runtime_manifest" '"smithay_event_loop_runtime": true'
 require_contains "$host_smithay_compositor_runtime_manifest" '"smithay_drm_first_present_probe": true'
@@ -989,6 +1035,8 @@ cat > "$host_out_dir/manifest.json" <<EOF
     "gui_preview_image": "$preview_image",
     "compositor_runtime_preview_ppm": "$host_compositor_preview_ppm",
     "compositor_runtime_preview_image": "$compositor_preview_image",
+    "smithay_normal_runtime_frame_ppm": "$host_smithay_normal_frame_ppm",
+    "smithay_normal_runtime_frame_image": "$smithay_normal_frame_image",
     "smithay_real_app_e2e_ppm": "$host_smithay_real_app_e2e_ppm",
     "smithay_real_app_e2e_image": "$real_app_e2e_image",
     "smithay_real_shm_frame_ppm": "$host_smithay_real_shm_frame_ppm",
@@ -1007,6 +1055,7 @@ cat > "$host_out_dir/manifest.json" <<EOF
     "compositor_runtime": true,
     "compositor_runtime_policy_preview": true,
     "smithay_compositor_runtime": true,
+    "smithay_normal_runtime_real_pixels": true,
     "smithay_live_surface_snapshots": true,
     "smithay_real_app_e2e": true,
     "real_app_e2e_pixels": true,
@@ -1050,6 +1099,10 @@ cat > "$host_out_dir/manifest.json" <<EOF
     "compositor_png_written": $compositor_png_written,
     "compositor_preview_format": "$compositor_preview_format",
     "compositor_converter": "$compositor_converter",
+    "smithay_normal_frame_ppm_bytes": $smithay_normal_frame_ppm_bytes,
+    "smithay_normal_frame_png_written": $smithay_normal_frame_png_written,
+    "smithay_normal_frame_format": "$smithay_normal_frame_format",
+    "smithay_normal_frame_converter": "$smithay_normal_frame_converter",
     "real_app_e2e_ppm_bytes": $real_app_e2e_ppm_bytes,
     "real_app_e2e_png_written": $real_app_e2e_png_written,
     "real_app_e2e_format": "$real_app_e2e_format",
@@ -1071,6 +1124,9 @@ else
 fi
 if [ "$compositor_preview_format" = "png" ]; then
   printf 'To view compositor-runtime preview on macOS: open %s\n' "$compositor_preview_image"
+fi
+if [ "$smithay_normal_frame_format" = "png" ]; then
+  printf 'To view Smithay normal runtime real-client frame on macOS: open %s\n' "$smithay_normal_frame_image"
 fi
 if [ "$real_app_e2e_format" = "png" ]; then
   printf 'To view real app E2E preview on macOS: open %s\n' "$real_app_e2e_image"

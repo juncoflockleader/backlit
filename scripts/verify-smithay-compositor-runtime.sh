@@ -15,6 +15,7 @@ first_present_log="$out_dir/smithay-first-present-probe.jsonl"
 first_present_err="$out_dir/smithay-first-present-probe.stderr"
 service_log="$out_dir/smithay-compositor-service.jsonl"
 service_err="$out_dir/smithay-compositor-service.stderr"
+normal_frame_ppm="$out_dir/smithay-normal-runtime-real-client-frame.ppm"
 first_demo_client_log="$out_dir/demo-client-first-socket.jsonl"
 demo_client_log="$out_dir/demo-client-socket.jsonl"
 service_duration_ms=500
@@ -91,6 +92,7 @@ write_blocked_manifest() {
     "first_present_stderr": "$first_present_err",
     "service_log": "$service_log",
     "service_stderr": "$service_err",
+    "normal_frame_ppm": "$normal_frame_ppm",
     "first_demo_client_log": "$first_demo_client_log",
     "demo_client_log": "$demo_client_log"
   },
@@ -111,6 +113,8 @@ write_blocked_manifest() {
     "smithay_real_wayland_client": false,
     "smithay_real_wayland_metadata": false,
     "smithay_real_shm_buffer": false,
+    "smithay_normal_runtime_live_snapshot_frame": false,
+    "smithay_normal_runtime_real_pixels": false,
     "smithay_real_wayland_policy_window": false,
     "smithay_event_loop_runtime": false,
     "smithay_drm_first_present_probe": false,
@@ -140,7 +144,8 @@ set +e
 target/debug/backlit-compositor \
   --backend=drm \
   --runtime=smithay \
-  --scripted-client > "$log" 2> "$err"
+  --scripted-client \
+  --scripted-client-preview "$normal_frame_ppm" > "$log" 2> "$err"
 status=$?
 set -e
 
@@ -174,13 +179,9 @@ require_contains "$log" '"runtime_backend":"smithay-compositor-runtime"'
 require_contains "$log" '"runtime_trait":true'
 require_line_contains_all "$log" \
   '"event":"compositor.scripted_client"' \
-  '"inserted_wayland_clients":1' \
   '"smithay_protocol_globals":10' \
-  '"wayland_dispatch_count":7' \
-  '"calloop_dispatch_count":7' \
   '"input_sources_ready":true' \
   '"input_source_count":2' \
-  '"input_event_loop_dispatch_count":7' \
   '"input_seat_ready":true' \
   '"input_keyboard_handle_ready":true' \
   '"input_pointer_handle_ready":true' \
@@ -191,10 +192,35 @@ require_line_contains_all "$log" \
   '"input_keyboard_event_count":' \
   '"input_pointer_event_count":' \
   '"input_special_event_count":'
+require_matches "$log" '"inserted_wayland_clients":([2-9]|[1-9][0-9]+)'
+require_matches "$log" '"wayland_dispatch_count":([8-9]|[1-9][0-9]+)'
+require_matches "$log" '"calloop_dispatch_count":([8-9]|[1-9][0-9]+)'
+require_matches "$log" '"input_event_loop_dispatch_count":([8-9]|[1-9][0-9]+)'
 require_contains "$log" '"client_connected":true'
 require_contains "$log" '"surfaces_after_map":2'
 require_contains "$log" '"targeted_damage_ok":true'
 require_contains "$log" '"clean_disconnect":true'
+require_line_contains_all "$log" \
+  '"event":"compositor.scripted_client"' \
+  '"normal_frame_uses_live_snapshot":true' \
+  '"normal_frame_real_wayland_client":true' \
+  '"normal_frame_live_snapshot_presented":true' \
+  '"normal_frame_policy_window_from_snapshot":true' \
+  '"normal_frame_policy_geometry_preserved":true' \
+  '"normal_frame_pixels_composited":true' \
+  '"normal_frame_samples_verified":true' \
+  '"normal_frame_ppm_written":true' \
+  '"normal_frame_surface_count":1' \
+  '"normal_frame_damaged_surfaces":1' \
+  '"normal_frame_presented_pixels":76800' \
+  '"normal_frame_snapshot_width":320' \
+  '"normal_frame_snapshot_height":240' \
+  '"normal_frame_snapshot_pixel_count":76800' \
+  '"normal_frame_composited_pixels":76800'
+require_matches "$log" '"normal_frame_client_count":[1-9][0-9]*'
+require_matches "$log" '"normal_frame_ppm_bytes":[1-9][0-9]*'
+require_matches "$log" '"normal_frame_checksum":[1-9][0-9]*'
+test -s "$normal_frame_ppm" || fail "missing Smithay normal runtime real client frame $normal_frame_ppm"
 require_contains "$log" '"event":"compositor.ready"'
 require_contains "$log" '"ready":true'
 require_line_contains_all "$log" \
@@ -558,6 +584,7 @@ cat > "$out_dir/manifest.json" <<EOF
     "first_present_stderr": "$first_present_err",
     "service_log": "$service_log",
     "service_stderr": "$service_err",
+    "normal_frame_ppm": "$normal_frame_ppm",
     "first_demo_client_log": "$first_demo_client_log",
     "demo_client_log": "$demo_client_log"
   },
@@ -578,6 +605,8 @@ cat > "$out_dir/manifest.json" <<EOF
     "smithay_real_wayland_client": true,
     "smithay_real_wayland_metadata": true,
     "smithay_real_shm_buffer": true,
+    "smithay_normal_runtime_live_snapshot_frame": true,
+    "smithay_normal_runtime_real_pixels": true,
     "smithay_real_wayland_policy_window": true,
     "smithay_event_loop_runtime": true,
     "smithay_drm_first_present_probe": true,

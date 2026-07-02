@@ -12,6 +12,8 @@ use std::time::Duration;
 use std::time::Instant;
 
 use backlit_common::metrics::{event_json, FieldValue};
+#[cfg(all(feature = "smithay-backend", target_os = "linux"))]
+use backlit_compositor_backend::FrameReport;
 use backlit_compositor_backend::{
     backend_launch_plan, parse_args, preflight_backend_with_environment, smithay_runtime_probe,
     BackendKind, BackendLaunchPlan, BackendPreflightEnvironment, BackendPreflightReport, ClientId,
@@ -968,6 +970,78 @@ fn run() -> Result<(), String> {
                 (
                     "policy_preview_checksum",
                     FieldValue::U64(runtime.policy_preview_checksum),
+                ),
+                (
+                    "normal_frame_uses_live_snapshot",
+                    FieldValue::Bool(runtime.normal_frame_uses_live_snapshot),
+                ),
+                (
+                    "normal_frame_real_wayland_client",
+                    FieldValue::Bool(runtime.normal_frame_real_wayland_client),
+                ),
+                (
+                    "normal_frame_live_snapshot_presented",
+                    FieldValue::Bool(runtime.normal_frame_live_snapshot_presented),
+                ),
+                (
+                    "normal_frame_policy_window_from_snapshot",
+                    FieldValue::Bool(runtime.normal_frame_policy_window_from_snapshot),
+                ),
+                (
+                    "normal_frame_policy_geometry_preserved",
+                    FieldValue::Bool(runtime.normal_frame_policy_geometry_preserved),
+                ),
+                (
+                    "normal_frame_pixels_composited",
+                    FieldValue::Bool(runtime.normal_frame_pixels_composited),
+                ),
+                (
+                    "normal_frame_samples_verified",
+                    FieldValue::Bool(runtime.normal_frame_samples_verified),
+                ),
+                (
+                    "normal_frame_ppm_written",
+                    FieldValue::Bool(runtime.normal_frame_ppm_written),
+                ),
+                (
+                    "normal_frame_client_count",
+                    FieldValue::U64(runtime.normal_frame_client_count),
+                ),
+                (
+                    "normal_frame_surface_count",
+                    FieldValue::U64(runtime.normal_frame_surface_count),
+                ),
+                (
+                    "normal_frame_damaged_surfaces",
+                    FieldValue::U64(runtime.normal_frame_damaged_surfaces),
+                ),
+                (
+                    "normal_frame_presented_pixels",
+                    FieldValue::U64(runtime.normal_frame_presented_pixels),
+                ),
+                (
+                    "normal_frame_snapshot_width",
+                    FieldValue::U64(runtime.normal_frame_snapshot_width),
+                ),
+                (
+                    "normal_frame_snapshot_height",
+                    FieldValue::U64(runtime.normal_frame_snapshot_height),
+                ),
+                (
+                    "normal_frame_snapshot_pixel_count",
+                    FieldValue::U64(runtime.normal_frame_snapshot_pixel_count),
+                ),
+                (
+                    "normal_frame_composited_pixels",
+                    FieldValue::U64(runtime.normal_frame_composited_pixels),
+                ),
+                (
+                    "normal_frame_ppm_bytes",
+                    FieldValue::U64(runtime.normal_frame_ppm_bytes),
+                ),
+                (
+                    "normal_frame_checksum",
+                    FieldValue::U64(runtime.normal_frame_checksum),
                 ),
             ],
         );
@@ -3110,6 +3184,24 @@ struct ScriptedClientRuntime {
     policy_preview_verified: bool,
     policy_preview_non_background_pixels: u64,
     policy_preview_checksum: u64,
+    normal_frame_uses_live_snapshot: bool,
+    normal_frame_real_wayland_client: bool,
+    normal_frame_live_snapshot_presented: bool,
+    normal_frame_policy_window_from_snapshot: bool,
+    normal_frame_policy_geometry_preserved: bool,
+    normal_frame_pixels_composited: bool,
+    normal_frame_samples_verified: bool,
+    normal_frame_ppm_written: bool,
+    normal_frame_client_count: u64,
+    normal_frame_surface_count: u64,
+    normal_frame_damaged_surfaces: u64,
+    normal_frame_presented_pixels: u64,
+    normal_frame_snapshot_width: u64,
+    normal_frame_snapshot_height: u64,
+    normal_frame_snapshot_pixel_count: u64,
+    normal_frame_composited_pixels: u64,
+    normal_frame_ppm_bytes: u64,
+    normal_frame_checksum: u64,
 }
 
 impl ScriptedClientRuntime {
@@ -3143,6 +3235,7 @@ impl ScriptedClientRuntime {
             && (!self.policy_preview_requested || self.policy_preview_written)
             && self.policy_preview_verified
             && self.policy_preview_non_background_pixels > 10_000
+            && self.smithay_normal_frame_ok()
     }
 
     fn smithay_event_loop_runtime_ok(self) -> bool {
@@ -3164,6 +3257,52 @@ impl ScriptedClientRuntime {
     fn smithay_protocol_globals_ok(self) -> bool {
         self.runtime_backend != "smithay-compositor-runtime" || self.smithay_protocol_globals >= 10
     }
+
+    fn smithay_normal_frame_ok(self) -> bool {
+        self.runtime_backend != "smithay-compositor-runtime"
+            || (self.normal_frame_uses_live_snapshot
+                && self.normal_frame_real_wayland_client
+                && self.normal_frame_live_snapshot_presented
+                && self.normal_frame_policy_window_from_snapshot
+                && self.normal_frame_policy_geometry_preserved
+                && self.normal_frame_pixels_composited
+                && self.normal_frame_samples_verified
+                && self.normal_frame_ppm_written
+                && self.normal_frame_client_count >= 1
+                && self.normal_frame_surface_count == 1
+                && self.normal_frame_damaged_surfaces == 1
+                && self.normal_frame_snapshot_width == 320
+                && self.normal_frame_snapshot_height == 240
+                && self.normal_frame_snapshot_pixel_count == 320 * 240
+                && self.normal_frame_presented_pixels == self.normal_frame_snapshot_pixel_count
+                && self.normal_frame_composited_pixels == self.normal_frame_snapshot_pixel_count
+                && self.normal_frame_ppm_bytes > self.normal_frame_snapshot_pixel_count
+                && self.normal_frame_checksum > 0)
+    }
+}
+
+#[cfg(all(feature = "smithay-backend", target_os = "linux"))]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+struct SmithayNormalFrameSmoke {
+    uses_live_snapshot: bool,
+    real_wayland_client: bool,
+    live_snapshot_presented: bool,
+    policy_window_from_snapshot: bool,
+    policy_geometry_preserved: bool,
+    pixels_composited: bool,
+    samples_verified: bool,
+    ppm_written: bool,
+    client_count: u64,
+    surface_count: u64,
+    damaged_surfaces: u64,
+    presented_pixels: u64,
+    snapshot_width: u64,
+    snapshot_height: u64,
+    snapshot_pixel_count: u64,
+    composited_pixels: u64,
+    ppm_bytes: u64,
+    frame_checksum: u64,
+    non_background_pixels: u64,
 }
 
 fn run_scripted_client_runtime(
@@ -3186,8 +3325,37 @@ fn run_scripted_client_runtime_for_config(
 fn run_scripted_client_runtime_with_smithay(
     policy_preview_path: Option<&str>,
 ) -> Result<ScriptedClientRuntime, String> {
-    let runtime = SmithayCompositorRuntime::try_new().map_err(|error| error.to_string())?;
-    run_scripted_client_runtime_with_backend(runtime, policy_preview_path)
+    let mut runtime = SmithayCompositorRuntime::try_new().map_err(|error| error.to_string())?;
+    let normal_frame = run_smithay_normal_live_snapshot_frame(&mut runtime, policy_preview_path)?;
+    let mut report = run_scripted_client_runtime_with_backend(runtime, None)?;
+
+    report.policy_preview_requested = policy_preview_path.is_some();
+    report.policy_preview_written = normal_frame.ppm_written;
+    report.policy_preview_verified = normal_frame.samples_verified
+        && normal_frame.policy_window_from_snapshot
+        && normal_frame.policy_geometry_preserved;
+    report.policy_preview_non_background_pixels = normal_frame.non_background_pixels;
+    report.policy_preview_checksum = normal_frame.frame_checksum;
+    report.normal_frame_uses_live_snapshot = normal_frame.uses_live_snapshot;
+    report.normal_frame_real_wayland_client = normal_frame.real_wayland_client;
+    report.normal_frame_live_snapshot_presented = normal_frame.live_snapshot_presented;
+    report.normal_frame_policy_window_from_snapshot = normal_frame.policy_window_from_snapshot;
+    report.normal_frame_policy_geometry_preserved = normal_frame.policy_geometry_preserved;
+    report.normal_frame_pixels_composited = normal_frame.pixels_composited;
+    report.normal_frame_samples_verified = normal_frame.samples_verified;
+    report.normal_frame_ppm_written = normal_frame.ppm_written;
+    report.normal_frame_client_count = normal_frame.client_count;
+    report.normal_frame_surface_count = normal_frame.surface_count;
+    report.normal_frame_damaged_surfaces = normal_frame.damaged_surfaces;
+    report.normal_frame_presented_pixels = normal_frame.presented_pixels;
+    report.normal_frame_snapshot_width = normal_frame.snapshot_width;
+    report.normal_frame_snapshot_height = normal_frame.snapshot_height;
+    report.normal_frame_snapshot_pixel_count = normal_frame.snapshot_pixel_count;
+    report.normal_frame_composited_pixels = normal_frame.composited_pixels;
+    report.normal_frame_ppm_bytes = normal_frame.ppm_bytes;
+    report.normal_frame_checksum = normal_frame.frame_checksum;
+
+    Ok(report)
 }
 
 #[cfg(not(all(feature = "smithay-backend", target_os = "linux")))]
@@ -3197,6 +3365,128 @@ fn run_scripted_client_runtime_with_smithay(
     Err(String::from(
         "smithay runtime requires Linux and the smithay-backend feature",
     ))
+}
+
+#[cfg(all(feature = "smithay-backend", target_os = "linux"))]
+fn run_smithay_normal_live_snapshot_frame(
+    runtime: &mut SmithayCompositorRuntime,
+    policy_preview_path: Option<&str>,
+) -> Result<SmithayNormalFrameSmoke, String> {
+    let report = runtime
+        .run_live_surface_snapshot_capture()
+        .map_err(|error| error.to_string())?;
+    let frame_report = runtime.present();
+    let snapshot = report
+        .snapshots
+        .last()
+        .ok_or_else(|| String::from("normal-runtime-frame:missing-live-snapshot"))?;
+
+    compose_smithay_normal_live_snapshot_frame(&report, snapshot, frame_report, policy_preview_path)
+}
+
+#[cfg(all(feature = "smithay-backend", target_os = "linux"))]
+fn compose_smithay_normal_live_snapshot_frame(
+    report: &SmithayLiveSurfaceSnapshotReport,
+    snapshot: &SmithayLiveSurfaceSnapshot,
+    frame_report: FrameReport,
+    policy_preview_path: Option<&str>,
+) -> Result<SmithayNormalFrameSmoke, String> {
+    let frame_width = 800u32;
+    let frame_height = 520u32;
+    let layout = OutputLayout::new(frame_width as i32, frame_height as i32, 42);
+    let mut manager = SurfaceManager::new(layout);
+    let surface = map_scripted_app_toplevel(
+        &mut manager,
+        snapshot.title.as_str(),
+        snapshot.app_id.as_str(),
+        snapshot.width as i32,
+        snapshot.height as i32,
+    )?;
+    let window_id = manager
+        .surface(surface)
+        .and_then(|surface| surface.window_id)
+        .ok_or_else(|| String::from("normal-runtime-frame:missing-policy-window"))?;
+    let window = manager
+        .policy()
+        .window(window_id)
+        .cloned()
+        .ok_or_else(|| String::from("normal-runtime-frame:missing-window-geometry"))?;
+    let mut frame = render_policy_gui(frame_width, frame_height, manager.policy(), layout);
+    let policy_preview_report = verify_policy_gui(&frame, manager.policy(), layout);
+    let mut composited_pixels = 0u64;
+
+    for y in 0..snapshot.height {
+        for x in 0..snapshot.width {
+            let Some(pixel) = snapshot.pixel(x, y) else {
+                continue;
+            };
+            let frame_x = window.geometry.x + x as i32;
+            let frame_y = window.geometry.y + y as i32;
+            if frame_x < 0 || frame_y < 0 {
+                continue;
+            }
+            if frame.set_pixel(frame_x as u32, frame_y as u32, real_shm_color(pixel)) {
+                composited_pixels += 1;
+            }
+        }
+    }
+
+    let frame_top_left = frame_real_shm_sample(
+        &frame,
+        window.geometry,
+        snapshot.sample_coordinates.top_left,
+    );
+    let frame_center =
+        frame_real_shm_sample(&frame, window.geometry, snapshot.sample_coordinates.center);
+    let frame_bottom_right = frame_real_shm_sample(
+        &frame,
+        window.geometry,
+        snapshot.sample_coordinates.bottom_right,
+    );
+    let samples_verified = snapshot.samples_verified()
+        && frame_color_matches_real_pixel(frame_top_left, snapshot.samples.top_left)
+        && frame_color_matches_real_pixel(frame_center, snapshot.samples.center)
+        && frame_color_matches_real_pixel(frame_bottom_right, snapshot.samples.bottom_right);
+
+    let (ppm_written, ppm_bytes) = if let Some(path) = policy_preview_path {
+        let written = frame.write_ppm(path).is_ok();
+        let bytes = if written {
+            fs::metadata(path)
+                .map(|metadata| metadata.len())
+                .unwrap_or_default()
+        } else {
+            0
+        };
+        (written && bytes > 0, bytes)
+    } else {
+        (true, frame.width() as u64 * frame.height() as u64 * 3)
+    };
+
+    Ok(SmithayNormalFrameSmoke {
+        uses_live_snapshot: report.passed(),
+        real_wayland_client: report.smoke.passed(),
+        live_snapshot_presented: frame_report.surface_count == report.snapshots.len() as u64
+            && frame_report.damaged_surfaces >= 1
+            && frame_report.total_pixels == snapshot.pixel_count(),
+        policy_window_from_snapshot: window.title == snapshot.title
+            && manager.policy().focused() == Some(window.id),
+        policy_geometry_preserved: window.geometry.width == snapshot.width as i32
+            && window.geometry.height == snapshot.height as i32,
+        pixels_composited: composited_pixels == snapshot.pixel_count(),
+        samples_verified,
+        ppm_written,
+        client_count: frame_report.client_count,
+        surface_count: frame_report.surface_count,
+        damaged_surfaces: frame_report.damaged_surfaces,
+        presented_pixels: frame_report.total_pixels,
+        snapshot_width: snapshot.width as u64,
+        snapshot_height: snapshot.height as u64,
+        snapshot_pixel_count: snapshot.pixel_count(),
+        composited_pixels,
+        ppm_bytes,
+        frame_checksum: frame.checksum(),
+        non_background_pixels: policy_preview_report.non_background_pixels,
+    })
 }
 
 fn run_scripted_client_runtime_with_backend<B: CompositorRuntime>(
@@ -3313,6 +3603,24 @@ fn run_scripted_client_runtime_with_backend<B: CompositorRuntime>(
         policy_preview_verified,
         policy_preview_non_background_pixels: policy_preview_report.non_background_pixels,
         policy_preview_checksum: policy_preview_report.checksum,
+        normal_frame_uses_live_snapshot: false,
+        normal_frame_real_wayland_client: false,
+        normal_frame_live_snapshot_presented: false,
+        normal_frame_policy_window_from_snapshot: false,
+        normal_frame_policy_geometry_preserved: false,
+        normal_frame_pixels_composited: false,
+        normal_frame_samples_verified: false,
+        normal_frame_ppm_written: true,
+        normal_frame_client_count: 0,
+        normal_frame_surface_count: 0,
+        normal_frame_damaged_surfaces: 0,
+        normal_frame_presented_pixels: 0,
+        normal_frame_snapshot_width: 0,
+        normal_frame_snapshot_height: 0,
+        normal_frame_snapshot_pixel_count: 0,
+        normal_frame_composited_pixels: 0,
+        normal_frame_ppm_bytes: 0,
+        normal_frame_checksum: 0,
     })
 }
 
