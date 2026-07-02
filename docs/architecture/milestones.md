@@ -2,7 +2,7 @@
 
 This roadmap starts from the current verified state: Backlit can launch in the Parallels Ubuntu E2E environment, run Smithay readiness probes, prove dedicated DRM first-present through the packaged session path, render real generated `wl_shm` client pixels into a Backlit frame through the `--smithay-real-shm-frame` proof path, and render pixels from an installed Wayland app through the `--smithay-real-app-e2e` proof path.
 
-The next milestones move those proof paths from focused verifiers into the normal compositor loop, then add lifecycle, input, and production rendering behavior.
+The next milestone moves the proven CPU snapshot/composition paths toward production renderer integration.
 
 ## Current Status
 
@@ -11,12 +11,12 @@ The next milestones move those proof paths from focused verifiers into the norma
 | 1. Live Surface Snapshots | Complete | `scripts/verify-smithay-live-surface-snapshots.sh` and Linux/Parallels E2E manifests include copied real `wl_shm` snapshots. |
 | 2. Real Clients In The Normal Frame Loop | Complete | `--runtime=smithay --scripted-client` emits normal-frame live snapshot evidence and exports a Backlit frame composed from real generated `wl_shm` pixels; MVP-complete passed on commit `4ce6c97`. |
 | 3. Surface Lifecycle | Complete | `--runtime=smithay --scripted-client` emits generated-client resize, unmap, close, destroy, disconnect, and Backlit policy cleanup evidence; Parallels Linux E2E passed on commit `b931ddb`. |
-| 4. Input To Real Clients | In progress | Keyboard and pointer events reach real generated clients while compositor shortcut filtering remains active. |
+| 4. Input To Real Clients | Complete | `--runtime=smithay --scripted-client` emits real generated-client keyboard, pointer, focus-routing, and shortcut-filter evidence; Parallels Linux E2E passed on commit `77e552e`. |
 | 5. Real App E2E | Complete | Parallels exports a Backlit frame containing pixels from `/usr/bin/weston-simple-shm`, with server-side SHM capture and Backlit frame sample verification. |
 | 6. GPU Texture Compositing | Pending | Real client buffers render through the GPU path with SHM CPU upload as fallback. |
 | 7. MVP 1 Closure | Pending | MVP contract and complete gates require real client/rendering evidence. |
 
-The active implementation target is **Milestone 4: Input To Real Clients**. Milestone 3 extended the real-client path through xdg configure/ack, resize, unmap, close, and disconnect policy cleanup; Milestone 4 now routes Smithay seat keyboard and pointer events into real generated Wayland clients.
+The active implementation target is **Milestone 6: GPU Texture Compositing**. Milestones 1 through 5 prove real client snapshots, normal frame composition, xdg lifecycle, input delivery, shortcut filtering, and installed-app pixels through deterministic CPU-backed evidence; Milestone 6 now moves the rendering path toward Smithay renderer/allocator integration.
 
 ## Milestone 1: Live Surface Snapshots
 
@@ -160,6 +160,7 @@ Route keyboard and pointer input from the Backlit/Smithay runtime into real Wayl
 - The generated client records `wl_pointer` enter, leave, motion, button, and frame events plus `wl_keyboard` keymap, enter, leave, key, modifiers, and repeat-info events.
 - The Smithay keyboard filter now proves ordinary keys are forwarded to the focused real client while a compositor-reserved shortcut probe is intercepted and not forwarded.
 - `scripts/verify-smithay-compositor-runtime.sh`, Linux E2E, Parallels export, MVP 1 contract, and MVP-complete require `smithay_real_client_input`, `smithay_real_pointer_input`, `smithay_real_keyboard_input`, `smithay_real_input_focus_routing`, and `smithay_shortcut_filter_preserved`.
+- Verified on commit `77e552e` with `cargo test --workspace` and `scripts/verify-parallels-linux-e2e.sh`.
 
 ### Dependencies
 
