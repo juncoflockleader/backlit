@@ -97,6 +97,20 @@ run_capture() {
   return "$status"
 }
 
+run_guest_write_probe() {
+  probe_name="$1"
+  probe_path="$2"
+  touch_log="$host_out_dir/${probe_name}-write-touch.txt"
+  cleanup_log="$host_out_dir/${probe_name}-write-cleanup.txt"
+
+  if ! run_capture "$touch_log" "$prlctl_bin" exec "$vm_name" --user root touch "$probe_path"; then
+    return 1
+  fi
+
+  run_capture "$cleanup_log" "$prlctl_bin" exec "$vm_name" --user root rm -f "$probe_path" || true
+  return 0
+}
+
 prlctl_bin="${PRLCTL:-}"
 if [ -z "$prlctl_bin" ]; then
   if command -v prlctl >/dev/null 2>&1; then
@@ -213,11 +227,11 @@ fi
 root_probe="/root/.backlit-ubuntu-health-write-check-$$"
 tmp_probe="/tmp/backlit-ubuntu-health-write-check-$$"
 
-if run_capture "$host_out_dir/root-write-check.txt" "$prlctl_bin" exec "$vm_name" --user root sh -lc "touch '$root_probe' && rm -f '$root_probe'"; then
+if run_guest_write_probe "root" "$root_probe"; then
   root_filesystem_writable=true
 fi
 
-if run_capture "$host_out_dir/tmp-write-check.txt" "$prlctl_bin" exec "$vm_name" --user root sh -lc "touch '$tmp_probe' && rm -f '$tmp_probe'"; then
+if run_guest_write_probe "tmp" "$tmp_probe"; then
   tmp_writable=true
 fi
 
