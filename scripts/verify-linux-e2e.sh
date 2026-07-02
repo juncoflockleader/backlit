@@ -11,6 +11,7 @@ compositor_runtime_dir="$out_dir/compositor-runtime"
 compositor_socket_dir="$out_dir/compositor-socket"
 smithay_compositor_runtime_dir="$out_dir/smithay-compositor-runtime"
 smithay_live_surface_snapshots_dir="$out_dir/smithay-live-surface-snapshots"
+smithay_real_app_e2e_dir="$out_dir/smithay-real-app-e2e"
 smithay_real_shm_frame_dir="$out_dir/smithay-real-shm-frame"
 launch_performance_dir="$out_dir/launch-performance"
 launcher_desktop_dir="$out_dir/launcher-desktop-discovery"
@@ -55,6 +56,7 @@ cargo clippy --workspace --all-targets -- -D warnings
 ./scripts/verify-compositor-socket.sh "$compositor_socket_dir"
 ./scripts/verify-smithay-compositor-runtime.sh "$smithay_compositor_runtime_dir"
 ./scripts/verify-smithay-live-surface-snapshots.sh "$smithay_live_surface_snapshots_dir"
+./scripts/verify-smithay-real-app-e2e.sh "$smithay_real_app_e2e_dir"
 ./scripts/verify-smithay-real-shm-frame.sh "$smithay_real_shm_frame_dir"
 ./scripts/verify-launch-performance.sh "$launch_performance_dir"
 ./scripts/verify-launcher-desktop-discovery.sh "$launcher_desktop_dir"
@@ -108,6 +110,7 @@ cat > "$out_dir/manifest.json" <<EOF
     "compositor_socket_manifest": "$compositor_socket_dir/manifest.json",
     "smithay_compositor_runtime_manifest": "$smithay_compositor_runtime_dir/manifest.json",
     "smithay_live_surface_snapshots_manifest": "$smithay_live_surface_snapshots_dir/manifest.json",
+    "smithay_real_app_e2e_manifest": "$smithay_real_app_e2e_dir/manifest.json",
     "smithay_real_shm_frame_manifest": "$smithay_real_shm_frame_dir/manifest.json",
     "launch_performance_manifest": "$launch_performance_dir/manifest.json",
     "launcher_desktop_discovery_manifest": "$launcher_desktop_dir/manifest.json",
@@ -149,6 +152,7 @@ cat > "$out_dir/manifest.json" <<EOF
     "compositor_socket": true,
     "smithay_compositor_runtime": true,
     "smithay_live_surface_snapshots": true,
+    "smithay_real_app_e2e": true,
     "smithay_real_shm_frame": true,
     "launch_performance": true,
     "launcher_desktop_discovery": true,

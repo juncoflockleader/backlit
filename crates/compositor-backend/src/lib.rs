@@ -3037,6 +3037,9 @@ pub struct RunConfig {
     pub scripted_client_preview: Option<String>,
     pub smithay_client_smoke: bool,
     pub smithay_live_surface_snapshots: bool,
+    pub smithay_real_app_e2e: bool,
+    pub smithay_real_app_command: Option<String>,
+    pub smithay_real_app_frame_output: Option<String>,
     pub smithay_real_shm_frame: bool,
     pub smithay_real_shm_frame_output: Option<String>,
     pub drm_first_present_probe: bool,
@@ -3057,6 +3060,9 @@ impl Default for RunConfig {
             scripted_client_preview: None,
             smithay_client_smoke: false,
             smithay_live_surface_snapshots: false,
+            smithay_real_app_e2e: false,
+            smithay_real_app_command: None,
+            smithay_real_app_frame_output: None,
             smithay_real_shm_frame: false,
             smithay_real_shm_frame_output: None,
             drm_first_present_probe: false,
@@ -3108,6 +3114,26 @@ where
             config.smithay_client_smoke = true;
         } else if arg == "--smithay-live-surface-snapshots" {
             config.smithay_live_surface_snapshots = true;
+        } else if arg == "--smithay-real-app-e2e" {
+            config.smithay_real_app_e2e = true;
+        } else if let Some(value) = arg.strip_prefix("--smithay-real-app-command=") {
+            config.smithay_real_app_e2e = true;
+            config.smithay_real_app_command = Some(value.to_string());
+        } else if arg == "--smithay-real-app-command" {
+            config.smithay_real_app_e2e = true;
+            config.smithay_real_app_command = Some(
+                args.next()
+                    .ok_or(ArgError::MissingValue("--smithay-real-app-command"))?,
+            );
+        } else if let Some(value) = arg.strip_prefix("--smithay-real-app-frame-output=") {
+            config.smithay_real_app_e2e = true;
+            config.smithay_real_app_frame_output = Some(value.to_string());
+        } else if arg == "--smithay-real-app-frame-output" {
+            config.smithay_real_app_e2e = true;
+            config.smithay_real_app_frame_output = Some(
+                args.next()
+                    .ok_or(ArgError::MissingValue("--smithay-real-app-frame-output"))?,
+            );
         } else if arg == "--smithay-real-shm-frame" {
             config.smithay_real_shm_frame = true;
         } else if let Some(value) = arg.strip_prefix("--smithay-real-shm-frame-output=") {
@@ -3731,6 +3757,8 @@ struct SmithayCompositorState {
     shm_buffer_width: u64,
     shm_buffer_height: u64,
     shm_buffer_pixels: u64,
+    committed_shm_snapshots: Vec<SmithayCommittedShmSnapshot>,
+    next_committed_shm_snapshot_id: u64,
 }
 
 #[cfg(all(feature = "smithay-backend", target_os = "linux"))]
@@ -3822,6 +3850,16 @@ impl RealShmSampleCoordinates {
             bottom_right: SMITHAY_REAL_SHM_BOTTOM_RIGHT_SAMPLE,
         }
     }
+
+    pub fn for_size(width: u32, height: u32) -> Self {
+        let max_x = width.saturating_sub(1);
+        let max_y = height.saturating_sub(1);
+        Self {
+            top_left: (max_x.min(16), max_y.min(16)),
+            center: (width / 2, height / 2),
+            bottom_right: (max_x.saturating_sub(16), max_y.saturating_sub(16)),
+        }
+    }
 }
 
 #[cfg(all(feature = "smithay-backend", target_os = "linux"))]
@@ -3891,6 +3929,97 @@ pub struct SmithaySurfaceDamageRect {
     pub y: u32,
     pub width: u32,
     pub height: u32,
+}
+
+#[cfg(all(feature = "smithay-backend", target_os = "linux"))]
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct SmithayCommittedShmSnapshot {
+    pub id: u64,
+    pub title: String,
+    pub app_id: String,
+    pub width: u32,
+    pub height: u32,
+    pub stride: u32,
+    pub format: &'static str,
+    pub commit_serial: u64,
+    pub damage: SmithaySurfaceDamageRect,
+    pub sample_coordinates: RealShmSampleCoordinates,
+    pub samples: RealShmPixelSamples,
+    pub pixel_checksum: u64,
+    pub nonzero_pixels: u64,
+    pub pixels: Vec<RealShmPixel>,
+}
+
+#[cfg(all(feature = "smithay-backend", target_os = "linux"))]
+impl SmithayCommittedShmSnapshot {
+    pub fn pixel(&self, x: u32, y: u32) -> Option<RealShmPixel> {
+        if x >= self.width || y >= self.height {
+            return None;
+        }
+
+        self.pixels.get((y * self.width + x) as usize).copied()
+    }
+
+    pub fn pixel_count(&self) -> u64 {
+        self.pixels.len() as u64
+    }
+
+    pub fn metadata_observed(&self) -> bool {
+        !self.title.trim().is_empty() || !self.app_id.trim().is_empty()
+    }
+
+    pub fn pixels_copied(&self) -> bool {
+        self.width > 0
+            && self.height > 0
+            && self.pixel_count() == self.width.saturating_mul(self.height) as u64
+            && self.stride >= self.width.saturating_mul(4)
+            && self.pixel_checksum > 0
+            && self.nonzero_pixels > 0
+    }
+}
+
+#[cfg(all(feature = "smithay-backend", target_os = "linux"))]
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct SmithayRealAppE2eReport {
+    pub app_command: String,
+    pub app_spawned: bool,
+    pub app_pid: u64,
+    pub app_exited_before_capture: bool,
+    pub app_exit_status: i32,
+    pub app_killed_after_capture: bool,
+    pub socket_name: String,
+    pub inserted_wayland_clients: u64,
+    pub wayland_dispatch_count: u64,
+    pub calloop_dispatch_count: u64,
+    pub surface_commit_count: u64,
+    pub shm_snapshot_count: u64,
+    pub snapshots: Vec<SmithayCommittedShmSnapshot>,
+}
+
+#[cfg(all(feature = "smithay-backend", target_os = "linux"))]
+impl SmithayRealAppE2eReport {
+    pub fn latest_snapshot(&self) -> Option<&SmithayCommittedShmSnapshot> {
+        self.snapshots.last()
+    }
+
+    pub fn passed(&self) -> bool {
+        let Some(snapshot) = self.latest_snapshot() else {
+            return false;
+        };
+
+        self.app_spawned
+            && self.app_pid > 0
+            && self.inserted_wayland_clients >= 1
+            && self.wayland_dispatch_count >= 1
+            && self.calloop_dispatch_count >= 1
+            && self.surface_commit_count >= 1
+            && self.shm_snapshot_count >= 1
+            && snapshot.metadata_observed()
+            && snapshot.pixels_copied()
+            && snapshot.commit_serial >= 1
+            && snapshot.damage.width > 0
+            && snapshot.damage.height > 0
+    }
 }
 
 #[cfg(all(feature = "smithay-backend", target_os = "linux"))]
@@ -4834,6 +4963,8 @@ impl SmithayCompositorState {
             shm_buffer_width: 0,
             shm_buffer_height: 0,
             shm_buffer_pixels: 0,
+            committed_shm_snapshots: Vec::new(),
+            next_committed_shm_snapshot_id: 1,
         })
     }
 
@@ -4947,6 +5078,20 @@ impl smithay::wayland::compositor::CompositorHandler for SmithayCompositorState 
             self.shm_buffer_height = height;
             self.shm_buffer_pixels = width * height;
         }
+        if let Some(snapshot) = smithay_capture_committed_shm_snapshot(
+            surface,
+            self.next_committed_shm_snapshot_id,
+            self.surface_commit_count,
+        ) {
+            self.next_committed_shm_snapshot_id += 1;
+            if !snapshot.title.is_empty() {
+                self.observed_title = Some(snapshot.title.clone());
+            }
+            if !snapshot.app_id.is_empty() {
+                self.observed_app_id = Some(snapshot.app_id.clone());
+            }
+            self.committed_shm_snapshots.push(snapshot);
+        }
         smithay::backend::renderer::utils::on_commit_buffer_handler::<Self>(surface);
     }
 }
@@ -4968,6 +5113,182 @@ fn smithay_committed_buffer_dimensions(
 
         smithay::backend::renderer::buffer_dimensions(buffer)
             .map(|size| (size.w.max(0) as u64, size.h.max(0) as u64))
+    })
+}
+
+#[cfg(all(feature = "smithay-backend", target_os = "linux"))]
+fn smithay_capture_committed_shm_snapshot(
+    surface: &smithay::reexports::wayland_server::protocol::wl_surface::WlSurface,
+    id: u64,
+    commit_serial: u64,
+) -> Option<SmithayCommittedShmSnapshot> {
+    use smithay::reexports::wayland_server::protocol::wl_shm;
+
+    let (buffer, damage) = smithay_committed_buffer_and_damage(surface)?;
+    let (title, app_id) = smithay_surface_toplevel_metadata(surface);
+
+    smithay::wayland::shm::with_buffer_contents(&buffer, |ptr, len, data| {
+        let width = data.width.max(0) as u32;
+        let height = data.height.max(0) as u32;
+        let stride = data.stride.max(0) as u32;
+        if width == 0 || height == 0 || stride < width.saturating_mul(4) || data.offset < 0 {
+            return None;
+        }
+
+        let format = match data.format {
+            wl_shm::Format::Argb8888 => "ARGB8888",
+            wl_shm::Format::Xrgb8888 => "XRGB8888",
+            wl_shm::Format::Abgr8888 => "ABGR8888",
+            wl_shm::Format::Xbgr8888 => "XBGR8888",
+            _ => return None,
+        };
+        let sample_coordinates = RealShmSampleCoordinates::for_size(width, height);
+        let mut pixels = Vec::with_capacity(width.saturating_mul(height) as usize);
+        let base_offset = data.offset as usize;
+
+        for y in 0..height as usize {
+            for x in 0..width as usize {
+                let offset = base_offset + y * stride as usize + x * 4;
+                let end = offset + 4;
+                if end > len {
+                    return None;
+                }
+                let bytes = unsafe { std::slice::from_raw_parts(ptr.add(offset), 4) };
+                pixels.push(decode_shm_pixel(data.format, bytes)?);
+            }
+        }
+
+        let samples = RealShmPixelSamples {
+            top_left: sample_pixel_from_vec(
+                &pixels,
+                width,
+                sample_coordinates.top_left.0,
+                sample_coordinates.top_left.1,
+            )
+            .ok()?,
+            center: sample_pixel_from_vec(
+                &pixels,
+                width,
+                sample_coordinates.center.0,
+                sample_coordinates.center.1,
+            )
+            .ok()?,
+            bottom_right: sample_pixel_from_vec(
+                &pixels,
+                width,
+                sample_coordinates.bottom_right.0,
+                sample_coordinates.bottom_right.1,
+            )
+            .ok()?,
+        };
+        let pixel_checksum = real_shm_pixel_checksum(&pixels);
+        let nonzero_pixels = pixels
+            .iter()
+            .filter(|pixel| pixel.red != 0 || pixel.green != 0 || pixel.blue != 0)
+            .count() as u64;
+        let damage = damage.unwrap_or(SmithaySurfaceDamageRect {
+            x: 0,
+            y: 0,
+            width,
+            height,
+        });
+
+        Some(SmithayCommittedShmSnapshot {
+            id,
+            title: title.unwrap_or_default(),
+            app_id: app_id.unwrap_or_default(),
+            width,
+            height,
+            stride,
+            format,
+            commit_serial,
+            damage,
+            sample_coordinates,
+            samples,
+            pixel_checksum,
+            nonzero_pixels,
+            pixels,
+        })
+    })
+    .ok()
+    .flatten()
+}
+
+#[cfg(all(feature = "smithay-backend", target_os = "linux"))]
+fn decode_shm_pixel(
+    format: smithay::reexports::wayland_server::protocol::wl_shm::Format,
+    bytes: &[u8],
+) -> Option<RealShmPixel> {
+    use smithay::reexports::wayland_server::protocol::wl_shm;
+
+    match format {
+        wl_shm::Format::Argb8888 => {
+            Some(RealShmPixel::rgba(bytes[2], bytes[1], bytes[0], bytes[3]))
+        }
+        wl_shm::Format::Xrgb8888 => Some(RealShmPixel::rgba(bytes[2], bytes[1], bytes[0], 255)),
+        wl_shm::Format::Abgr8888 => {
+            Some(RealShmPixel::rgba(bytes[0], bytes[1], bytes[2], bytes[3]))
+        }
+        wl_shm::Format::Xbgr8888 => Some(RealShmPixel::rgba(bytes[0], bytes[1], bytes[2], 255)),
+        _ => None,
+    }
+}
+
+#[cfg(all(feature = "smithay-backend", target_os = "linux"))]
+fn smithay_committed_buffer_and_damage(
+    surface: &smithay::reexports::wayland_server::protocol::wl_surface::WlSurface,
+) -> Option<(
+    smithay::reexports::wayland_server::protocol::wl_buffer::WlBuffer,
+    Option<SmithaySurfaceDamageRect>,
+)> {
+    smithay::wayland::compositor::with_states(surface, |states| {
+        let mut guard = states
+            .cached_state
+            .get::<smithay::wayland::compositor::SurfaceAttributes>();
+        let attributes = guard.current();
+        let Some(smithay::wayland::compositor::BufferAssignment::NewBuffer(buffer)) =
+            attributes.buffer.as_ref()
+        else {
+            return None;
+        };
+        let damage = attributes.damage.iter().find_map(smithay_damage_rect);
+        Some((buffer.clone(), damage))
+    })
+}
+
+#[cfg(all(feature = "smithay-backend", target_os = "linux"))]
+fn smithay_damage_rect(
+    damage: &smithay::wayland::compositor::Damage,
+) -> Option<SmithaySurfaceDamageRect> {
+    let (x, y, width, height) = match damage {
+        smithay::wayland::compositor::Damage::Surface(rect) => {
+            (rect.loc.x, rect.loc.y, rect.size.w, rect.size.h)
+        }
+        smithay::wayland::compositor::Damage::Buffer(rect) => {
+            (rect.loc.x, rect.loc.y, rect.size.w, rect.size.h)
+        }
+    };
+    Some(SmithaySurfaceDamageRect {
+        x: x.max(0) as u32,
+        y: y.max(0) as u32,
+        width: width.max(0) as u32,
+        height: height.max(0) as u32,
+    })
+}
+
+#[cfg(all(feature = "smithay-backend", target_os = "linux"))]
+fn smithay_surface_toplevel_metadata(
+    surface: &smithay::reexports::wayland_server::protocol::wl_surface::WlSurface,
+) -> (Option<String>, Option<String>) {
+    smithay::wayland::compositor::with_states(surface, |states| {
+        let Some(data) = states
+            .data_map
+            .get::<smithay::wayland::shell::xdg::XdgToplevelSurfaceData>()
+        else {
+            return (None, None);
+        };
+        let attributes = data.lock().unwrap();
+        (attributes.title.clone(), attributes.app_id.clone())
     })
 }
 
@@ -5333,6 +5654,10 @@ impl SmithayCompositorRuntime {
         &self.live_surface_snapshots
     }
 
+    pub fn committed_shm_snapshots(&self) -> &[SmithayCommittedShmSnapshot] {
+        &self.state.committed_shm_snapshots
+    }
+
     pub fn run_wayland_client_smoke(
         &mut self,
     ) -> Result<SmithayWaylandClientSmokeReport, SmithayRuntimeError> {
@@ -5382,6 +5707,92 @@ impl SmithayCompositorRuntime {
             latest_snapshot_id: snapshot_id,
             commit_count: self.state.surface_commit_count,
             damage_count: self.live_surface_snapshots.len() as u64,
+        })
+    }
+
+    pub fn run_real_app_e2e_capture(
+        &mut self,
+        app_command: &str,
+        timeout_ms: u64,
+    ) -> Result<SmithayRealAppE2eReport, SmithayRuntimeError> {
+        use std::process::{Command, ExitStatus, Stdio};
+        use std::time::{Duration, Instant};
+
+        let mut child = Command::new(app_command)
+            .env("WAYLAND_DISPLAY", self.socket_name.as_str())
+            .stdin(Stdio::null())
+            .stdout(Stdio::null())
+            .stderr(Stdio::null())
+            .spawn()
+            .map_err(|error| {
+                SmithayRuntimeError(format!("real-app-spawn:{app_command}:{error}"))
+            })?;
+        let app_pid = child.id() as u64;
+        let deadline = Instant::now() + Duration::from_millis(timeout_ms.max(250));
+        let mut app_exited_before_capture = false;
+        let mut observed_exit_status: Option<ExitStatus> = None;
+
+        while Instant::now() < deadline && self.state.committed_shm_snapshots.is_empty() {
+            self.accept_pending_wayland_clients("real-app-e2e")?;
+            self.dispatch_wayland();
+
+            match child
+                .try_wait()
+                .map_err(|error| SmithayRuntimeError(format!("real-app-status:{error}")))?
+            {
+                Some(status) => {
+                    app_exited_before_capture = true;
+                    observed_exit_status = Some(status);
+                    break;
+                }
+                None => {}
+            }
+
+            std::thread::sleep(Duration::from_millis(5));
+        }
+
+        for _ in 0..8 {
+            self.accept_pending_wayland_clients("real-app-e2e")?;
+            self.dispatch_wayland();
+            if !self.state.committed_shm_snapshots.is_empty() {
+                break;
+            }
+            std::thread::sleep(Duration::from_millis(5));
+        }
+
+        let (app_exit_status, app_killed_after_capture) = if let Some(status) = observed_exit_status
+        {
+            (status.code().unwrap_or(255), false)
+        } else {
+            match child
+                .try_wait()
+                .map_err(|error| SmithayRuntimeError(format!("real-app-status:{error}")))?
+            {
+                Some(status) => (status.code().unwrap_or(255), false),
+                None => {
+                    let _ = child.kill();
+                    let status = child
+                        .wait()
+                        .map_err(|error| SmithayRuntimeError(format!("real-app-wait:{error}")))?;
+                    (status.code().unwrap_or(255), true)
+                }
+            }
+        };
+
+        Ok(SmithayRealAppE2eReport {
+            app_command: app_command.to_string(),
+            app_spawned: true,
+            app_pid,
+            app_exited_before_capture,
+            app_exit_status,
+            app_killed_after_capture,
+            socket_name: self.socket_name.clone(),
+            inserted_wayland_clients: self.inserted_wayland_clients,
+            wayland_dispatch_count: self.wayland_dispatch_count,
+            calloop_dispatch_count: self.calloop_dispatch_count,
+            surface_commit_count: self.state.surface_commit_count,
+            shm_snapshot_count: self.state.committed_shm_snapshots.len() as u64,
+            snapshots: self.state.committed_shm_snapshots.clone(),
         })
     }
 
@@ -5523,6 +5934,32 @@ impl SmithayCompositorRuntime {
             .map_err(|error| SmithayRuntimeError(format!("client-insert:{name}:{error}")))?;
         self.inserted_wayland_clients += 1;
         Ok(client_stream)
+    }
+
+    fn accept_pending_wayland_clients(&mut self, name: &str) -> Result<u64, SmithayRuntimeError> {
+        use std::sync::Arc;
+
+        use smithay::reexports::wayland_server::backend::ClientData;
+
+        let mut accepted = 0u64;
+        for _ in 0..16 {
+            let Some(stream) = self
+                .listening_socket
+                .accept()
+                .map_err(|error| SmithayRuntimeError(format!("socket-accept:{name}:{error}")))?
+            else {
+                break;
+            };
+            let client_data: Arc<dyn ClientData> = Arc::new(SmithayClientData::default());
+            let mut display_handle = self.display.handle();
+            display_handle
+                .insert_client(stream, client_data)
+                .map_err(|error| SmithayRuntimeError(format!("client-insert:{name}:{error}")))?;
+            self.inserted_wayland_clients += 1;
+            accepted += 1;
+        }
+
+        Ok(accepted)
     }
 
     fn insert_wayland_client(&mut self, name: &str) -> Result<(), SmithayRuntimeError> {
@@ -5810,6 +6247,11 @@ mod tests {
             "--scripted-client",
             "--smithay-client-smoke",
             "--smithay-live-surface-snapshots",
+            "--smithay-real-app-e2e",
+            "--smithay-real-app-command",
+            "/usr/bin/weston-simple-shm",
+            "--smithay-real-app-frame-output",
+            "target/smithay-real-app-e2e/frame.ppm",
             "--smithay-real-shm-frame",
             "--smithay-real-shm-frame-output",
             "target/smithay-real-shm-frame/frame.ppm",
@@ -5830,6 +6272,15 @@ mod tests {
         assert!(config.scripted_client);
         assert!(config.smithay_client_smoke);
         assert!(config.smithay_live_surface_snapshots);
+        assert!(config.smithay_real_app_e2e);
+        assert_eq!(
+            config.smithay_real_app_command.as_deref(),
+            Some("/usr/bin/weston-simple-shm")
+        );
+        assert_eq!(
+            config.smithay_real_app_frame_output.as_deref(),
+            Some("target/smithay-real-app-e2e/frame.ppm")
+        );
         assert!(config.smithay_real_shm_frame);
         assert_eq!(
             config.smithay_real_shm_frame_output.as_deref(),

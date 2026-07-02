@@ -138,7 +138,7 @@ The Linux-side verifier can also be run directly inside any Ubuntu checkout:
 ./scripts/verify-linux-e2e.sh
 ```
 
-It runs `cargo fmt`, workspace tests, `cargo clippy`, the deterministic GUI smoke verifier, the preview renderer, compositor-runtime verifier, compositor-socket verifier, Smithay compositor runtime verifier, real SHM client-pixel frame verifier, launch-performance verifier, launcher desktop discovery verifier, resource-budget verifier, notification-daemon verifier, settings-daemon verifier, service-lifecycle verifier, settings-app verifier, portal-security verifier, crash-log verifier, CI contract verifier, packaging contract verifier, package-manifest verifier, Debian package-build verifier, Debian package-install verifier, Debian system-install verifier, staged session install verifier, systemd activation verifier, Smithay runtime probe, DRM-master boundary verifier, launch-readiness verifier, session launch verifier, session clean-exit verifier, nested Wayland smoke verifier, MVP 1 contract verifier, and MVP 0 contract verifier, then writes `target/linux-e2e/manifest.json`.
+It runs `cargo fmt`, workspace tests, `cargo clippy`, the deterministic GUI smoke verifier, the preview renderer, compositor-runtime verifier, compositor-socket verifier, Smithay compositor runtime verifier, Smithay live-snapshot verifier, installed real Wayland app E2E verifier, real SHM client-pixel frame verifier, launch-performance verifier, launcher desktop discovery verifier, resource-budget verifier, notification-daemon verifier, settings-daemon verifier, service-lifecycle verifier, settings-app verifier, portal-security verifier, crash-log verifier, CI contract verifier, packaging contract verifier, package-manifest verifier, Debian package-build verifier, Debian package-install verifier, Debian system-install verifier, staged session install verifier, systemd activation verifier, Smithay runtime probe, DRM-master boundary verifier, launch-readiness verifier, session launch verifier, session clean-exit verifier, nested Wayland smoke verifier, MVP 1 contract verifier, and MVP 0 contract verifier, then writes `target/linux-e2e/manifest.json`.
 
 ## GUI Linux VM Workflow
 
@@ -221,6 +221,7 @@ cargo run -p backlit-session -- --backend=headless --screenshot target/backlit-s
 ./scripts/verify-smithay-runtime-probe.sh
 ./scripts/verify-smithay-compositor-runtime.sh
 ./scripts/verify-smithay-live-surface-snapshots.sh
+./scripts/verify-smithay-real-app-e2e.sh
 ./scripts/verify-smithay-real-shm-frame.sh
 ./scripts/verify-launch-readiness.sh
 ./scripts/verify-session-launch.sh
@@ -253,6 +254,9 @@ Current compositor flags:
 --scripted-client-preview=<path>
 --smithay-client-smoke
 --smithay-live-surface-snapshots
+--smithay-real-app-e2e
+--smithay-real-app-command=<path>
+--smithay-real-app-frame-output=<path>
 --smithay-real-shm-frame
 --smithay-real-shm-frame-output=<path>
 --drm-first-present-probe
@@ -325,6 +329,8 @@ The compositor-runtime verifier runs `backlit-compositor --scripted-client --scr
 The Smithay compositor runtime verifier also runs `backlit-compositor --backend=drm --runtime=smithay --drm-first-present-probe`. That compositor-owned probe records KMS scanout selection, framebuffer allocation/fill, primary-plane state readiness, and either a first commit with vblank or the expected DRM-master permission denial from a nested desktop session.
 
 The Smithay live surface snapshot verifier runs `backlit-compositor --backend=drm --runtime=smithay --smithay-live-surface-snapshots` and requires a generated real Wayland `wl_shm` client to produce a persisted Backlit-owned snapshot with copied pixels, full damage metadata, verified sample colors, commit counters, and policy-window mapping from the real title/app id and buffer geometry.
+
+The Smithay real app E2E verifier runs `backlit-compositor --backend=drm --runtime=smithay --smithay-real-app-e2e`, launches an installed Wayland SHM app such as `weston-simple-shm`, accepts that external process through the Smithay socket, captures committed server-side `wl_shm` pixels, CPU-composes them into a Backlit frame, verifies frame sample pixels, and writes `target/smithay-real-app-e2e/backlit-real-app-frame.ppm`. The Parallels E2E export copies that frame back as `target/linux-e2e-parallels/smithay-real-app-e2e.ppm` and converts it to `target/linux-e2e-parallels/smithay-real-app-e2e.png` on macOS when a converter is available.
 
 The compositor-socket verifier runs the compositor in bounded service mode with a private `XDG_RUNTIME_DIR`, requires the configured socket name to appear as a Unix socket, connects one `backlit-demo-client` as a persistent terminal-like window, then connects another with `--connect-management --connect-lifecycle`. It verifies both windows map into policy, the newer app receives focus, socket commands move and resize it, maximize uses the panel-reserved work area, fullscreen uses the whole output, the damage event presents exactly one damaged surface, close removes the newer backend surface and managed policy window, focus returns to the older app window, waits for clean exit, and verifies socket cleanup. This is the current executable contract behind `--socket=backlit-0` in the packaged user service.
 

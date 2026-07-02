@@ -21,7 +21,7 @@ use backlit_compositor_backend::{
 #[cfg(all(feature = "smithay-backend", target_os = "linux"))]
 use backlit_compositor_backend::{
     RealShmPixel, SmithayCompositorRuntime, SmithayLiveSurfaceSnapshot,
-    SmithayLiveSurfaceSnapshotReport, SmithayRealShmFrameCapture,
+    SmithayLiveSurfaceSnapshotReport, SmithayRealAppE2eReport, SmithayRealShmFrameCapture,
 };
 use backlit_demo_client::{render_policy_gui, verify_policy_gui};
 #[cfg(all(feature = "smithay-backend", target_os = "linux"))]
@@ -59,6 +59,10 @@ fn run() -> Result<(), String> {
             (
                 "smithay_live_surface_snapshots",
                 FieldValue::Bool(config.smithay_live_surface_snapshots),
+            ),
+            (
+                "smithay_real_app_e2e",
+                FieldValue::Bool(config.smithay_real_app_e2e),
             ),
             (
                 "smithay_real_shm_frame",
@@ -106,6 +110,7 @@ fn run() -> Result<(), String> {
         if !config.scripted_client
             && !config.smithay_client_smoke
             && !config.smithay_live_surface_snapshots
+            && !config.smithay_real_app_e2e
             && !config.smithay_real_shm_frame
             && !config.smoke_test
             && !config.serve
@@ -375,6 +380,7 @@ fn run() -> Result<(), String> {
 
         if !config.scripted_client
             && !config.smithay_live_surface_snapshots
+            && !config.smithay_real_app_e2e
             && !config.smithay_real_shm_frame
             && !config.smoke_test
             && !config.serve
@@ -495,6 +501,129 @@ fn run() -> Result<(), String> {
             return Err(String::from(
                 "Smithay live surface snapshot verification failed",
             ));
+        }
+
+        if !config.scripted_client
+            && !config.smithay_real_app_e2e
+            && !config.smithay_real_shm_frame
+            && !config.smoke_test
+            && !config.serve
+            && config.idle_probe_ms.is_none()
+        {
+            emit(
+                "compositor.exit",
+                &config,
+                &[(
+                    "elapsed_ms",
+                    FieldValue::U64(started.elapsed().as_millis() as u64),
+                )],
+            );
+            return Ok(());
+        }
+    }
+
+    if config.smithay_real_app_e2e {
+        let real_app = run_smithay_real_app_e2e_for_config(&config)?;
+        emit(
+            "compositor.smithay_real_app_e2e",
+            &config,
+            &[
+                ("passed", FieldValue::Bool(real_app.passed())),
+                ("runtime_backend", FieldValue::Str(real_app.runtime_backend)),
+                (
+                    "real_installed_app_spawned",
+                    FieldValue::Bool(real_app.real_installed_app_spawned),
+                ),
+                (
+                    "real_app_wayland_client_connected",
+                    FieldValue::Bool(real_app.real_app_wayland_client_connected),
+                ),
+                (
+                    "real_app_metadata_observed",
+                    FieldValue::Bool(real_app.real_app_metadata_observed),
+                ),
+                (
+                    "real_app_shm_pixels_captured",
+                    FieldValue::Bool(real_app.real_app_shm_pixels_captured),
+                ),
+                (
+                    "real_app_pixels_composited",
+                    FieldValue::Bool(real_app.real_app_pixels_composited),
+                ),
+                (
+                    "real_app_frame_samples_verified",
+                    FieldValue::Bool(real_app.real_app_frame_samples_verified),
+                ),
+                (
+                    "policy_window_from_real_app",
+                    FieldValue::Bool(real_app.policy_window_from_real_app),
+                ),
+                (
+                    "policy_geometry_preserved",
+                    FieldValue::Bool(real_app.policy_geometry_preserved),
+                ),
+                (
+                    "frame_ppm_written",
+                    FieldValue::Bool(real_app.frame_ppm_written),
+                ),
+                (
+                    "app_command",
+                    FieldValue::Str(real_app.app_command.as_str()),
+                ),
+                ("app_pid", FieldValue::U64(real_app.app_pid)),
+                (
+                    "app_killed_after_capture",
+                    FieldValue::Bool(real_app.app_killed_after_capture),
+                ),
+                (
+                    "inserted_wayland_clients",
+                    FieldValue::U64(real_app.inserted_wayland_clients),
+                ),
+                (
+                    "surface_commit_count",
+                    FieldValue::U64(real_app.surface_commit_count),
+                ),
+                ("snapshot_width", FieldValue::U64(real_app.snapshot_width)),
+                ("snapshot_height", FieldValue::U64(real_app.snapshot_height)),
+                ("snapshot_stride", FieldValue::U64(real_app.snapshot_stride)),
+                ("snapshot_format", FieldValue::Str(real_app.snapshot_format)),
+                (
+                    "snapshot_pixel_count",
+                    FieldValue::U64(real_app.snapshot_pixel_count),
+                ),
+                (
+                    "snapshot_nonzero_pixels",
+                    FieldValue::U64(real_app.snapshot_nonzero_pixels),
+                ),
+                (
+                    "snapshot_pixel_checksum",
+                    FieldValue::U64(real_app.snapshot_pixel_checksum),
+                ),
+                ("damage_width", FieldValue::U64(real_app.damage_width)),
+                ("damage_height", FieldValue::U64(real_app.damage_height)),
+                (
+                    "composited_pixels",
+                    FieldValue::U64(real_app.composited_pixels),
+                ),
+                ("frame_ppm_bytes", FieldValue::U64(real_app.frame_ppm_bytes)),
+                ("frame_checksum", FieldValue::U64(real_app.frame_checksum)),
+                (
+                    "observed_title",
+                    FieldValue::Str(real_app.observed_title.as_str()),
+                ),
+                (
+                    "observed_app_id",
+                    FieldValue::Str(real_app.observed_app_id.as_str()),
+                ),
+                (
+                    "frame_ppm_path",
+                    FieldValue::Str(real_app.frame_ppm_path.as_str()),
+                ),
+            ],
+        );
+
+        if !real_app.passed() {
+            return Err(String::from("Smithay real app E2E verification failed"));
         }
 
         if !config.scripted_client
@@ -624,6 +753,7 @@ fn run() -> Result<(), String> {
         }
 
         if !config.scripted_client
+            && !config.smithay_real_app_e2e
             && !config.smoke_test
             && !config.serve
             && config.idle_probe_ms.is_none()
@@ -2218,6 +2348,69 @@ struct LiveSurfaceSnapshotsSmoke {
     source_bottom_right_blue: u64,
 }
 
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct RealAppE2eSmoke {
+    runtime_backend: &'static str,
+    real_installed_app_spawned: bool,
+    real_app_wayland_client_connected: bool,
+    real_app_metadata_observed: bool,
+    real_app_shm_pixels_captured: bool,
+    real_app_pixels_composited: bool,
+    real_app_frame_samples_verified: bool,
+    policy_window_from_real_app: bool,
+    policy_geometry_preserved: bool,
+    frame_ppm_written: bool,
+    app_command: String,
+    app_pid: u64,
+    app_killed_after_capture: bool,
+    inserted_wayland_clients: u64,
+    surface_commit_count: u64,
+    snapshot_width: u64,
+    snapshot_height: u64,
+    snapshot_stride: u64,
+    snapshot_format: &'static str,
+    snapshot_pixel_count: u64,
+    snapshot_nonzero_pixels: u64,
+    snapshot_pixel_checksum: u64,
+    damage_width: u64,
+    damage_height: u64,
+    composited_pixels: u64,
+    frame_ppm_bytes: u64,
+    frame_checksum: u64,
+    observed_title: String,
+    observed_app_id: String,
+    frame_ppm_path: String,
+}
+
+impl RealAppE2eSmoke {
+    fn passed(&self) -> bool {
+        self.runtime_backend == "smithay-compositor-runtime"
+            && self.real_installed_app_spawned
+            && self.real_app_wayland_client_connected
+            && self.real_app_metadata_observed
+            && self.real_app_shm_pixels_captured
+            && self.real_app_pixels_composited
+            && self.real_app_frame_samples_verified
+            && self.policy_window_from_real_app
+            && self.policy_geometry_preserved
+            && self.frame_ppm_written
+            && self.app_pid > 0
+            && self.inserted_wayland_clients >= 1
+            && self.surface_commit_count >= 1
+            && self.snapshot_width > 0
+            && self.snapshot_height > 0
+            && self.snapshot_stride >= self.snapshot_width * 4
+            && self.snapshot_pixel_count == self.snapshot_width * self.snapshot_height
+            && self.snapshot_nonzero_pixels > 0
+            && self.snapshot_pixel_checksum > 0
+            && self.damage_width > 0
+            && self.damage_height > 0
+            && self.composited_pixels == self.snapshot_pixel_count
+            && self.frame_ppm_bytes > self.snapshot_pixel_count
+            && self.frame_checksum > 0
+    }
+}
+
 impl LiveSurfaceSnapshotsSmoke {
     fn passed(&self) -> bool {
         self.runtime_backend == "smithay-compositor-runtime"
@@ -2533,6 +2726,160 @@ fn map_live_snapshot_into_policy(
 }
 
 #[cfg(all(feature = "smithay-backend", target_os = "linux"))]
+fn run_smithay_real_app_e2e_for_config(config: &RunConfig) -> Result<RealAppE2eSmoke, String> {
+    if config.runtime != RuntimeKind::Smithay {
+        return Err(String::from(
+            "Smithay real app E2E requires --runtime=smithay",
+        ));
+    }
+
+    let mut runtime = SmithayCompositorRuntime::try_new().map_err(|error| error.to_string())?;
+    let runtime_backend = runtime.runtime_name();
+    let app_command = config
+        .smithay_real_app_command
+        .as_deref()
+        .unwrap_or("weston-simple-shm");
+    let report = runtime
+        .run_real_app_e2e_capture(app_command, 2_000)
+        .map_err(|error| error.to_string())?;
+    compose_real_app_capture(runtime_backend, &report, config)
+}
+
+#[cfg(all(feature = "smithay-backend", target_os = "linux"))]
+fn compose_real_app_capture(
+    runtime_backend: &'static str,
+    report: &SmithayRealAppE2eReport,
+    config: &RunConfig,
+) -> Result<RealAppE2eSmoke, String> {
+    let snapshot = report
+        .latest_snapshot()
+        .ok_or_else(|| String::from("real-app-e2e:missing-shm-snapshot"))?;
+    let frame_width = 900u32;
+    let frame_height = 620u32;
+    let layout = OutputLayout::new(frame_width as i32, frame_height as i32, 42);
+    let mut manager = SurfaceManager::new(layout);
+    let policy_title = if snapshot.title.trim().is_empty() {
+        real_app_command_name(report.app_command.as_str())
+    } else {
+        snapshot.title.clone()
+    };
+    let policy_app_id = if snapshot.app_id.trim().is_empty() {
+        real_app_command_name(report.app_command.as_str())
+    } else {
+        snapshot.app_id.clone()
+    };
+    let surface = map_scripted_app_toplevel(
+        &mut manager,
+        policy_title.as_str(),
+        policy_app_id.as_str(),
+        snapshot.width as i32,
+        snapshot.height as i32,
+    )?;
+    let window_id = manager
+        .surface(surface)
+        .and_then(|surface| surface.window_id)
+        .ok_or_else(|| String::from("real-app-e2e:missing-policy-window"))?;
+    let window = manager
+        .policy()
+        .window(window_id)
+        .cloned()
+        .ok_or_else(|| String::from("real-app-e2e:missing-window-geometry"))?;
+    let mut frame = render_policy_gui(frame_width, frame_height, manager.policy(), layout);
+    let mut composited_pixels = 0u64;
+
+    for y in 0..snapshot.height {
+        for x in 0..snapshot.width {
+            let Some(pixel) = snapshot.pixel(x, y) else {
+                continue;
+            };
+            let frame_x = window.geometry.x + x as i32;
+            let frame_y = window.geometry.y + y as i32;
+            if frame_x < 0 || frame_y < 0 {
+                continue;
+            }
+            if frame.set_pixel(frame_x as u32, frame_y as u32, real_shm_color(pixel)) {
+                composited_pixels += 1;
+            }
+        }
+    }
+
+    let frame_top_left = frame_real_shm_sample(
+        &frame,
+        window.geometry,
+        snapshot.sample_coordinates.top_left,
+    );
+    let frame_center =
+        frame_real_shm_sample(&frame, window.geometry, snapshot.sample_coordinates.center);
+    let frame_bottom_right = frame_real_shm_sample(
+        &frame,
+        window.geometry,
+        snapshot.sample_coordinates.bottom_right,
+    );
+    let real_app_frame_samples_verified =
+        frame_color_matches_real_pixel(frame_top_left, snapshot.samples.top_left)
+            && frame_color_matches_real_pixel(frame_center, snapshot.samples.center)
+            && frame_color_matches_real_pixel(frame_bottom_right, snapshot.samples.bottom_right);
+
+    let output_path = config
+        .smithay_real_app_frame_output
+        .as_deref()
+        .unwrap_or("target/smithay-real-app-e2e/backlit-real-app-frame.ppm");
+    let frame_ppm_written = frame.write_ppm(output_path).is_ok();
+    let frame_ppm_bytes = if frame_ppm_written {
+        fs::metadata(output_path)
+            .map(|metadata| metadata.len())
+            .unwrap_or_default()
+    } else {
+        0
+    };
+
+    Ok(RealAppE2eSmoke {
+        runtime_backend,
+        real_installed_app_spawned: report.app_spawned && report.app_pid > 0,
+        real_app_wayland_client_connected: report.inserted_wayland_clients >= 1,
+        real_app_metadata_observed: snapshot.metadata_observed(),
+        real_app_shm_pixels_captured: snapshot.pixels_copied() && report.passed(),
+        real_app_pixels_composited: composited_pixels == snapshot.pixel_count(),
+        real_app_frame_samples_verified,
+        policy_window_from_real_app: window.title == policy_title
+            && manager.policy().focused() == Some(window.id),
+        policy_geometry_preserved: window.geometry.width == snapshot.width as i32
+            && window.geometry.height == snapshot.height as i32,
+        frame_ppm_written: frame_ppm_written && frame_ppm_bytes > 0,
+        app_command: report.app_command.clone(),
+        app_pid: report.app_pid,
+        app_killed_after_capture: report.app_killed_after_capture,
+        inserted_wayland_clients: report.inserted_wayland_clients,
+        surface_commit_count: report.surface_commit_count,
+        snapshot_width: snapshot.width as u64,
+        snapshot_height: snapshot.height as u64,
+        snapshot_stride: snapshot.stride as u64,
+        snapshot_format: snapshot.format,
+        snapshot_pixel_count: snapshot.pixel_count(),
+        snapshot_nonzero_pixels: snapshot.nonzero_pixels,
+        snapshot_pixel_checksum: snapshot.pixel_checksum,
+        damage_width: snapshot.damage.width as u64,
+        damage_height: snapshot.damage.height as u64,
+        composited_pixels,
+        frame_ppm_bytes,
+        frame_checksum: frame.checksum(),
+        observed_title: snapshot.title.clone(),
+        observed_app_id: snapshot.app_id.clone(),
+        frame_ppm_path: output_path.to_string(),
+    })
+}
+
+#[cfg(all(feature = "smithay-backend", target_os = "linux"))]
+fn real_app_command_name(command: &str) -> String {
+    Path::new(command)
+        .file_name()
+        .and_then(|name| name.to_str())
+        .filter(|name| !name.trim().is_empty())
+        .unwrap_or("real-wayland-app")
+        .to_string()
+}
+
+#[cfg(all(feature = "smithay-backend", target_os = "linux"))]
 fn run_smithay_real_shm_frame_for_config(config: &RunConfig) -> Result<RealShmFrameSmoke, String> {
     if config.runtime != RuntimeKind::Smithay {
         return Err(String::from(
@@ -2701,6 +3048,13 @@ fn run_smithay_live_surface_snapshots_for_config(
 ) -> Result<LiveSurfaceSnapshotsSmoke, String> {
     Err(String::from(
         "Smithay live surface snapshots require Linux and the smithay-backend feature",
+    ))
+}
+
+#[cfg(not(all(feature = "smithay-backend", target_os = "linux")))]
+fn run_smithay_real_app_e2e_for_config(_config: &RunConfig) -> Result<RealAppE2eSmoke, String> {
+    Err(String::from(
+        "Smithay real app E2E requires Linux and the smithay-backend feature",
     ))
 }
 
@@ -4087,7 +4441,7 @@ fn print_help() {
 backlit-compositor
 
 Usage:
-  backlit-compositor [--backend=headless|wayland|drm] [--runtime=headless|smithay] [--socket=backlit-0] [--smoke-test] [--scripted-client] [--smithay-client-smoke] [--smithay-live-surface-snapshots] [--smithay-real-shm-frame] [--drm-first-present-probe] [--scripted-client-preview=path] [--smithay-real-shm-frame-output=path] [--serve] [--serve-for-ms=1000] [--idle-probe-ms=1000]
+  backlit-compositor [--backend=headless|wayland|drm] [--runtime=headless|smithay] [--socket=backlit-0] [--smoke-test] [--scripted-client] [--smithay-client-smoke] [--smithay-live-surface-snapshots] [--smithay-real-app-e2e] [--smithay-real-shm-frame] [--drm-first-present-probe] [--scripted-client-preview=path] [--smithay-real-app-command=path] [--smithay-real-app-frame-output=path] [--smithay-real-shm-frame-output=path] [--serve] [--serve-for-ms=1000] [--idle-probe-ms=1000]
 
 Flags:
   --backend      Select compositor backend. Defaults to headless.
@@ -4100,6 +4454,12 @@ Flags:
                  Run a real Wayland registry/surface/xdg-toplevel protocol smoke through Smithay.
   --smithay-live-surface-snapshots
                  Capture live Smithay-observed wl_shm surface snapshots and map them into Backlit policy.
+  --smithay-real-app-e2e
+                 Launch an installed Wayland app against Smithay, capture SHM pixels, and render a Backlit frame.
+  --smithay-real-app-command
+                 Installed Wayland app command for real-app E2E. Defaults to weston-simple-shm.
+  --smithay-real-app-frame-output
+                 Write the real app Backlit frame to a PPM file.
   --smithay-real-shm-frame
                  Render generated wl_shm client pixels into a Backlit policy frame and verify samples.
   --drm-first-present-probe

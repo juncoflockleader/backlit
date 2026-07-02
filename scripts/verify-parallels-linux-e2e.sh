@@ -164,6 +164,7 @@ uploaded_gui_preview_renderer="/tmp/backlit-render-gui-preview.sh"
 uploaded_compositor_runtime_verifier="/tmp/backlit-verify-compositor-runtime.sh"
 uploaded_smithay_compositor_runtime_verifier="/tmp/backlit-verify-smithay-compositor-runtime.sh"
 uploaded_smithay_live_surface_snapshots_verifier="/tmp/backlit-verify-smithay-live-surface-snapshots.sh"
+uploaded_smithay_real_app_e2e_verifier="/tmp/backlit-verify-smithay-real-app-e2e.sh"
 uploaded_smithay_real_shm_frame_verifier="/tmp/backlit-verify-smithay-real-shm-frame.sh"
 uploaded_compositor_socket_verifier="/tmp/backlit-verify-compositor-socket.sh"
 uploaded_launch_performance_verifier="/tmp/backlit-verify-launch-performance.sh"
@@ -289,6 +290,7 @@ install -m 0755 -o "\$guest_user" -g "\$guest_user" "\$uploaded_gui_preview_rend
 install -m 0755 -o "\$guest_user" -g "\$guest_user" "\$uploaded_compositor_runtime_verifier" "\$repo_dir/scripts/verify-compositor-runtime.sh"
 install -m 0755 -o "\$guest_user" -g "\$guest_user" "\$uploaded_smithay_compositor_runtime_verifier" "\$repo_dir/scripts/verify-smithay-compositor-runtime.sh"
 install -m 0755 -o "\$guest_user" -g "\$guest_user" "\$uploaded_smithay_live_surface_snapshots_verifier" "\$repo_dir/scripts/verify-smithay-live-surface-snapshots.sh"
+install -m 0755 -o "\$guest_user" -g "\$guest_user" "\$uploaded_smithay_real_app_e2e_verifier" "\$repo_dir/scripts/verify-smithay-real-app-e2e.sh"
 install -m 0755 -o "\$guest_user" -g "\$guest_user" "\$uploaded_smithay_real_shm_frame_verifier" "\$repo_dir/scripts/verify-smithay-real-shm-frame.sh"
 install -m 0755 -o "\$guest_user" -g "\$guest_user" "\$uploaded_compositor_socket_verifier" "\$repo_dir/scripts/verify-compositor-socket.sh"
 install -m 0755 -o "\$guest_user" -g "\$guest_user" "\$uploaded_launch_performance_verifier" "\$repo_dir/scripts/verify-launch-performance.sh"
@@ -344,6 +346,7 @@ upload_script "$repo_root/scripts/render-gui-preview.sh" "/tmp/backlit-render-gu
 upload_script "$repo_root/scripts/verify-compositor-runtime.sh" "/tmp/backlit-verify-compositor-runtime.sh"
 upload_script "$repo_root/scripts/verify-smithay-compositor-runtime.sh" "/tmp/backlit-verify-smithay-compositor-runtime.sh"
 upload_script "$repo_root/scripts/verify-smithay-live-surface-snapshots.sh" "/tmp/backlit-verify-smithay-live-surface-snapshots.sh"
+upload_script "$repo_root/scripts/verify-smithay-real-app-e2e.sh" "/tmp/backlit-verify-smithay-real-app-e2e.sh"
 upload_script "$repo_root/scripts/verify-smithay-real-shm-frame.sh" "/tmp/backlit-verify-smithay-real-shm-frame.sh"
 upload_script "$repo_root/scripts/verify-compositor-socket.sh" "/tmp/backlit-verify-compositor-socket.sh"
 upload_script "$repo_root/scripts/verify-launch-performance.sh" "/tmp/backlit-verify-launch-performance.sh"
@@ -379,6 +382,7 @@ host_gui_preview_manifest="$host_out_dir/gui-preview-manifest.json"
 host_compositor_runtime_manifest="$host_out_dir/compositor-runtime-manifest.json"
 host_smithay_compositor_runtime_manifest="$host_out_dir/smithay-compositor-runtime-manifest.json"
 host_smithay_live_surface_snapshots_manifest="$host_out_dir/smithay-live-surface-snapshots-manifest.json"
+host_smithay_real_app_e2e_manifest="$host_out_dir/smithay-real-app-e2e-manifest.json"
 host_smithay_real_shm_frame_manifest="$host_out_dir/smithay-real-shm-frame-manifest.json"
 host_compositor_socket_manifest="$host_out_dir/compositor-socket-manifest.json"
 host_smithay_runtime_probe_manifest="$host_out_dir/smithay-runtime-probe-manifest.json"
@@ -403,6 +407,8 @@ host_ppm="$host_out_dir/gui-preview-backlit-session.ppm"
 host_png="$host_out_dir/gui-preview-backlit-session.png"
 host_compositor_preview_ppm="$host_out_dir/compositor-runtime-scripted-client-policy-preview.ppm"
 host_compositor_preview_png="$host_out_dir/compositor-runtime-scripted-client-policy-preview.png"
+host_smithay_real_app_e2e_ppm="$host_out_dir/smithay-real-app-e2e.ppm"
+host_smithay_real_app_e2e_png="$host_out_dir/smithay-real-app-e2e.png"
 host_smithay_real_shm_frame_ppm="$host_out_dir/smithay-real-shm-frame.ppm"
 host_smithay_real_shm_frame_png="$host_out_dir/smithay-real-shm-frame.png"
 
@@ -414,6 +420,7 @@ rm -f \
   "$host_compositor_runtime_manifest" \
   "$host_smithay_compositor_runtime_manifest" \
   "$host_smithay_live_surface_snapshots_manifest" \
+  "$host_smithay_real_app_e2e_manifest" \
   "$host_smithay_real_shm_frame_manifest" \
   "$host_compositor_socket_manifest" \
   "$host_smithay_runtime_probe_manifest" \
@@ -438,6 +445,8 @@ rm -f \
   "$host_png" \
   "$host_compositor_preview_ppm" \
   "$host_compositor_preview_png" \
+  "$host_smithay_real_app_e2e_ppm" \
+  "$host_smithay_real_app_e2e_png" \
   "$host_smithay_real_shm_frame_ppm" \
   "$host_smithay_real_shm_frame_png" \
   "$host_out_dir/manifest.json"
@@ -448,6 +457,7 @@ download_file "$guest_e2e_dir/gui-preview/manifest.json" "$host_gui_preview_mani
 download_file "$guest_e2e_dir/compositor-runtime/manifest.json" "$host_compositor_runtime_manifest"
 download_file "$guest_e2e_dir/smithay-compositor-runtime/manifest.json" "$host_smithay_compositor_runtime_manifest"
 download_file "$guest_e2e_dir/smithay-live-surface-snapshots/manifest.json" "$host_smithay_live_surface_snapshots_manifest"
+download_file "$guest_e2e_dir/smithay-real-app-e2e/manifest.json" "$host_smithay_real_app_e2e_manifest"
 download_file "$guest_e2e_dir/smithay-real-shm-frame/manifest.json" "$host_smithay_real_shm_frame_manifest"
 download_file "$guest_e2e_dir/compositor-socket/manifest.json" "$host_compositor_socket_manifest"
 download_file "$guest_e2e_dir/smithay-runtime-probe/manifest.json" "$host_smithay_runtime_probe_manifest"
@@ -471,6 +481,7 @@ download_file "$guest_e2e_dir/mvp0-contract/manifest.json" "$host_mvp0_contract_
 download_file "$guest_e2e_dir/mvp1-contract/manifest.json" "$host_mvp1_contract_manifest"
 download_file "$guest_e2e_dir/gui-preview/backlit-session.ppm" "$host_ppm"
 download_file "$guest_e2e_dir/compositor-runtime/scripted-client-policy-preview.ppm" "$host_compositor_preview_ppm"
+download_file "$guest_e2e_dir/smithay-real-app-e2e/backlit-real-app-frame.ppm" "$host_smithay_real_app_e2e_ppm"
 download_file "$guest_e2e_dir/smithay-real-shm-frame/backlit-real-shm-frame.ppm" "$host_smithay_real_shm_frame_ppm"
 
 preview_image="$host_ppm"
@@ -549,6 +560,44 @@ fi
 compositor_preview_ppm_bytes="$(wc -c < "$host_compositor_preview_ppm" | tr -d ' ')"
 test "$compositor_preview_ppm_bytes" -gt 10000
 
+real_app_e2e_image="$host_smithay_real_app_e2e_ppm"
+real_app_e2e_format="ppm"
+real_app_e2e_png_written=false
+real_app_e2e_converter="none"
+
+if command -v sips >/dev/null 2>&1; then
+  if sips -s format png "$host_smithay_real_app_e2e_ppm" --out "$host_smithay_real_app_e2e_png" >/dev/null 2>&1; then
+    real_app_e2e_image="$host_smithay_real_app_e2e_png"
+    real_app_e2e_format="png"
+    real_app_e2e_png_written=true
+    real_app_e2e_converter="sips"
+  fi
+elif command -v magick >/dev/null 2>&1; then
+  if magick "$host_smithay_real_app_e2e_ppm" "$host_smithay_real_app_e2e_png" >/dev/null 2>&1; then
+    real_app_e2e_image="$host_smithay_real_app_e2e_png"
+    real_app_e2e_format="png"
+    real_app_e2e_png_written=true
+    real_app_e2e_converter="magick"
+  fi
+elif command -v convert >/dev/null 2>&1; then
+  if convert "$host_smithay_real_app_e2e_ppm" "$host_smithay_real_app_e2e_png" >/dev/null 2>&1; then
+    real_app_e2e_image="$host_smithay_real_app_e2e_png"
+    real_app_e2e_format="png"
+    real_app_e2e_png_written=true
+    real_app_e2e_converter="convert"
+  fi
+elif command -v pnmtopng >/dev/null 2>&1; then
+  if pnmtopng "$host_smithay_real_app_e2e_ppm" > "$host_smithay_real_app_e2e_png"; then
+    real_app_e2e_image="$host_smithay_real_app_e2e_png"
+    real_app_e2e_format="png"
+    real_app_e2e_png_written=true
+    real_app_e2e_converter="pnmtopng"
+  fi
+fi
+
+real_app_e2e_ppm_bytes="$(wc -c < "$host_smithay_real_app_e2e_ppm" | tr -d ' ')"
+test "$real_app_e2e_ppm_bytes" -gt 10000
+
 real_shm_frame_image="$host_smithay_real_shm_frame_ppm"
 real_shm_frame_format="ppm"
 real_shm_frame_png_written=false
@@ -594,6 +643,7 @@ require_contains "$host_guest_manifest" '"debian_package_install": true'
 require_contains "$host_guest_manifest" '"launch_readiness": true'
 require_contains "$host_guest_manifest" '"smithay_compositor_runtime": true'
 require_contains "$host_guest_manifest" '"smithay_live_surface_snapshots": true'
+require_contains "$host_guest_manifest" '"smithay_real_app_e2e": true'
 require_contains "$host_guest_manifest" '"smithay_real_shm_frame": true'
 require_contains "$host_guest_manifest" '"drm_master_boundary": true'
 require_contains "$host_guest_manifest" '"drm_session_smoke": true'
@@ -650,6 +700,16 @@ require_contains "$host_smithay_live_surface_snapshots_manifest" '"live_snapshot
 require_contains "$host_smithay_live_surface_snapshots_manifest" '"live_snapshot_samples_verified": true'
 require_contains "$host_smithay_live_surface_snapshots_manifest" '"policy_window_from_live_snapshot": true'
 require_contains "$host_smithay_live_surface_snapshots_manifest" '"drm_launch_ready": true'
+require_contains "$host_smithay_real_app_e2e_manifest" '"smithay_real_app_e2e": true'
+require_contains "$host_smithay_real_app_e2e_manifest" '"real_installed_app": true'
+require_contains "$host_smithay_real_app_e2e_manifest" '"real_app_wayland_client_connected": true'
+require_contains "$host_smithay_real_app_e2e_manifest" '"real_app_metadata_observed": true'
+require_contains "$host_smithay_real_app_e2e_manifest" '"real_app_shm_pixels_captured": true'
+require_contains "$host_smithay_real_app_e2e_manifest" '"real_app_pixels_composited": true'
+require_contains "$host_smithay_real_app_e2e_manifest" '"real_app_frame_samples_verified": true'
+require_contains "$host_smithay_real_app_e2e_manifest" '"policy_window_from_real_app": true'
+require_contains "$host_smithay_real_app_e2e_manifest" '"frame_ppm_written": true'
+require_contains "$host_smithay_real_app_e2e_manifest" '"drm_launch_ready": true'
 require_contains "$host_smithay_real_shm_frame_manifest" '"smithay_real_shm_frame": true'
 require_contains "$host_smithay_real_shm_frame_manifest" '"real_wayland_client": true'
 require_contains "$host_smithay_real_shm_frame_manifest" '"real_wayland_metadata": true'
@@ -880,6 +940,7 @@ require_contains "$host_mvp1_contract_manifest" '"dedicated_drm_session_artifact
 require_contains "$host_mvp1_contract_manifest" '"drm_session_smoke_ready_artifact": true'
 require_contains "$host_mvp1_contract_manifest" '"smithay_compositor_runtime_artifact": true'
 require_contains "$host_mvp1_contract_manifest" '"smithay_live_surface_snapshots_artifact": true'
+require_contains "$host_mvp1_contract_manifest" '"smithay_real_app_e2e_artifact": true'
 require_contains "$host_mvp1_contract_manifest" '"smithay_real_shm_frame_artifact": true'
 require_contains "$host_mvp1_contract_manifest" '"resource_budget_contract": true'
 require_contains "$host_mvp1_contract_manifest" '"debian_package_install_replay_artifact": true'
@@ -903,6 +964,7 @@ cat > "$host_out_dir/manifest.json" <<EOF
     "compositor_runtime_manifest": "$host_compositor_runtime_manifest",
     "smithay_compositor_runtime_manifest": "$host_smithay_compositor_runtime_manifest",
     "smithay_live_surface_snapshots_manifest": "$host_smithay_live_surface_snapshots_manifest",
+    "smithay_real_app_e2e_manifest": "$host_smithay_real_app_e2e_manifest",
     "smithay_real_shm_frame_manifest": "$host_smithay_real_shm_frame_manifest",
     "compositor_socket_manifest": "$host_compositor_socket_manifest",
     "smithay_runtime_probe_manifest": "$host_smithay_runtime_probe_manifest",
@@ -927,6 +989,8 @@ cat > "$host_out_dir/manifest.json" <<EOF
     "gui_preview_image": "$preview_image",
     "compositor_runtime_preview_ppm": "$host_compositor_preview_ppm",
     "compositor_runtime_preview_image": "$compositor_preview_image",
+    "smithay_real_app_e2e_ppm": "$host_smithay_real_app_e2e_ppm",
+    "smithay_real_app_e2e_image": "$real_app_e2e_image",
     "smithay_real_shm_frame_ppm": "$host_smithay_real_shm_frame_ppm",
     "smithay_real_shm_frame_image": "$real_shm_frame_image"
   },
@@ -944,6 +1008,8 @@ cat > "$host_out_dir/manifest.json" <<EOF
     "compositor_runtime_policy_preview": true,
     "smithay_compositor_runtime": true,
     "smithay_live_surface_snapshots": true,
+    "smithay_real_app_e2e": true,
+    "real_app_e2e_pixels": true,
     "smithay_real_shm_frame": true,
     "real_shm_frame_pixels": true,
     "compositor_socket": true,
@@ -984,6 +1050,10 @@ cat > "$host_out_dir/manifest.json" <<EOF
     "compositor_png_written": $compositor_png_written,
     "compositor_preview_format": "$compositor_preview_format",
     "compositor_converter": "$compositor_converter",
+    "real_app_e2e_ppm_bytes": $real_app_e2e_ppm_bytes,
+    "real_app_e2e_png_written": $real_app_e2e_png_written,
+    "real_app_e2e_format": "$real_app_e2e_format",
+    "real_app_e2e_converter": "$real_app_e2e_converter",
     "real_shm_frame_ppm_bytes": $real_shm_frame_ppm_bytes,
     "real_shm_frame_png_written": $real_shm_frame_png_written,
     "real_shm_frame_format": "$real_shm_frame_format",
@@ -1001,6 +1071,9 @@ else
 fi
 if [ "$compositor_preview_format" = "png" ]; then
   printf 'To view compositor-runtime preview on macOS: open %s\n' "$compositor_preview_image"
+fi
+if [ "$real_app_e2e_format" = "png" ]; then
+  printf 'To view real app E2E preview on macOS: open %s\n' "$real_app_e2e_image"
 fi
 if [ "$real_shm_frame_format" = "png" ]; then
   printf 'To view real SHM frame preview on macOS: open %s\n' "$real_shm_frame_image"

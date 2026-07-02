@@ -19,8 +19,10 @@ dedicated_dpkg_purge_log="$dedicated_e2e_dir/system-dpkg-purge.log"
 launch_performance_manifest="$parallels_e2e_dir/launch-performance-manifest.json"
 resource_budget_manifest="$parallels_e2e_dir/resource-budget-manifest.json"
 live_surface_snapshots_manifest="$parallels_e2e_dir/smithay-live-surface-snapshots-manifest.json"
+real_app_e2e_manifest="$parallels_e2e_dir/smithay-real-app-e2e-manifest.json"
 real_shm_frame_manifest="$parallels_e2e_dir/smithay-real-shm-frame-manifest.json"
 parallels_preview="$parallels_e2e_dir/gui-preview-backlit-session.png"
+real_app_e2e_preview="$parallels_e2e_dir/smithay-real-app-e2e.png"
 real_shm_frame_preview="$parallels_e2e_dir/smithay-real-shm-frame.png"
 dedicated_preview="$dedicated_e2e_dir/dedicated-session.png"
 mkdir -p "$out_dir"
@@ -45,6 +47,7 @@ launch_performance_evidence=false
 resource_budget_evidence=false
 parallels_health_evidence=false
 live_surface_snapshots_evidence=false
+real_app_e2e_evidence=false
 real_shm_frame_evidence=false
 
 write_manifest() {
@@ -69,8 +72,10 @@ write_manifest() {
     "parallels_launch_performance_manifest": "$launch_performance_manifest",
     "parallels_resource_budget_manifest": "$resource_budget_manifest",
     "parallels_live_surface_snapshots_manifest": "$live_surface_snapshots_manifest",
+    "parallels_real_app_e2e_manifest": "$real_app_e2e_manifest",
     "parallels_real_shm_frame_manifest": "$real_shm_frame_manifest",
     "parallels_linux_gui_preview": "$parallels_preview",
+    "parallels_real_app_e2e_preview": "$real_app_e2e_preview",
     "parallels_real_shm_frame_preview": "$real_shm_frame_preview",
     "parallels_dedicated_drm_manifest": "$dedicated_manifest",
     "parallels_dedicated_health_manifest": "$dedicated_health_manifest",
@@ -94,6 +99,7 @@ write_manifest() {
     "resource_budget_evidence": $resource_budget_evidence,
     "parallels_health_evidence": $parallels_health_evidence,
     "live_surface_snapshots_evidence": $live_surface_snapshots_evidence,
+    "real_app_e2e_evidence": $real_app_e2e_evidence,
     "real_shm_frame_evidence": $real_shm_frame_evidence
   }
 }
@@ -189,6 +195,7 @@ require_file "$dedicated_manifest" missing-parallels-dedicated-drm-manifest
 require_file "$launch_performance_manifest" missing-parallels-launch-performance-manifest
 require_file "$resource_budget_manifest" missing-parallels-resource-budget-manifest
 require_file "$live_surface_snapshots_manifest" missing-parallels-live-surface-snapshots-manifest
+require_file "$real_app_e2e_manifest" missing-parallels-real-app-e2e-manifest
 require_file "$real_shm_frame_manifest" missing-parallels-real-shm-frame-manifest
 require_file "$dedicated_session_manifest" missing-parallels-dedicated-session-manifest
 require_file "$package_build_manifest" missing-parallels-dedicated-package-build-manifest
@@ -203,6 +210,8 @@ require_contains "$parallels_manifest" '"debian_system_install_replay": true' pa
 require_contains "$parallels_manifest" '"nested_wayland": true' parallels-linux-e2e
 require_contains "$parallels_manifest" '"drm_session_smoke": true' parallels-linux-e2e
 require_contains "$parallels_manifest" '"smithay_live_surface_snapshots": true' parallels-linux-e2e
+require_contains "$parallels_manifest" '"smithay_real_app_e2e": true' parallels-linux-e2e
+require_contains "$parallels_manifest" '"real_app_e2e_pixels": true' parallels-linux-e2e
 require_contains "$parallels_manifest" '"smithay_real_shm_frame": true' parallels-linux-e2e
 require_contains "$parallels_manifest" '"real_shm_frame_pixels": true' parallels-linux-e2e
 require_contains "$parallels_manifest" '"mvp1_contract": true' parallels-linux-e2e
@@ -235,6 +244,15 @@ require_contains "$live_surface_snapshots_manifest" '"live_snapshot_pixels_copie
 require_contains "$live_surface_snapshots_manifest" '"live_snapshot_damage_recorded": true' live-surface-snapshots-evidence
 require_contains "$live_surface_snapshots_manifest" '"live_snapshot_samples_verified": true' live-surface-snapshots-evidence
 require_contains "$live_surface_snapshots_manifest" '"policy_window_from_live_snapshot": true' live-surface-snapshots-evidence
+require_contains "$real_app_e2e_manifest" '"smithay_real_app_e2e": true' real-app-e2e-evidence
+require_contains "$real_app_e2e_manifest" '"real_installed_app": true' real-app-e2e-evidence
+require_contains "$real_app_e2e_manifest" '"real_app_wayland_client_connected": true' real-app-e2e-evidence
+require_contains "$real_app_e2e_manifest" '"real_app_metadata_observed": true' real-app-e2e-evidence
+require_contains "$real_app_e2e_manifest" '"real_app_shm_pixels_captured": true' real-app-e2e-evidence
+require_contains "$real_app_e2e_manifest" '"real_app_pixels_composited": true' real-app-e2e-evidence
+require_contains "$real_app_e2e_manifest" '"real_app_frame_samples_verified": true' real-app-e2e-evidence
+require_contains "$real_app_e2e_manifest" '"policy_window_from_real_app": true' real-app-e2e-evidence
+require_contains "$real_app_e2e_manifest" '"frame_ppm_written": true' real-app-e2e-evidence
 require_contains "$real_shm_frame_manifest" '"smithay_real_shm_frame": true' real-shm-frame-evidence
 require_contains "$real_shm_frame_manifest" '"real_wayland_client": true' real-shm-frame-evidence
 require_contains "$real_shm_frame_manifest" '"real_wayland_metadata": true' real-shm-frame-evidence
@@ -244,11 +262,13 @@ require_contains "$real_shm_frame_manifest" '"real_client_pixel_samples_verified
 require_contains "$real_shm_frame_manifest" '"policy_window_from_real_surface": true' real-shm-frame-evidence
 require_contains "$real_shm_frame_manifest" '"frame_ppm_written": true' real-shm-frame-evidence
 require_png_file "$parallels_preview" missing-parallels-linux-preview
+require_png_file "$real_app_e2e_preview" missing-real-app-e2e-preview
 require_png_file "$real_shm_frame_preview" missing-real-shm-frame-preview
 normal_parallels_e2e=true
 launch_performance_evidence=true
 resource_budget_evidence=true
 live_surface_snapshots_evidence=true
+real_app_e2e_evidence=true
 real_shm_frame_evidence=true
 
 require_contains "$dedicated_manifest" '"passed": true' package-installed-dedicated-drm

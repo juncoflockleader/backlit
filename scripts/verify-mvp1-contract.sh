@@ -51,6 +51,7 @@ require_executable scripts/verify-launch-performance.sh
 require_executable scripts/verify-resource-budget.sh
 require_executable scripts/verify-smithay-runtime-probe.sh
 require_executable scripts/verify-smithay-compositor-runtime.sh
+require_executable scripts/verify-smithay-real-app-e2e.sh
 require_executable scripts/verify-smithay-real-shm-frame.sh
 require_executable scripts/verify-nested-wayland-smoke.sh
 require_executable scripts/verify-linux-e2e.sh
@@ -252,6 +253,7 @@ require_contains scripts/verify-smithay-runtime-probe.sh '"smithay_libinput_poin
 require_contains scripts/verify-linux-e2e.sh './scripts/verify-smithay-runtime-probe.sh'
 require_contains scripts/verify-linux-e2e.sh './scripts/verify-smithay-compositor-runtime.sh'
 require_contains scripts/verify-linux-e2e.sh './scripts/verify-smithay-live-surface-snapshots.sh'
+require_contains scripts/verify-linux-e2e.sh './scripts/verify-smithay-real-app-e2e.sh'
 require_contains scripts/verify-linux-e2e.sh './scripts/verify-smithay-real-shm-frame.sh'
 require_contains scripts/verify-smithay-live-surface-snapshots.sh '--smithay-live-surface-snapshots'
 require_contains scripts/verify-smithay-live-surface-snapshots.sh '"live_snapshot_pixels_copied": true'
@@ -259,6 +261,15 @@ require_contains scripts/verify-smithay-live-surface-snapshots.sh '"live_snapsho
 require_contains scripts/verify-smithay-live-surface-snapshots.sh '"policy_window_from_live_snapshot": true'
 require_contains crates/compositor/src/main.rs '"compositor.smithay_live_surface_snapshots"'
 require_contains crates/compositor-backend/src/lib.rs 'run_live_surface_snapshot_capture'
+require_contains scripts/verify-smithay-real-app-e2e.sh '--smithay-real-app-e2e'
+require_contains scripts/verify-smithay-real-app-e2e.sh '"real_installed_app": true'
+require_contains scripts/verify-smithay-real-app-e2e.sh '"real_app_shm_pixels_captured": true'
+require_contains scripts/verify-smithay-real-app-e2e.sh '"real_app_pixels_composited": true'
+require_contains scripts/verify-smithay-real-app-e2e.sh '"real_app_frame_samples_verified": true'
+require_contains scripts/verify-smithay-real-app-e2e.sh '"policy_window_from_real_app": true'
+require_contains crates/compositor/src/main.rs '"compositor.smithay_real_app_e2e"'
+require_contains crates/compositor/src/main.rs 'smithay_real_app_frame_output'
+require_contains crates/compositor-backend/src/lib.rs 'run_real_app_e2e_capture'
 require_contains scripts/verify-smithay-real-shm-frame.sh '--smithay-real-shm-frame'
 require_contains scripts/verify-smithay-real-shm-frame.sh '"real_shm_pixels_captured": true'
 require_contains scripts/verify-smithay-real-shm-frame.sh '"real_shm_pixels_composited": true'
@@ -309,6 +320,7 @@ compositor_socket_artifact=false
 smithay_runtime_probe_artifact=false
 smithay_compositor_runtime_artifact=false
 smithay_live_surface_snapshots_artifact=false
+smithay_real_app_e2e_artifact=false
 smithay_real_shm_frame_artifact=false
 
 if [ -n "$artifact_root" ] && [ -d "$artifact_root" ]; then
@@ -327,6 +339,7 @@ if [ -n "$artifact_root" ] && [ -d "$artifact_root" ]; then
   require_file "$artifact_root/smithay-runtime-probe/manifest.json"
   require_file "$artifact_root/smithay-compositor-runtime/manifest.json"
   require_file "$artifact_root/smithay-live-surface-snapshots/manifest.json"
+  require_file "$artifact_root/smithay-real-app-e2e/manifest.json"
   require_file "$artifact_root/smithay-real-shm-frame/manifest.json"
   require_file "$artifact_root/launcher-desktop-discovery/manifest.json"
   require_file "$artifact_root/debian-package-install/manifest.json"
@@ -573,6 +586,34 @@ if [ -n "$artifact_root" ] && [ -d "$artifact_root" ]; then
     fi
   else
     require_contains "$artifact_root/smithay-live-surface-snapshots/manifest.json" '"expected_blocked": true'
+  fi
+  require_contains "$artifact_root/smithay-real-app-e2e/manifest.json" '"name": "backlit-smithay-real-app-e2e"'
+  require_contains "$artifact_root/smithay-real-app-e2e/manifest.json" '"smithay_real_app_e2e":'
+  require_contains "$artifact_root/smithay-real-app-e2e/manifest.json" '"real_installed_app":'
+  require_contains "$artifact_root/smithay-real-app-e2e/manifest.json" '"real_app_wayland_client_connected":'
+  require_contains "$artifact_root/smithay-real-app-e2e/manifest.json" '"real_app_metadata_observed":'
+  require_contains "$artifact_root/smithay-real-app-e2e/manifest.json" '"real_app_shm_pixels_captured":'
+  require_contains "$artifact_root/smithay-real-app-e2e/manifest.json" '"real_app_pixels_composited":'
+  require_contains "$artifact_root/smithay-real-app-e2e/manifest.json" '"real_app_frame_samples_verified":'
+  require_contains "$artifact_root/smithay-real-app-e2e/manifest.json" '"policy_window_from_real_app":'
+  require_contains "$artifact_root/smithay-real-app-e2e/manifest.json" '"frame_ppm_written":'
+  if grep '"checked": true' "$artifact_root/smithay-real-app-e2e/manifest.json" >/dev/null; then
+    if grep '"drm_launch_ready": true' "$artifact_root/smithay-real-app-e2e/manifest.json" >/dev/null; then
+      require_contains "$artifact_root/smithay-real-app-e2e/manifest.json" '"smithay_real_app_e2e": true'
+      require_contains "$artifact_root/smithay-real-app-e2e/manifest.json" '"real_installed_app": true'
+      require_contains "$artifact_root/smithay-real-app-e2e/manifest.json" '"real_app_wayland_client_connected": true'
+      require_contains "$artifact_root/smithay-real-app-e2e/manifest.json" '"real_app_metadata_observed": true'
+      require_contains "$artifact_root/smithay-real-app-e2e/manifest.json" '"real_app_shm_pixels_captured": true'
+      require_contains "$artifact_root/smithay-real-app-e2e/manifest.json" '"real_app_pixels_composited": true'
+      require_contains "$artifact_root/smithay-real-app-e2e/manifest.json" '"real_app_frame_samples_verified": true'
+      require_contains "$artifact_root/smithay-real-app-e2e/manifest.json" '"policy_window_from_real_app": true'
+      require_contains "$artifact_root/smithay-real-app-e2e/manifest.json" '"frame_ppm_written": true'
+      smithay_real_app_e2e_artifact=true
+    else
+      require_contains "$artifact_root/smithay-real-app-e2e/manifest.json" '"expected_blocked": true'
+    fi
+  else
+    require_contains "$artifact_root/smithay-real-app-e2e/manifest.json" '"expected_blocked": true'
   fi
   require_contains "$artifact_root/smithay-real-shm-frame/manifest.json" '"name": "backlit-smithay-real-shm-frame"'
   require_contains "$artifact_root/smithay-real-shm-frame/manifest.json" '"smithay_real_shm_frame":'
@@ -835,6 +876,7 @@ cat > "$manifest" <<EOF
     "session_launch_verifier": "scripts/verify-session-launch.sh",
     "drm_session_smoke_verifier": "scripts/verify-drm-session-smoke.sh",
     "smithay_live_surface_snapshots_verifier": "scripts/verify-smithay-live-surface-snapshots.sh",
+    "smithay_real_app_e2e_verifier": "scripts/verify-smithay-real-app-e2e.sh",
     "smithay_real_shm_frame_verifier": "scripts/verify-smithay-real-shm-frame.sh",
     "dedicated_drm_session_verifier": "scripts/verify-dedicated-drm-session.sh",
     "linux_e2e_verifier": "scripts/verify-linux-e2e.sh"
@@ -859,6 +901,8 @@ cat > "$manifest" <<EOF
     "smithay_compositor_runtime_artifact": $smithay_compositor_runtime_artifact,
     "smithay_live_surface_snapshots_contract": true,
     "smithay_live_surface_snapshots_artifact": $smithay_live_surface_snapshots_artifact,
+    "smithay_real_app_e2e_contract": true,
+    "smithay_real_app_e2e_artifact": $smithay_real_app_e2e_artifact,
     "smithay_real_shm_frame_contract": true,
     "smithay_real_shm_frame_artifact": $smithay_real_shm_frame_artifact,
     "compositor_socket_contract": true,
