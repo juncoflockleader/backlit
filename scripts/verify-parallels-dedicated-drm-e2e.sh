@@ -315,6 +315,7 @@ systemd-run --unit="\$unit_name" --wait --collect \
   --property=StandardError=append:"\$unit_log" \
   --property=RuntimeMaxSec=300 \
   --uid="\$guest_user" \
+  /usr/bin/bash \
   "\$inner_runner"
 status="\$?"
 set -e
