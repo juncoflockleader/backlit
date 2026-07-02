@@ -115,6 +115,11 @@ write_blocked_manifest() {
     "smithay_real_shm_buffer": false,
     "smithay_normal_runtime_live_snapshot_frame": false,
     "smithay_normal_runtime_real_pixels": false,
+    "smithay_real_surface_lifecycle": false,
+    "smithay_real_xdg_resize_commit": false,
+    "smithay_real_xdg_unmap_cleanup": false,
+    "smithay_real_xdg_close_disconnect": false,
+    "smithay_policy_lifecycle_cleanup": false,
     "smithay_real_wayland_policy_window": false,
     "smithay_event_loop_runtime": false,
     "smithay_drm_first_present_probe": false,
@@ -220,6 +225,32 @@ require_line_contains_all "$log" \
 require_matches "$log" '"normal_frame_client_count":[1-9][0-9]*'
 require_matches "$log" '"normal_frame_ppm_bytes":[1-9][0-9]*'
 require_matches "$log" '"normal_frame_checksum":[1-9][0-9]*'
+require_line_contains_all "$log" \
+  '"event":"compositor.scripted_client"' \
+  '"real_surface_lifecycle":true' \
+  '"real_surface_configure_acked":true' \
+  '"real_surface_resize_configured":true' \
+  '"real_surface_resize_committed":true' \
+  '"real_surface_unmapped":true' \
+  '"real_surface_close_sent":true' \
+  '"real_surface_close_received":true' \
+  '"real_surface_destroyed":true' \
+  '"real_surface_client_disconnected":true' \
+  '"real_surface_policy_window_mapped":true' \
+  '"real_surface_policy_window_resized":true' \
+  '"real_surface_policy_focus_preserved":true' \
+  '"real_surface_policy_window_removed_after_unmap":true' \
+  '"real_surface_policy_no_stale_windows_after_disconnect":true' \
+  '"real_surface_initial_width":320' \
+  '"real_surface_initial_height":240' \
+  '"real_surface_resized_width":420' \
+  '"real_surface_resized_height":300' \
+  '"real_surface_resized_pixel_count":126000'
+require_matches "$log" '"real_surface_configure_sent_count":([2-9]|[1-9][0-9]+)'
+require_matches "$log" '"real_surface_configure_ack_count":([2-9]|[1-9][0-9]+)'
+require_matches "$log" '"real_surface_unmap_count":[1-9][0-9]*'
+require_matches "$log" '"real_surface_toplevel_destroyed_count":[1-9][0-9]*'
+require_matches "$log" '"real_surface_resized_checksum":[1-9][0-9]*'
 test -s "$normal_frame_ppm" || fail "missing Smithay normal runtime real client frame $normal_frame_ppm"
 require_contains "$log" '"event":"compositor.ready"'
 require_contains "$log" '"ready":true'
@@ -607,6 +638,11 @@ cat > "$out_dir/manifest.json" <<EOF
     "smithay_real_shm_buffer": true,
     "smithay_normal_runtime_live_snapshot_frame": true,
     "smithay_normal_runtime_real_pixels": true,
+    "smithay_real_surface_lifecycle": true,
+    "smithay_real_xdg_resize_commit": true,
+    "smithay_real_xdg_unmap_cleanup": true,
+    "smithay_real_xdg_close_disconnect": true,
+    "smithay_policy_lifecycle_cleanup": true,
     "smithay_real_wayland_policy_window": true,
     "smithay_event_loop_runtime": true,
     "smithay_drm_first_present_probe": true,

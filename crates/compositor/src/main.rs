@@ -24,6 +24,7 @@ use backlit_compositor_backend::{
 use backlit_compositor_backend::{
     RealShmPixel, SmithayCompositorRuntime, SmithayLiveSurfaceSnapshot,
     SmithayLiveSurfaceSnapshotReport, SmithayRealAppE2eReport, SmithayRealShmFrameCapture,
+    SmithaySurfaceLifecycleReport,
 };
 use backlit_demo_client::{render_policy_gui, verify_policy_gui};
 #[cfg(all(feature = "smithay-backend", target_os = "linux"))]
@@ -1042,6 +1043,106 @@ fn run() -> Result<(), String> {
                 (
                     "normal_frame_checksum",
                     FieldValue::U64(runtime.normal_frame_checksum),
+                ),
+                (
+                    "real_surface_lifecycle",
+                    FieldValue::Bool(runtime.real_surface_lifecycle),
+                ),
+                (
+                    "real_surface_configure_acked",
+                    FieldValue::Bool(runtime.real_surface_configure_acked),
+                ),
+                (
+                    "real_surface_resize_configured",
+                    FieldValue::Bool(runtime.real_surface_resize_configured),
+                ),
+                (
+                    "real_surface_resize_committed",
+                    FieldValue::Bool(runtime.real_surface_resize_committed),
+                ),
+                (
+                    "real_surface_unmapped",
+                    FieldValue::Bool(runtime.real_surface_unmapped),
+                ),
+                (
+                    "real_surface_close_sent",
+                    FieldValue::Bool(runtime.real_surface_close_sent),
+                ),
+                (
+                    "real_surface_close_received",
+                    FieldValue::Bool(runtime.real_surface_close_received),
+                ),
+                (
+                    "real_surface_destroyed",
+                    FieldValue::Bool(runtime.real_surface_destroyed),
+                ),
+                (
+                    "real_surface_client_disconnected",
+                    FieldValue::Bool(runtime.real_surface_client_disconnected),
+                ),
+                (
+                    "real_surface_policy_window_mapped",
+                    FieldValue::Bool(runtime.real_surface_policy_window_mapped),
+                ),
+                (
+                    "real_surface_policy_window_resized",
+                    FieldValue::Bool(runtime.real_surface_policy_window_resized),
+                ),
+                (
+                    "real_surface_policy_focus_preserved",
+                    FieldValue::Bool(runtime.real_surface_policy_focus_preserved),
+                ),
+                (
+                    "real_surface_policy_window_removed_after_unmap",
+                    FieldValue::Bool(runtime.real_surface_policy_window_removed_after_unmap),
+                ),
+                (
+                    "real_surface_policy_no_stale_windows_after_disconnect",
+                    FieldValue::Bool(runtime.real_surface_policy_no_stale_windows_after_disconnect),
+                ),
+                (
+                    "real_surface_configure_sent_count",
+                    FieldValue::U64(runtime.real_surface_configure_sent_count),
+                ),
+                (
+                    "real_surface_configure_ack_count",
+                    FieldValue::U64(runtime.real_surface_configure_ack_count),
+                ),
+                (
+                    "real_surface_unmap_count",
+                    FieldValue::U64(runtime.real_surface_unmap_count),
+                ),
+                (
+                    "real_surface_toplevel_destroyed_count",
+                    FieldValue::U64(runtime.real_surface_toplevel_destroyed_count),
+                ),
+                (
+                    "real_surface_client_destroyed_count",
+                    FieldValue::U64(runtime.real_surface_client_destroyed_count),
+                ),
+                (
+                    "real_surface_initial_width",
+                    FieldValue::U64(runtime.real_surface_initial_width),
+                ),
+                (
+                    "real_surface_initial_height",
+                    FieldValue::U64(runtime.real_surface_initial_height),
+                ),
+                (
+                    "real_surface_resized_width",
+                    FieldValue::U64(runtime.real_surface_resized_width),
+                ),
+                (
+                    "real_surface_resized_height",
+                    FieldValue::U64(runtime.real_surface_resized_height),
+                ),
+                (
+                    "real_surface_resized_pixel_count",
+                    FieldValue::U64(runtime.real_surface_resized_pixel_count),
+                ),
+                (
+                    "real_surface_resized_checksum",
+                    FieldValue::U64(runtime.real_surface_resized_checksum),
                 ),
             ],
         );
@@ -3202,6 +3303,31 @@ struct ScriptedClientRuntime {
     normal_frame_composited_pixels: u64,
     normal_frame_ppm_bytes: u64,
     normal_frame_checksum: u64,
+    real_surface_lifecycle: bool,
+    real_surface_configure_acked: bool,
+    real_surface_resize_configured: bool,
+    real_surface_resize_committed: bool,
+    real_surface_unmapped: bool,
+    real_surface_close_sent: bool,
+    real_surface_close_received: bool,
+    real_surface_destroyed: bool,
+    real_surface_client_disconnected: bool,
+    real_surface_policy_window_mapped: bool,
+    real_surface_policy_window_resized: bool,
+    real_surface_policy_focus_preserved: bool,
+    real_surface_policy_window_removed_after_unmap: bool,
+    real_surface_policy_no_stale_windows_after_disconnect: bool,
+    real_surface_configure_sent_count: u64,
+    real_surface_configure_ack_count: u64,
+    real_surface_unmap_count: u64,
+    real_surface_toplevel_destroyed_count: u64,
+    real_surface_client_destroyed_count: u64,
+    real_surface_initial_width: u64,
+    real_surface_initial_height: u64,
+    real_surface_resized_width: u64,
+    real_surface_resized_height: u64,
+    real_surface_resized_pixel_count: u64,
+    real_surface_resized_checksum: u64,
 }
 
 impl ScriptedClientRuntime {
@@ -3236,6 +3362,7 @@ impl ScriptedClientRuntime {
             && self.policy_preview_verified
             && self.policy_preview_non_background_pixels > 10_000
             && self.smithay_normal_frame_ok()
+            && self.smithay_surface_lifecycle_ok()
     }
 
     fn smithay_event_loop_runtime_ok(self) -> bool {
@@ -3279,6 +3406,34 @@ impl ScriptedClientRuntime {
                 && self.normal_frame_ppm_bytes > self.normal_frame_snapshot_pixel_count
                 && self.normal_frame_checksum > 0)
     }
+
+    fn smithay_surface_lifecycle_ok(self) -> bool {
+        self.runtime_backend != "smithay-compositor-runtime"
+            || (self.real_surface_lifecycle
+                && self.real_surface_configure_acked
+                && self.real_surface_resize_configured
+                && self.real_surface_resize_committed
+                && self.real_surface_unmapped
+                && self.real_surface_close_sent
+                && self.real_surface_close_received
+                && self.real_surface_destroyed
+                && self.real_surface_client_disconnected
+                && self.real_surface_policy_window_mapped
+                && self.real_surface_policy_window_resized
+                && self.real_surface_policy_focus_preserved
+                && self.real_surface_policy_window_removed_after_unmap
+                && self.real_surface_policy_no_stale_windows_after_disconnect
+                && self.real_surface_configure_sent_count >= 2
+                && self.real_surface_configure_ack_count >= 2
+                && self.real_surface_unmap_count >= 1
+                && self.real_surface_toplevel_destroyed_count >= 1
+                && self.real_surface_initial_width == 320
+                && self.real_surface_initial_height == 240
+                && self.real_surface_resized_width == 420
+                && self.real_surface_resized_height == 300
+                && self.real_surface_resized_pixel_count == 420 * 300
+                && self.real_surface_resized_checksum > 0)
+    }
 }
 
 #[cfg(all(feature = "smithay-backend", target_os = "linux"))]
@@ -3305,6 +3460,36 @@ struct SmithayNormalFrameSmoke {
     non_background_pixels: u64,
 }
 
+#[cfg(all(feature = "smithay-backend", target_os = "linux"))]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+struct SmithaySurfaceLifecycleSmoke {
+    lifecycle_passed: bool,
+    configure_acked: bool,
+    resize_configured: bool,
+    resize_committed: bool,
+    unmapped: bool,
+    close_sent: bool,
+    close_received: bool,
+    destroyed: bool,
+    client_disconnected: bool,
+    policy_window_mapped: bool,
+    policy_window_resized: bool,
+    policy_focus_preserved: bool,
+    policy_window_removed_after_unmap: bool,
+    policy_no_stale_windows_after_disconnect: bool,
+    configure_sent_count: u64,
+    configure_ack_count: u64,
+    unmap_count: u64,
+    toplevel_destroyed_count: u64,
+    client_destroyed_count: u64,
+    initial_width: u64,
+    initial_height: u64,
+    resized_width: u64,
+    resized_height: u64,
+    resized_pixel_count: u64,
+    resized_checksum: u64,
+}
+
 fn run_scripted_client_runtime(
     policy_preview_path: Option<&str>,
 ) -> Result<ScriptedClientRuntime, String> {
@@ -3327,6 +3512,7 @@ fn run_scripted_client_runtime_with_smithay(
 ) -> Result<ScriptedClientRuntime, String> {
     let mut runtime = SmithayCompositorRuntime::try_new().map_err(|error| error.to_string())?;
     let normal_frame = run_smithay_normal_live_snapshot_frame(&mut runtime, policy_preview_path)?;
+    let lifecycle = run_smithay_surface_lifecycle(&mut runtime)?;
     let mut report = run_scripted_client_runtime_with_backend(runtime, None)?;
 
     report.policy_preview_requested = policy_preview_path.is_some();
@@ -3354,6 +3540,33 @@ fn run_scripted_client_runtime_with_smithay(
     report.normal_frame_composited_pixels = normal_frame.composited_pixels;
     report.normal_frame_ppm_bytes = normal_frame.ppm_bytes;
     report.normal_frame_checksum = normal_frame.frame_checksum;
+    report.real_surface_lifecycle = lifecycle.lifecycle_passed;
+    report.real_surface_configure_acked = lifecycle.configure_acked;
+    report.real_surface_resize_configured = lifecycle.resize_configured;
+    report.real_surface_resize_committed = lifecycle.resize_committed;
+    report.real_surface_unmapped = lifecycle.unmapped;
+    report.real_surface_close_sent = lifecycle.close_sent;
+    report.real_surface_close_received = lifecycle.close_received;
+    report.real_surface_destroyed = lifecycle.destroyed;
+    report.real_surface_client_disconnected = lifecycle.client_disconnected;
+    report.real_surface_policy_window_mapped = lifecycle.policy_window_mapped;
+    report.real_surface_policy_window_resized = lifecycle.policy_window_resized;
+    report.real_surface_policy_focus_preserved = lifecycle.policy_focus_preserved;
+    report.real_surface_policy_window_removed_after_unmap =
+        lifecycle.policy_window_removed_after_unmap;
+    report.real_surface_policy_no_stale_windows_after_disconnect =
+        lifecycle.policy_no_stale_windows_after_disconnect;
+    report.real_surface_configure_sent_count = lifecycle.configure_sent_count;
+    report.real_surface_configure_ack_count = lifecycle.configure_ack_count;
+    report.real_surface_unmap_count = lifecycle.unmap_count;
+    report.real_surface_toplevel_destroyed_count = lifecycle.toplevel_destroyed_count;
+    report.real_surface_client_destroyed_count = lifecycle.client_destroyed_count;
+    report.real_surface_initial_width = lifecycle.initial_width;
+    report.real_surface_initial_height = lifecycle.initial_height;
+    report.real_surface_resized_width = lifecycle.resized_width;
+    report.real_surface_resized_height = lifecycle.resized_height;
+    report.real_surface_resized_pixel_count = lifecycle.resized_pixel_count;
+    report.real_surface_resized_checksum = lifecycle.resized_checksum;
 
     Ok(report)
 }
@@ -3489,6 +3702,104 @@ fn compose_smithay_normal_live_snapshot_frame(
     })
 }
 
+#[cfg(all(feature = "smithay-backend", target_os = "linux"))]
+fn run_smithay_surface_lifecycle(
+    runtime: &mut SmithayCompositorRuntime,
+) -> Result<SmithaySurfaceLifecycleSmoke, String> {
+    let report = runtime
+        .run_surface_lifecycle_capture()
+        .map_err(|error| error.to_string())?;
+    build_smithay_surface_lifecycle_smoke(&report)
+}
+
+#[cfg(all(feature = "smithay-backend", target_os = "linux"))]
+fn build_smithay_surface_lifecycle_smoke(
+    report: &SmithaySurfaceLifecycleReport,
+) -> Result<SmithaySurfaceLifecycleSmoke, String> {
+    let frame_width = 900i32;
+    let frame_height = 620i32;
+    let layout = OutputLayout::new(frame_width, frame_height, 42);
+    let mut manager = SurfaceManager::new(layout);
+    let surface = map_scripted_app_toplevel(
+        &mut manager,
+        report.initial_snapshot.title.as_str(),
+        report.initial_snapshot.app_id.as_str(),
+        report.initial_snapshot.width as i32,
+        report.initial_snapshot.height as i32,
+    )?;
+    let window_id = manager
+        .surface(surface)
+        .and_then(|surface| surface.window_id)
+        .ok_or_else(|| String::from("surface-lifecycle:missing-policy-window"))?;
+    let initial_window = manager
+        .policy()
+        .window(window_id)
+        .cloned()
+        .ok_or_else(|| String::from("surface-lifecycle:missing-initial-window"))?;
+    let policy_window_mapped = initial_window.geometry.width
+        == report.initial_snapshot.width as i32
+        && initial_window.geometry.height == report.initial_snapshot.height as i32
+        && initial_window.app_id.as_deref() == Some(report.initial_snapshot.app_id.as_str())
+        && manager.policy().focused() == Some(window_id);
+
+    let policy_window_resized = manager.resize_toplevel(
+        surface,
+        report.resized_snapshot.width as i32,
+        report.resized_snapshot.height as i32,
+    );
+    let resized_window = manager
+        .policy()
+        .window(window_id)
+        .cloned()
+        .ok_or_else(|| String::from("surface-lifecycle:missing-resized-window"))?;
+    let policy_window_resized = policy_window_resized
+        && resized_window.geometry.width == report.resized_snapshot.width as i32
+        && resized_window.geometry.height == report.resized_snapshot.height as i32;
+    let policy_focus_preserved = manager.policy().focused() == Some(window_id);
+
+    let policy_window_removed_after_unmap = manager.close(surface)
+        && manager
+            .surface(surface)
+            .map(|surface| surface.phase == SurfacePhase::Closed && surface.window_id.is_none())
+            .unwrap_or(false)
+        && manager.policy().windows().is_empty();
+    let policy_no_stale_windows_after_disconnect =
+        report.client_disconnected && manager.policy().windows().is_empty();
+
+    Ok(SmithaySurfaceLifecycleSmoke {
+        lifecycle_passed: report.passed(),
+        configure_acked: report.configure_ack_count >= 2,
+        resize_configured: report.resize_configure_sent_count >= 1
+            && report.resize_configure_received
+            && report.resize_configure_acked,
+        resize_committed: report.resized_snapshot.width == 420
+            && report.resized_snapshot.height == 300
+            && report.resized_snapshot.pixel_count() == 420 * 300
+            && report.resized_snapshot.pixel_checksum > 0,
+        unmapped: report.unmap_committed && report.unmap_count >= 1,
+        close_sent: report.close_sent_count >= 1,
+        close_received: report.close_received,
+        destroyed: report.toplevel_destroyed_count >= 1,
+        client_disconnected: report.client_disconnected,
+        policy_window_mapped,
+        policy_window_resized,
+        policy_focus_preserved,
+        policy_window_removed_after_unmap,
+        policy_no_stale_windows_after_disconnect,
+        configure_sent_count: report.configure_sent_count,
+        configure_ack_count: report.configure_ack_count,
+        unmap_count: report.unmap_count,
+        toplevel_destroyed_count: report.toplevel_destroyed_count,
+        client_destroyed_count: report.client_destroyed_count,
+        initial_width: report.initial_snapshot.width as u64,
+        initial_height: report.initial_snapshot.height as u64,
+        resized_width: report.resized_snapshot.width as u64,
+        resized_height: report.resized_snapshot.height as u64,
+        resized_pixel_count: report.resized_snapshot.pixel_count(),
+        resized_checksum: report.resized_snapshot.pixel_checksum,
+    })
+}
+
 fn run_scripted_client_runtime_with_backend<B: CompositorRuntime>(
     mut backend: B,
     policy_preview_path: Option<&str>,
@@ -3621,6 +3932,31 @@ fn run_scripted_client_runtime_with_backend<B: CompositorRuntime>(
         normal_frame_composited_pixels: 0,
         normal_frame_ppm_bytes: 0,
         normal_frame_checksum: 0,
+        real_surface_lifecycle: false,
+        real_surface_configure_acked: false,
+        real_surface_resize_configured: false,
+        real_surface_resize_committed: false,
+        real_surface_unmapped: false,
+        real_surface_close_sent: false,
+        real_surface_close_received: false,
+        real_surface_destroyed: false,
+        real_surface_client_disconnected: false,
+        real_surface_policy_window_mapped: false,
+        real_surface_policy_window_resized: false,
+        real_surface_policy_focus_preserved: false,
+        real_surface_policy_window_removed_after_unmap: false,
+        real_surface_policy_no_stale_windows_after_disconnect: false,
+        real_surface_configure_sent_count: 0,
+        real_surface_configure_ack_count: 0,
+        real_surface_unmap_count: 0,
+        real_surface_toplevel_destroyed_count: 0,
+        real_surface_client_destroyed_count: 0,
+        real_surface_initial_width: 0,
+        real_surface_initial_height: 0,
+        real_surface_resized_width: 0,
+        real_surface_resized_height: 0,
+        real_surface_resized_pixel_count: 0,
+        real_surface_resized_checksum: 0,
     })
 }
 

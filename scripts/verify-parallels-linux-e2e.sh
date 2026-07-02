@@ -686,6 +686,7 @@ require_contains "$host_guest_manifest" '"debian_package_install": true'
 require_contains "$host_guest_manifest" '"launch_readiness": true'
 require_contains "$host_guest_manifest" '"smithay_compositor_runtime": true'
 require_contains "$host_guest_manifest" '"smithay_normal_runtime_real_pixels": true'
+require_contains "$host_guest_manifest" '"smithay_real_surface_lifecycle": true'
 require_contains "$host_guest_manifest" '"smithay_live_surface_snapshots": true'
 require_contains "$host_guest_manifest" '"smithay_real_app_e2e": true'
 require_contains "$host_guest_manifest" '"smithay_real_shm_frame": true'
@@ -727,6 +728,11 @@ require_contains "$host_smithay_compositor_runtime_manifest" '"smithay_real_wayl
 require_contains "$host_smithay_compositor_runtime_manifest" '"smithay_real_shm_buffer": true'
 require_contains "$host_smithay_compositor_runtime_manifest" '"smithay_normal_runtime_live_snapshot_frame": true'
 require_contains "$host_smithay_compositor_runtime_manifest" '"smithay_normal_runtime_real_pixels": true'
+require_contains "$host_smithay_compositor_runtime_manifest" '"smithay_real_surface_lifecycle": true'
+require_contains "$host_smithay_compositor_runtime_manifest" '"smithay_real_xdg_resize_commit": true'
+require_contains "$host_smithay_compositor_runtime_manifest" '"smithay_real_xdg_unmap_cleanup": true'
+require_contains "$host_smithay_compositor_runtime_manifest" '"smithay_real_xdg_close_disconnect": true'
+require_contains "$host_smithay_compositor_runtime_manifest" '"smithay_policy_lifecycle_cleanup": true'
 require_contains "$host_smithay_compositor_runtime_manifest" '"smithay_real_wayland_policy_window": true'
 require_contains "$host_smithay_compositor_runtime_manifest" '"smithay_event_loop_runtime": true'
 require_contains "$host_smithay_compositor_runtime_manifest" '"smithay_drm_first_present_probe": true'
@@ -1056,6 +1062,7 @@ cat > "$host_out_dir/manifest.json" <<EOF
     "compositor_runtime_policy_preview": true,
     "smithay_compositor_runtime": true,
     "smithay_normal_runtime_real_pixels": true,
+    "smithay_real_surface_lifecycle": true,
     "smithay_live_surface_snapshots": true,
     "smithay_real_app_e2e": true,
     "real_app_e2e_pixels": true,

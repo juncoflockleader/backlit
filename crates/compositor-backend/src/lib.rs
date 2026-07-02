@@ -3756,6 +3756,15 @@ struct SmithayCompositorState {
     observed_app_id: Option<String>,
     title_matched: bool,
     app_id_matched: bool,
+    active_toplevel: Option<smithay::wayland::shell::xdg::ToplevelSurface>,
+    xdg_configure_sent_count: u64,
+    xdg_configure_ack_count: u64,
+    xdg_resize_configure_sent_count: u64,
+    xdg_unmap_count: u64,
+    xdg_close_sent_count: u64,
+    xdg_toplevel_destroyed_count: u64,
+    xdg_client_destroyed_count: u64,
+    live_surface_mapped: bool,
     shm_buffer_commit_count: u64,
     shm_buffer_width: u64,
     shm_buffer_height: u64,
@@ -3784,6 +3793,12 @@ const SMITHAY_SMOKE_WIDTH: i32 = 320;
 
 #[cfg(all(feature = "smithay-backend", target_os = "linux"))]
 const SMITHAY_SMOKE_HEIGHT: i32 = 240;
+
+#[cfg(all(feature = "smithay-backend", target_os = "linux"))]
+const SMITHAY_LIFECYCLE_RESIZED_WIDTH: i32 = 420;
+
+#[cfg(all(feature = "smithay-backend", target_os = "linux"))]
+const SMITHAY_LIFECYCLE_RESIZED_HEIGHT: i32 = 300;
 
 #[cfg(all(feature = "smithay-backend", target_os = "linux"))]
 const SMITHAY_RUNTIME_PROTOCOL_GLOBALS: u64 = 10;
@@ -4148,6 +4163,57 @@ impl SmithayLiveSurfaceSnapshotReport {
 }
 
 #[cfg(all(feature = "smithay-backend", target_os = "linux"))]
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct SmithaySurfaceLifecycleReport {
+    pub smoke: SmithayWaylandClientSmokeReport,
+    pub inserted_wayland_clients: u64,
+    pub wayland_dispatch_count: u64,
+    pub calloop_dispatch_count: u64,
+    pub configure_sent_count: u64,
+    pub configure_ack_count: u64,
+    pub resize_configure_sent_count: u64,
+    pub resize_configure_received: bool,
+    pub resize_configure_acked: bool,
+    pub initial_snapshot: SmithayCommittedShmSnapshot,
+    pub resized_snapshot: SmithayCommittedShmSnapshot,
+    pub unmap_committed: bool,
+    pub unmap_count: u64,
+    pub close_sent_count: u64,
+    pub close_received: bool,
+    pub toplevel_destroyed_count: u64,
+    pub client_destroyed_count: u64,
+    pub client_disconnected: bool,
+}
+
+#[cfg(all(feature = "smithay-backend", target_os = "linux"))]
+impl SmithaySurfaceLifecycleReport {
+    pub fn passed(&self) -> bool {
+        self.smoke.passed()
+            && self.inserted_wayland_clients >= 1
+            && self.wayland_dispatch_count >= 6
+            && self.calloop_dispatch_count >= 6
+            && self.configure_sent_count >= 2
+            && self.configure_ack_count >= 2
+            && self.resize_configure_sent_count >= 1
+            && self.resize_configure_received
+            && self.resize_configure_acked
+            && self.initial_snapshot.width == SMITHAY_SMOKE_WIDTH as u32
+            && self.initial_snapshot.height == SMITHAY_SMOKE_HEIGHT as u32
+            && self.initial_snapshot.pixels_copied()
+            && self.resized_snapshot.width == SMITHAY_LIFECYCLE_RESIZED_WIDTH as u32
+            && self.resized_snapshot.height == SMITHAY_LIFECYCLE_RESIZED_HEIGHT as u32
+            && self.resized_snapshot.pixels_copied()
+            && self.resized_snapshot.commit_serial > self.initial_snapshot.commit_serial
+            && self.unmap_committed
+            && self.unmap_count >= 1
+            && self.close_sent_count >= 1
+            && self.close_received
+            && self.toplevel_destroyed_count >= 1
+            && self.client_disconnected
+    }
+}
+
+#[cfg(all(feature = "smithay-backend", target_os = "linux"))]
 fn real_shm_pixel_checksum(pixels: &[RealShmPixel]) -> u64 {
     pixels.iter().fold(0u64, |checksum, pixel| {
         checksum
@@ -4311,9 +4377,17 @@ struct WaylandClientEventState {
     xdg_surface_created: bool,
     xdg_toplevel_created: bool,
     xdg_toplevel_configures: u64,
+    xdg_toplevel_last_configure_size: Option<(i32, i32)>,
     xdg_surface_configure_serial: Option<u32>,
     configure_acked: bool,
     surface_committed: bool,
+    requested_resize: Option<(i32, i32)>,
+    resize_configure_received: bool,
+    resize_configure_acked: bool,
+    resized_surface_committed: bool,
+    surface_unmapped: bool,
+    close_received: bool,
+    lifecycle_objects_destroyed: bool,
     compositor: Option<wayland_client::protocol::wl_compositor::WlCompositor>,
     shm: Option<wayland_client::protocol::wl_shm::WlShm>,
     wl_output: Option<wayland_client::protocol::wl_output::WlOutput>,
@@ -4323,6 +4397,8 @@ struct WaylandClientEventState {
     shm_pool: Option<wayland_client::protocol::wl_shm_pool::WlShmPool>,
     shm_buffer: Option<wayland_client::protocol::wl_buffer::WlBuffer>,
     shm_file: Option<std::fs::File>,
+    shm_width: u32,
+    shm_height: u32,
     shm_stride: u32,
     shm_byte_len: usize,
     shm_format: &'static str,
@@ -4417,21 +4493,30 @@ impl WaylandClientEventState {
             return;
         }
 
+        self.create_and_store_shm_buffer(SMITHAY_SMOKE_WIDTH, SMITHAY_SMOKE_HEIGHT, qh);
+    }
+
+    fn create_and_store_shm_buffer(
+        &mut self,
+        width: i32,
+        height: i32,
+        qh: &wayland_client::QueueHandle<Self>,
+    ) {
         let Some(shm) = self.shm.as_ref() else {
             return;
         };
 
-        match create_smoke_shm_file() {
+        match create_smoke_shm_file_for_size(width, height) {
             Ok(mut file) => {
                 use std::os::fd::AsFd;
 
-                let stride = SMITHAY_SMOKE_WIDTH * 4;
-                let byte_len = stride * SMITHAY_SMOKE_HEIGHT;
+                let stride = width * 4;
+                let byte_len = stride * height;
                 let pool = shm.create_pool(file.as_fd(), byte_len, qh, ());
                 let buffer = pool.create_buffer(
                     0,
-                    SMITHAY_SMOKE_WIDTH,
-                    SMITHAY_SMOKE_HEIGHT,
+                    width,
+                    height,
                     stride,
                     wayland_client::protocol::wl_shm::Format::Argb8888,
                     qh,
@@ -4444,6 +4529,8 @@ impl WaylandClientEventState {
                 self.shm_pool = Some(pool);
                 self.shm_buffer = Some(buffer);
                 self.shm_file = Some(file);
+                self.shm_width = width as u32;
+                self.shm_height = height as u32;
                 self.shm_stride = stride as u32;
                 self.shm_byte_len = byte_len as usize;
                 self.shm_format = "ARGB8888";
@@ -4467,10 +4554,82 @@ impl WaylandClientEventState {
         };
 
         base_surface.attach(Some(buffer), 0, 0);
-        base_surface.damage(0, 0, SMITHAY_SMOKE_WIDTH, SMITHAY_SMOKE_HEIGHT);
+        base_surface.damage(0, 0, self.shm_width as i32, self.shm_height as i32);
         base_surface.commit();
         self.shm_buffer_attached = true;
         self.surface_committed = true;
+    }
+
+    fn request_resize(&mut self, width: i32, height: i32) {
+        self.requested_resize = Some((width, height));
+        self.resize_configure_received = false;
+        self.resize_configure_acked = false;
+        self.resized_surface_committed = false;
+    }
+
+    fn attach_resized_shm_buffer_if_acked(&mut self, qh: &wayland_client::QueueHandle<Self>) {
+        if self.failure.is_some() || self.resized_surface_committed {
+            return;
+        }
+
+        let Some((width, height)) = self.requested_resize else {
+            return;
+        };
+        if !self.resize_configure_acked {
+            return;
+        }
+
+        self.create_and_store_shm_buffer(width, height, qh);
+
+        let (Some(base_surface), Some(xdg_surface), Some(buffer)) = (
+            self.base_surface.as_ref(),
+            self.xdg_surface.as_ref(),
+            self.shm_buffer.as_ref(),
+        ) else {
+            return;
+        };
+
+        xdg_surface.set_window_geometry(0, 0, width, height);
+        base_surface.attach(Some(buffer), 0, 0);
+        base_surface.damage(0, 0, width, height);
+        base_surface.commit();
+        self.resized_surface_committed = true;
+        self.surface_committed = true;
+    }
+
+    fn unmap_surface(&mut self) -> Result<(), String> {
+        let Some(base_surface) = self.base_surface.as_ref() else {
+            return Err(String::from("surface-lifecycle:missing-base-surface"));
+        };
+
+        base_surface.attach(None, 0, 0);
+        base_surface.commit();
+        self.surface_unmapped = true;
+        Ok(())
+    }
+
+    fn destroy_lifecycle_objects(&mut self) -> Result<(), String> {
+        if self.lifecycle_objects_destroyed {
+            return Ok(());
+        }
+
+        let Some(xdg_toplevel) = self.xdg_toplevel.take() else {
+            return Err(String::from("surface-lifecycle:missing-xdg-toplevel"));
+        };
+        xdg_toplevel.destroy();
+
+        let Some(xdg_surface) = self.xdg_surface.take() else {
+            return Err(String::from("surface-lifecycle:missing-xdg-surface"));
+        };
+        xdg_surface.destroy();
+
+        let Some(base_surface) = self.base_surface.take() else {
+            return Err(String::from("surface-lifecycle:missing-base-surface"));
+        };
+        base_surface.destroy();
+
+        self.lifecycle_objects_destroyed = true;
+        Ok(())
     }
 
     fn capture_real_shm_surface_frame(
@@ -4497,8 +4656,8 @@ impl WaylandClientEventState {
         file.read_exact(&mut bytes)
             .map_err(|error| format!("real-shm-capture:read:{error}"))?;
 
-        let width = SMITHAY_SMOKE_WIDTH as u32;
-        let height = SMITHAY_SMOKE_HEIGHT as u32;
+        let width = self.shm_width;
+        let height = self.shm_height;
         let stride = self.shm_stride as usize;
         let mut pixels = Vec::with_capacity(width.saturating_mul(height) as usize);
 
@@ -4517,7 +4676,7 @@ impl WaylandClientEventState {
             }
         }
 
-        let sample_coordinates = RealShmSampleCoordinates::smoke_samples();
+        let sample_coordinates = RealShmSampleCoordinates::for_size(width, height);
         let samples = RealShmPixelSamples {
             top_left: sample_pixel_from_vec(
                 &pixels,
@@ -4568,10 +4727,11 @@ fn sample_pixel_from_vec(
 }
 
 #[cfg(all(feature = "smithay-backend", target_os = "linux"))]
-fn smoke_shm_pixel(x: i32, y: i32) -> RealShmPixel {
-    let top_left = SMITHAY_REAL_SHM_TOP_LEFT_SAMPLE;
-    let center = SMITHAY_REAL_SHM_CENTER_SAMPLE;
-    let bottom_right = SMITHAY_REAL_SHM_BOTTOM_RIGHT_SAMPLE;
+fn smoke_shm_pixel_for_size(width: i32, height: i32, x: i32, y: i32) -> RealShmPixel {
+    let samples = RealShmSampleCoordinates::for_size(width as u32, height as u32);
+    let top_left = samples.top_left;
+    let center = samples.center;
+    let bottom_right = samples.bottom_right;
     let x = x as u32;
     let y = y as u32;
 
@@ -4585,14 +4745,18 @@ fn smoke_shm_pixel(x: i32, y: i32) -> RealShmPixel {
         return SMITHAY_REAL_SHM_BLUE_SAMPLE;
     }
 
-    let red = ((x * 255) / SMITHAY_SMOKE_WIDTH as u32) as u8;
-    let green = ((y * 255) / SMITHAY_SMOKE_HEIGHT as u32) as u8;
+    let red = ((x * 255) / width.max(1) as u32) as u8;
+    let green = ((y * 255) / height.max(1) as u32) as u8;
     RealShmPixel::rgba(red, green, 0x66, 255)
 }
 
 #[cfg(all(feature = "smithay-backend", target_os = "linux"))]
-fn create_smoke_shm_file() -> Result<std::fs::File, String> {
+fn create_smoke_shm_file_for_size(width: i32, height: i32) -> Result<std::fs::File, String> {
     use std::io::{Seek, SeekFrom, Write};
+
+    if width <= 0 || height <= 0 {
+        return Err(format!("shm-file-invalid-size:{width}x{height}"));
+    }
 
     let dir = std::env::var_os("XDG_RUNTIME_DIR")
         .map(PathBuf::from)
@@ -4613,14 +4777,14 @@ fn create_smoke_shm_file() -> Result<std::fs::File, String> {
         .map_err(|error| format!("shm-file-open:{error}"))?;
     let _ = fs::remove_file(&path);
 
-    let stride = SMITHAY_SMOKE_WIDTH as usize * 4;
-    let byte_len = stride * SMITHAY_SMOKE_HEIGHT as usize;
+    let stride = width as usize * 4;
+    let byte_len = stride * height as usize;
     file.set_len(byte_len as u64)
         .map_err(|error| format!("shm-file-len:{error}"))?;
 
-    for y in 0..SMITHAY_SMOKE_HEIGHT {
-        for x in 0..SMITHAY_SMOKE_WIDTH {
-            let pixel = smoke_shm_pixel(x, y);
+    for y in 0..height {
+        for x in 0..width {
+            let pixel = smoke_shm_pixel_for_size(width, height, x, y);
             file.write_all(&[pixel.blue, pixel.green, pixel.red, pixel.alpha])
                 .map_err(|error| format!("shm-file-write:{error}"))?;
         }
@@ -4817,7 +4981,7 @@ impl wayland_client::Dispatch<wayland_protocols::xdg::shell::client::xdg_surface
         event: wayland_protocols::xdg::shell::client::xdg_surface::Event,
         _: &(),
         _: &wayland_client::Connection,
-        _: &wayland_client::QueueHandle<Self>,
+        qh: &wayland_client::QueueHandle<Self>,
     ) {
         if let wayland_protocols::xdg::shell::client::xdg_surface::Event::Configure { serial } =
             event
@@ -4825,6 +4989,10 @@ impl wayland_client::Dispatch<wayland_protocols::xdg::shell::client::xdg_surface
             state.xdg_surface_configure_serial = Some(serial);
             xdg_surface.ack_configure(serial);
             state.configure_acked = true;
+            if state.resize_configure_received && !state.resized_surface_committed {
+                state.resize_configure_acked = true;
+                state.attach_resized_shm_buffer_if_acked(qh);
+            }
             state.attach_shm_buffer_if_configured();
         }
     }
@@ -4842,9 +5010,22 @@ impl wayland_client::Dispatch<wayland_protocols::xdg::shell::client::xdg_topleve
         _: &wayland_client::Connection,
         _: &wayland_client::QueueHandle<Self>,
     ) {
-        if let wayland_protocols::xdg::shell::client::xdg_toplevel::Event::Configure { .. } = event
-        {
-            state.xdg_toplevel_configures += 1;
+        match event {
+            wayland_protocols::xdg::shell::client::xdg_toplevel::Event::Configure {
+                width,
+                height,
+                ..
+            } => {
+                state.xdg_toplevel_configures += 1;
+                state.xdg_toplevel_last_configure_size = Some((width, height));
+                if state.requested_resize == Some((width, height)) {
+                    state.resize_configure_received = true;
+                }
+            }
+            wayland_protocols::xdg::shell::client::xdg_toplevel::Event::Close => {
+                state.close_received = true;
+            }
+            _ => {}
         }
     }
 }
@@ -4989,6 +5170,15 @@ impl SmithayCompositorState {
             observed_app_id: None,
             title_matched: false,
             app_id_matched: false,
+            active_toplevel: None,
+            xdg_configure_sent_count: 0,
+            xdg_configure_ack_count: 0,
+            xdg_resize_configure_sent_count: 0,
+            xdg_unmap_count: 0,
+            xdg_close_sent_count: 0,
+            xdg_toplevel_destroyed_count: 0,
+            xdg_client_destroyed_count: 0,
+            live_surface_mapped: false,
             shm_buffer_commit_count: 0,
             shm_buffer_width: 0,
             shm_buffer_height: 0,
@@ -5102,7 +5292,14 @@ impl smithay::wayland::compositor::CompositorHandler for SmithayCompositorState 
         surface: &smithay::reexports::wayland_server::protocol::wl_surface::WlSurface,
     ) {
         self.surface_commit_count += 1;
+        if smithay_commit_removed_buffer(surface) {
+            if self.live_surface_mapped {
+                self.xdg_unmap_count += 1;
+            }
+            self.live_surface_mapped = false;
+        }
         if let Some((width, height)) = smithay_committed_buffer_dimensions(surface) {
+            self.live_surface_mapped = true;
             self.shm_buffer_commit_count += 1;
             self.shm_buffer_width = width;
             self.shm_buffer_height = height;
@@ -5143,6 +5340,21 @@ fn smithay_committed_buffer_dimensions(
 
         smithay::backend::renderer::buffer_dimensions(buffer)
             .map(|size| (size.w.max(0) as u64, size.h.max(0) as u64))
+    })
+}
+
+#[cfg(all(feature = "smithay-backend", target_os = "linux"))]
+fn smithay_commit_removed_buffer(
+    surface: &smithay::reexports::wayland_server::protocol::wl_surface::WlSurface,
+) -> bool {
+    smithay::wayland::compositor::with_states(surface, |states| {
+        let mut guard = states
+            .cached_state
+            .get::<smithay::wayland::compositor::SurfaceAttributes>();
+        matches!(
+            guard.current().buffer.as_ref(),
+            Some(smithay::wayland::compositor::BufferAssignment::Removed)
+        )
     })
 }
 
@@ -5381,8 +5593,17 @@ impl smithay::wayland::shell::xdg::XdgShellHandler for SmithayCompositorState {
         &mut self.xdg_shell_state
     }
 
+    fn client_destroyed(&mut self, _client: smithay::wayland::shell::xdg::ShellClient) {
+        self.xdg_client_destroyed_count += 1;
+    }
+
     fn new_toplevel(&mut self, surface: smithay::wayland::shell::xdg::ToplevelSurface) {
         self.xdg_toplevel_count += 1;
+        surface.with_pending_state(|state| {
+            state.size = Some((SMITHAY_SMOKE_WIDTH, SMITHAY_SMOKE_HEIGHT).into());
+        });
+        self.active_toplevel = Some(surface.clone());
+        self.xdg_configure_sent_count += 1;
         surface.send_configure();
     }
 
@@ -5410,6 +5631,20 @@ impl smithay::wayland::shell::xdg::XdgShellHandler for SmithayCompositorState {
         token: u32,
     ) {
         surface.send_repositioned(token);
+    }
+
+    fn ack_configure(
+        &mut self,
+        _surface: smithay::reexports::wayland_server::protocol::wl_surface::WlSurface,
+        _configure: smithay::wayland::shell::xdg::Configure,
+    ) {
+        self.xdg_configure_ack_count += 1;
+    }
+
+    fn toplevel_destroyed(&mut self, _surface: smithay::wayland::shell::xdg::ToplevelSurface) {
+        self.xdg_toplevel_destroyed_count += 1;
+        self.active_toplevel = None;
+        self.live_surface_mapped = false;
     }
 
     fn title_changed(&mut self, surface: smithay::wayland::shell::xdg::ToplevelSurface) {
@@ -5747,6 +5982,170 @@ impl SmithayCompositorRuntime {
         })
     }
 
+    pub fn run_surface_lifecycle_capture(
+        &mut self,
+    ) -> Result<SmithaySurfaceLifecycleReport, SmithayRuntimeError> {
+        let client_stream = self.connect_and_insert_wayland_client("surface-lifecycle")?;
+        let client_connection = wayland_client::Connection::from_socket(client_stream)
+            .map_err(|error| SmithayRuntimeError(format!("client-connect:{error}")))?;
+        let mut event_queue = client_connection.new_event_queue::<WaylandClientEventState>();
+        let qh = event_queue.handle();
+        let mut client_state = WaylandClientEventState::default();
+
+        client_connection.display().get_registry(&qh, ());
+        for _ in 0..24 {
+            pump_wayland_client(
+                self,
+                &client_connection,
+                &mut event_queue,
+                &mut client_state,
+            )?;
+            if let Some(error) = client_state.failure.as_ref() {
+                return Err(SmithayRuntimeError(error.clone()));
+            }
+            if client_state.registry_announced()
+                && client_state.mvp_protocol_globals_announced()
+                && client_state.configure_acked
+                && client_state.surface_committed
+                && self.state.surface_commit_count >= 2
+                && self.state.title_matched
+                && self.state.app_id_matched
+                && self.state.shm_buffer_commit_count >= 1
+            {
+                break;
+            }
+        }
+
+        let smoke = self.build_wayland_client_smoke_report(&client_state);
+        let initial_snapshot = self
+            .state
+            .committed_shm_snapshots
+            .last()
+            .cloned()
+            .ok_or_else(|| {
+                SmithayRuntimeError(String::from("surface-lifecycle:missing-initial-snapshot"))
+            })?;
+
+        client_state.request_resize(
+            SMITHAY_LIFECYCLE_RESIZED_WIDTH,
+            SMITHAY_LIFECYCLE_RESIZED_HEIGHT,
+        );
+        self.send_active_toplevel_resize_configure(
+            SMITHAY_LIFECYCLE_RESIZED_WIDTH,
+            SMITHAY_LIFECYCLE_RESIZED_HEIGHT,
+        )?;
+        for _ in 0..24 {
+            pump_wayland_client(
+                self,
+                &client_connection,
+                &mut event_queue,
+                &mut client_state,
+            )?;
+            if let Some(error) = client_state.failure.as_ref() {
+                return Err(SmithayRuntimeError(error.clone()));
+            }
+            if client_state.resized_surface_committed
+                && self.state.shm_buffer_commit_count >= 2
+                && self
+                    .state
+                    .committed_shm_snapshots
+                    .last()
+                    .map(|snapshot| {
+                        snapshot.width == SMITHAY_LIFECYCLE_RESIZED_WIDTH as u32
+                            && snapshot.height == SMITHAY_LIFECYCLE_RESIZED_HEIGHT as u32
+                    })
+                    .unwrap_or(false)
+            {
+                break;
+            }
+        }
+
+        let resized_snapshot = self
+            .state
+            .committed_shm_snapshots
+            .last()
+            .cloned()
+            .ok_or_else(|| {
+                SmithayRuntimeError(String::from("surface-lifecycle:missing-resized-snapshot"))
+            })?;
+
+        client_state.unmap_surface().map_err(SmithayRuntimeError)?;
+        for _ in 0..8 {
+            pump_wayland_client(
+                self,
+                &client_connection,
+                &mut event_queue,
+                &mut client_state,
+            )?;
+            if self.state.xdg_unmap_count >= 1 {
+                break;
+            }
+        }
+
+        self.send_active_toplevel_close()?;
+        for _ in 0..8 {
+            pump_wayland_client(
+                self,
+                &client_connection,
+                &mut event_queue,
+                &mut client_state,
+            )?;
+            if client_state.close_received {
+                break;
+            }
+        }
+
+        client_state
+            .destroy_lifecycle_objects()
+            .map_err(SmithayRuntimeError)?;
+        for _ in 0..8 {
+            pump_wayland_client(
+                self,
+                &client_connection,
+                &mut event_queue,
+                &mut client_state,
+            )?;
+            if self.state.xdg_toplevel_destroyed_count >= 1 {
+                break;
+            }
+        }
+
+        drop(event_queue);
+        drop(client_connection);
+        for _ in 0..8 {
+            self.dispatch_wayland();
+            if self.state.xdg_client_destroyed_count >= 1 || self.last_error.is_some() {
+                break;
+            }
+        }
+
+        Ok(SmithaySurfaceLifecycleReport {
+            smoke,
+            inserted_wayland_clients: self.inserted_wayland_clients,
+            wayland_dispatch_count: self.wayland_dispatch_count,
+            calloop_dispatch_count: self.calloop_dispatch_count,
+            configure_sent_count: self.state.xdg_configure_sent_count,
+            configure_ack_count: self.state.xdg_configure_ack_count,
+            resize_configure_sent_count: self.state.xdg_resize_configure_sent_count,
+            resize_configure_received: client_state.resize_configure_received,
+            resize_configure_acked: client_state.resize_configure_acked,
+            initial_snapshot,
+            resized_snapshot,
+            unmap_committed: client_state.surface_unmapped,
+            unmap_count: self.state.xdg_unmap_count,
+            close_sent_count: self.state.xdg_close_sent_count,
+            close_received: client_state.close_received,
+            toplevel_destroyed_count: self.state.xdg_toplevel_destroyed_count,
+            client_destroyed_count: self.state.xdg_client_destroyed_count,
+            client_disconnected: self.state.xdg_client_destroyed_count >= 1
+                || self
+                    .last_error
+                    .as_deref()
+                    .unwrap_or_default()
+                    .contains("Broken pipe"),
+        })
+    }
+
     pub fn run_real_app_e2e_capture(
         &mut self,
         app_command: &str,
@@ -5946,6 +6345,38 @@ impl SmithayCompositorRuntime {
             shm_buffer_height: self.state.shm_buffer_height,
             shm_buffer_pixels: self.state.shm_buffer_pixels,
         }
+    }
+
+    fn send_active_toplevel_resize_configure(
+        &mut self,
+        width: i32,
+        height: i32,
+    ) -> Result<(), SmithayRuntimeError> {
+        let Some(toplevel) = self.state.active_toplevel.clone() else {
+            return Err(SmithayRuntimeError(String::from(
+                "surface-lifecycle:missing-active-toplevel",
+            )));
+        };
+
+        toplevel.with_pending_state(|state| {
+            state.size = Some((width, height).into());
+        });
+        toplevel.send_configure();
+        self.state.xdg_configure_sent_count += 1;
+        self.state.xdg_resize_configure_sent_count += 1;
+        Ok(())
+    }
+
+    fn send_active_toplevel_close(&mut self) -> Result<(), SmithayRuntimeError> {
+        let Some(toplevel) = self.state.active_toplevel.clone() else {
+            return Err(SmithayRuntimeError(String::from(
+                "surface-lifecycle:missing-active-toplevel",
+            )));
+        };
+
+        toplevel.send_close();
+        self.state.xdg_close_sent_count += 1;
+        Ok(())
     }
 
     fn connect_and_insert_wayland_client(

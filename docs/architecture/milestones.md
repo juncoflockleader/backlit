@@ -9,14 +9,14 @@ The next milestones move those proof paths from focused verifiers into the norma
 | Milestone | Status | Exit evidence |
 | --- | --- | --- |
 | 1. Live Surface Snapshots | Complete | `scripts/verify-smithay-live-surface-snapshots.sh` and Linux/Parallels E2E manifests include copied real `wl_shm` snapshots. |
-| 2. Real Clients In The Normal Frame Loop | In progress | `--runtime=smithay --scripted-client` emits normal-frame live snapshot evidence and exports a Backlit frame composed from real generated `wl_shm` pixels. |
-| 3. Surface Lifecycle | Pending | xdg map, resize, unmap, close, and disconnect update Backlit policy without stale windows. |
+| 2. Real Clients In The Normal Frame Loop | Complete | `--runtime=smithay --scripted-client` emits normal-frame live snapshot evidence and exports a Backlit frame composed from real generated `wl_shm` pixels; MVP-complete passed on commit `4ce6c97`. |
+| 3. Surface Lifecycle | In progress | xdg map, resize, unmap, close, and disconnect update Backlit policy without stale windows. |
 | 4. Input To Real Clients | Pending | Keyboard and pointer events reach real clients while Backlit shortcuts still work. |
 | 5. Real App E2E | Complete | Parallels exports a Backlit frame containing pixels from `/usr/bin/weston-simple-shm`, with server-side SHM capture and Backlit frame sample verification. |
 | 6. GPU Texture Compositing | Pending | Real client buffers render through the GPU path with SHM CPU upload as fallback. |
 | 7. MVP 1 Closure | Pending | MVP contract and complete gates require real client/rendering evidence. |
 
-The active implementation target is **Milestone 2: Real Clients In The Normal Frame Loop**. Milestone 5 proved an installed external app in a focused E2E path; Milestone 2 moves the generated-client snapshot path into the normal Smithay scripted runtime event and frame artifact.
+The active implementation target is **Milestone 3: Surface Lifecycle**. Milestone 2 moved generated-client pixels into the normal Smithay scripted runtime frame; Milestone 3 extends that real-client path through xdg configure/ack, resize, unmap, close, and disconnect policy cleanup.
 
 ## Milestone 1: Live Surface Snapshots
 
@@ -81,6 +81,7 @@ Render live real Wayland client snapshots in the normal Backlit compositor frame
 - `SmithayCompositorRuntime::present()` can report live snapshot-backed frames when a real generated client has committed pixels and no mock backend surfaces are present.
 - `backlit-compositor --backend=drm --runtime=smithay --scripted-client --scripted-client-preview <path>` writes a normal runtime frame with the live snapshot composited through Backlit policy geometry.
 - `scripts/verify-smithay-compositor-runtime.sh` requires `smithay_normal_runtime_live_snapshot_frame`, `smithay_normal_runtime_real_pixels`, and sample-verified real pixels before passing on launch-ready Linux.
+- Verified on commit `4ce6c97` with Parallels Linux E2E, dedicated DRM E2E, and MVP-complete.
 
 ### Dependencies
 
@@ -112,6 +113,12 @@ Handle normal xdg-shell client lifecycle events with real windows: map, unmap, r
 - `./scripts/verify-smithay-compositor-runtime.sh`
 - `./scripts/verify-compositor-socket.sh`
 - `./scripts/verify-linux-e2e.sh`
+
+### Current Slice
+
+- `SmithayCompositorRuntime::run_surface_lifecycle_capture()` keeps a generated xdg client connected after the initial real `wl_shm` map, sends a compositor resize configure, waits for the client ack and resized 420x300 SHM commit, records the null-buffer unmap, sends xdg close, observes client close handling, destroys the xdg objects, and dispatches client disconnect cleanup.
+- `backlit-compositor --backend=drm --runtime=smithay --scripted-client` now emits `real_surface_lifecycle`, `real_surface_resize_committed`, `real_surface_unmapped`, `real_surface_close_received`, `real_surface_client_disconnected`, and Backlit policy cleanup fields from the normal Smithay scripted runtime event.
+- `scripts/verify-smithay-compositor-runtime.sh`, Linux E2E, Parallels export, MVP 1 contract, and MVP-complete require Smithay surface lifecycle manifest keys before launch-ready evidence can pass.
 
 ### Dependencies
 
