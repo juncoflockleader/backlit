@@ -1,8 +1,8 @@
 # Backlit Milestones
 
-This roadmap starts from the current verified state: Backlit can launch in the Parallels Ubuntu E2E environment, run Smithay readiness probes, prove dedicated DRM first-present through the packaged session path, and render real generated `wl_shm` client pixels into a Backlit frame through the `--smithay-real-shm-frame` proof path.
+This roadmap starts from the current verified state: Backlit can launch in the Parallels Ubuntu E2E environment, run Smithay readiness probes, prove dedicated DRM first-present through the packaged session path, render real generated `wl_shm` client pixels into a Backlit frame through the `--smithay-real-shm-frame` proof path, and render pixels from an installed Wayland app through the `--smithay-real-app-e2e` proof path.
 
-The next milestones move that proof from a verifier slice into the normal compositor loop.
+The next milestones move those proof paths from focused verifiers into the normal compositor loop, then add lifecycle, input, and production rendering behavior.
 
 ## Current Status
 
@@ -12,11 +12,11 @@ The next milestones move that proof from a verifier slice into the normal compos
 | 2. Real Clients In The Normal Frame Loop | Pending | A normal Smithay runtime frame uses real surface snapshots instead of mock/demo window pixels. |
 | 3. Surface Lifecycle | Pending | xdg map, resize, unmap, close, and disconnect update Backlit policy without stale windows. |
 | 4. Input To Real Clients | Pending | Keyboard and pointer events reach real clients while Backlit shortcuts still work. |
-| 5. Real App E2E | In progress | Parallels exports a Backlit frame containing pixels from an installed Wayland app, not a generated-only client. |
+| 5. Real App E2E | Complete | Parallels exports a Backlit frame containing pixels from `/usr/bin/weston-simple-shm`, with server-side SHM capture and Backlit frame sample verification. |
 | 6. GPU Texture Compositing | Pending | Real client buffers render through the GPU path with SHM CPU upload as fallback. |
 | 7. MVP 1 Closure | Pending | MVP contract and complete gates require real client/rendering evidence. |
 
-The active implementation target is **Milestone 5: Real App E2E**. The first slice should use an installed deterministic Wayland client available in Ubuntu, currently `weston-simple-shm`, because it can prove true external-client rendering without waiting for terminal input support.
+The active implementation target is **Milestone 2: Real Clients In The Normal Frame Loop**. Milestone 5 proved an installed external app in a focused E2E path; the next product step is to make normal Smithay compositor frames use those real surface snapshots instead of mock/demo window pixels.
 
 ## Milestone 1: Live Surface Snapshots
 
@@ -167,6 +167,7 @@ Launch a real installed Wayland application inside Backlit and verify that it re
 - Manifest proves the app was not a mock or generated-only test surface.
 - Manifest proves server-side SHM pixels were copied from the external client and composited into the exported Backlit frame.
 - Dedicated DRM E2E remains green.
+- Verified on commit `410a2cb` with `scripts/verify-parallels-linux-e2e.sh`, `scripts/verify-parallels-dedicated-drm-e2e.sh`, and `scripts/verify-mvp-complete.sh`.
 
 ### Verification
 
